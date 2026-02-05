@@ -1,0 +1,150 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id            String    @id @default(cuid())
+  name          String?
+  email         String    @unique
+  emailVerified DateTime?
+  image         String?
+  password      String?   // hashed for credentials
+  role          String    @default("USER") // USER | OWNER | ADMIN
+  latitude      Float?
+  longitude     Float?
+  city          String?
+  state         String?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  accounts Account[]
+  sessions Session[]
+  memberships Membership[]
+  duosAsOne    Duo[]       @relation("UserOne")
+  duosAsTwo    Duo[]       @relation("UserTwo")
+  invitesSent  Invite[]    @relation("Inviter")
+  payments     Payment[]
+  ownedGyms    Gym[]
+}
+
+model Account {
+  id                String  @id @default(cuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String?
+  access_token      String?
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String?
+  session_state     String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+
+  @@unique([identifier, token])
+}
+
+model Gym {
+  id                   String   @id @default(cuid())
+  name                 String
+  address              String
+  latitude             Float
+  longitude            Float
+  ownerId              String
+  monthlyPrice         Int      // in paise
+  yearlyPrice          Int      // in paise
+  partnerDiscountPercent Int     @default(10)
+  yearlyDiscountPercent  Int    @default(15)
+  welcomeDiscountPercent Int    @default(10)
+  maxDiscountCapPercent  Int    @default(40)
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
+
+  owner       User         @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  memberships Membership[]
+  duos        Duo[]
+  invites     Invite[]
+  payments    Payment[]
+}
+
+model Membership {
+  id           String   @id @default(cuid())
+  userId       String
+  gymId        String
+  planType     String   // MONTHLY | YEARLY
+  basePrice    Int      // in paise
+  finalPrice   Int      // in paise
+  discountBreakdown String? // JSON
+  active       Boolean  @default(true)
+  startedAt    DateTime @default(now())
+  expiresAt    DateTime
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  gym  Gym  @relation(fields: [gymId], references: [id], onDelete: Cascade)
+}
+
+model Duo {
+  id        String   @id @default(cuid())
+  userOneId String
+  userTwoId String
+  gymId     String
+  active    Boolean  @default(true)
+  createdAt DateTime @default(now())
+
+  userOne User @relation("UserOne", fields: [userOneId], references: [id], onDelete: Cascade)
+  userTwo User @relation("UserTwo", fields: [userTwoId], references: [id], onDelete: Cascade)
+  gym     Gym  @relation(fields: [gymId], references: [id], onDelete: Cascade)
+
+  @@unique([userOneId, userTwoId, gymId])
+}
+
+model Invite {
+  id       String   @id @default(cuid())
+  email    String
+  code     String   @unique
+  gymId    String
+  inviterId String
+  accepted Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  gym    Gym  @relation(fields: [gymId], references: [id], onDelete: Cascade)
+  inviter User @relation("Inviter", fields: [inviterId], references: [id], onDelete: Cascade)
+}
+
+model Payment {
+  id                 String   @id @default(cuid())
+  userId             String
+  gymId              String
+  amount             Int      // in paise
+  razorpayOrderId    String?
+  razorpayPaymentId  String?
+  status             String   // PENDING | CAPTURED | FAILED
+  createdAt          DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  gym  Gym  @relation(fields: [gymId], references: [id], onDelete: Cascade)
+}
