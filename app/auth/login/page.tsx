@@ -69,7 +69,7 @@ function LoginForm() {
         redirect: false,
       });
       if (!res || res?.error || res?.ok === false) {
-        setError(resolveAuthError(res.error));
+        setError(resolveAuthError(res?.error ?? undefined));
         setLoading(false);
         return;
       }

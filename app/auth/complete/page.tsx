@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useSession } from "next-auth/react";
 import { Loader2 } from "lucide-react";
@@ -18,7 +18,7 @@ function resolveNextUrl(raw: string | null) {
   return "/dashboard/user";
 }
 
-export default function AuthCompletePage() {
+function AuthCompleteContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const { data: session, status, update } = useSession();
@@ -76,5 +76,20 @@ export default function AuthCompletePage() {
         </div>
       </Card>
     </div>
+  );
+}
+
+export default function AuthCompletePage() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen flex items-center justify-center p-6 bg-background">
+        <Card className="glass-card p-8 flex items-center gap-3">
+          <Loader2 className="h-5 w-5 animate-spin" />
+          <div className="text-sm text-muted-foreground">Finishing sign in…</div>
+        </Card>
+      </div>
+    }>
+      <AuthCompleteContent />
+    </Suspense>
   );
 }
