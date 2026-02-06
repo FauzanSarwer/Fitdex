@@ -33,7 +33,7 @@ export async function GET(req: Request) {
   });
   const memberships = await prisma.membership.findMany({
     where: { gymId },
-    orderBy: { createdAt: "asc" },
+    orderBy: { startedAt: "asc" },
   });
   const totalRevenue = payments.reduce((s, p) => s + p.amount, 0);
   const byMonth: Record<string, number> = {};
@@ -46,7 +46,7 @@ export async function GET(req: Request) {
   const inactiveMembers = totalMembers - activeMembers;
   const newMembersByMonth: Record<string, number> = {};
   for (const m of memberships) {
-    const key = `${m.createdAt.getFullYear()}-${String(m.createdAt.getMonth() + 1).padStart(2, "0")}`;
+    const key = `${m.startedAt.getFullYear()}-${String(m.startedAt.getMonth() + 1).padStart(2, "0")}`;
     newMembersByMonth[key] = (newMembersByMonth[key] ?? 0) + 1;
   }
   const planDistribution = memberships.reduce<Record<string, number>>((acc, m) => {
