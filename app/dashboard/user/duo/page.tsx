@@ -20,6 +20,7 @@ export default function DuoPage() {
   const [sending, setSending] = useState(false);
   const [acceptCode, setAcceptCode] = useState("");
   const [accepting, setAccepting] = useState(false);
+  const [lastInviteCode, setLastInviteCode] = useState<string | null>(null);
 
   useEffect(() => {
     Promise.all([
@@ -56,6 +57,7 @@ export default function DuoPage() {
         return;
       }
       if (data.code) {
+        setLastInviteCode(data.code);
         toast({ title: "Invite created", description: `Share this code: ${data.code}` });
       } else {
         toast({ title: "Invite sent", description: `Sent to ${data.email}` });
@@ -151,10 +153,53 @@ export default function DuoPage() {
             </div>
             <div className="space-y-2">
               <Label>Or generate code</Label>
-              <Button variant="outline" onClick={() => fetch("/api/duos", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ gymId: inviteGymId }) }).then(r => r.json()).then(d => toast({ title: "Code", description: d.code }))}>
+              <Button
+                variant="outline"
+                onClick={() =>
+                  fetch("/api/duos", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ gymId: inviteGymId, joinTogether: true }),
+                  })
+                    .then((r) => r.json())
+                    .then((d) => {
+                      if (d.code) {
+                        setLastInviteCode(d.code);
+                        toast({ title: "Code", description: d.code });
+                      }
+                    })
+                }
+              >
                 Generate code
               </Button>
             </div>
+            {lastInviteCode && (
+              <div className="space-y-2">
+                <Label>Share partner link</Label>
+                <div className="flex flex-wrap gap-2">
+                  <Button
+                    variant="secondary"
+                    onClick={() => {
+                      const link = `${window.location.origin}/invite/${lastInviteCode}`;
+                      navigator.clipboard.writeText(link);
+                      toast({ title: "Link copied", description: "Invite link copied to clipboard" });
+                    }}
+                  >
+                    Copy partner link
+                  </Button>
+                  <Button
+                    variant="outline"
+                    onClick={() => {
+                      const link = `${window.location.origin}/invite/${lastInviteCode}`;
+                      const text = `Join me at GymDuo and unlock partner discount: ${link}`;
+                      window.open(`https://wa.me/?text=${encodeURIComponent(text)}`, "_blank");
+                    }}
+                  >
+                    Send via WhatsApp
+                  </Button>
+                </div>
+              </div>
+            )}
           </CardContent>
         </Card>
       )}

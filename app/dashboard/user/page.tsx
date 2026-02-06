@@ -5,7 +5,7 @@ import Link from "next/link";
 import { useSession } from "next-auth/react";
 import { useSearchParams, useRouter } from "next/navigation";
 import { motion } from "framer-motion";
-import { MapPin, CreditCard, Users, Loader2 } from "lucide-react";
+import { MapPin, CreditCard, Users, Loader2, Sparkles, Trophy, Bookmark } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { MapView } from "@/components/maps/MapView";
@@ -18,6 +18,7 @@ interface Membership {
   planType: string;
   basePrice: number;
   finalPrice: number;
+  startedAt: string;
   expiresAt: string;
   gym: { id: string; name: string; address: string; latitude: number; longitude: number };
 }
@@ -37,6 +38,7 @@ function UserDashboardContent() {
   const [memberships, setMemberships] = useState<Membership[]>([]);
   const [duos, setDuos] = useState<Duo[]>([]);
   const [location, setLocation] = useState<{ latitude: number; longitude: number } | null>(null);
+  const [savedGyms, setSavedGyms] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -50,7 +52,8 @@ function UserDashboardContent() {
       fetch("/api/memberships").then((r) => r.json()),
       fetch("/api/duos").then((r) => r.json()),
       fetch("/api/location").then((r) => r.json()),
-    ]).then(([mem, d, loc]) => {
+      fetch("/api/saved-gyms").then((r) => r.json()).catch(() => ({ saved: [] })),
+    ]).then(([mem, d, loc, saved]) => {
       setMemberships(mem.memberships ?? []);
       setDuos(d.duos ?? []);
       if (loc.location?.latitude != null && loc.location?.longitude != null) {
@@ -59,12 +62,27 @@ function UserDashboardContent() {
           longitude: loc.location.longitude,
         });
       }
+      setSavedGyms(saved.saved ?? []);
       setLoading(false);
     });
   }, [searchParams, router]);
 
   const activeMembership = memberships.find((m) => m.active);
   const activeDuo = duos.find((d) => d.active);
+  const streakDays = activeMembership
+    ? Math.max(
+        1,
+        Math.floor(
+          (Date.now() - new Date(activeMembership.startedAt).getTime()) /
+            (1000 * 60 * 60 * 24)
+        ) + 1
+      )
+    : 0;
+  const badges = [
+    activeMembership ? "Active member" : null,
+    activeMembership?.planType === "YEARLY" ? "Yearly commitment" : null,
+    activeDuo ? "Duo partner" : null,
+  ].filter(Boolean) as string[];
 
   if (loading) {
     return (
@@ -143,6 +161,42 @@ function UserDashboardContent() {
             </CardContent>
           </Card>
 
+          <div className="grid gap-4 md:grid-cols-2">
+            <Card className="glass-card">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Sparkles className="h-5 w-5" />
+                  Consistency streak
+                </CardTitle>
+                <CardDescription>Keep your momentum strong.</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <p className="text-3xl font-bold text-primary">{streakDays} days</p>
+                <p className="text-sm text-muted-foreground">Based on your active membership cycle.</p>
+              </CardContent>
+            </Card>
+            <Card className="glass-card">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Trophy className="h-5 w-5" />
+                  Badges
+                </CardTitle>
+                <CardDescription>Achievements you’ve unlocked.</CardDescription>
+              </CardHeader>
+              <CardContent className="flex flex-wrap gap-2">
+                {badges.length > 0 ? (
+                  badges.map((b) => (
+                    <span key={b} className="text-xs bg-white/10 px-2 py-1 rounded-full">
+                      {b}
+                    </span>
+                  ))
+                ) : (
+                  <span className="text-sm text-muted-foreground">No badges yet</span>
+                )}
+              </CardContent>
+            </Card>
+          </div>
+
           <Card className="glass-card">
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
@@ -168,6 +222,31 @@ function UserDashboardContent() {
               )}
             </CardContent>
           </Card>
+
+          {savedGyms.length > 0 && (
+            <Card className="glass-card">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Bookmark className="h-5 w-5" />
+                  Saved gyms
+                </CardTitle>
+                <CardDescription>Quick access to gyms you liked.</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-2">
+                {savedGyms.slice(0, 5).map((s) => (
+                  <div key={s.id} className="flex items-center justify-between py-2 border-b border-white/10 last:border-0">
+                    <div>
+                      <p className="font-medium">{s.gym?.name}</p>
+                      <p className="text-sm text-muted-foreground">{s.gym?.address}</p>
+                    </div>
+                    <Button size="sm" variant="outline" asChild>
+                      <Link href={`/explore/${s.gym?.id}`}>View</Link>
+                    </Button>
+                  </div>
+                ))}
+              </CardContent>
+            </Card>
+          )}
         </>
       ) : (
         <Card className="glass-card p-12 text-center">

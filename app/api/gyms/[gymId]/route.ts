@@ -47,6 +47,8 @@ export async function GET(
         yearlyDiscountPercent: gym.yearlyDiscountPercent,
         welcomeDiscountPercent: gym.welcomeDiscountPercent,
         maxDiscountCapPercent: gym.maxDiscountCapPercent,
+        featuredUntil: gym.featuredUntil,
+        verifiedUntil: gym.verifiedUntil,
         yearlySavePercent,
         quarterlySavePercent,
       },

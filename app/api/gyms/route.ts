@@ -46,17 +46,26 @@ export async function GET(req: Request) {
       welcomeDiscountPercent: g.welcomeDiscountPercent,
       maxDiscountCapPercent: g.maxDiscountCapPercent,
       ownerId: g.ownerId,
+      featuredUntil: g.featuredUntil,
+      verifiedUntil: g.verifiedUntil,
+      createdAt: g.createdAt,
     }));
     if (lat && lng) {
       const numLat = parseFloat(lat);
       const numLng = parseFloat(lng);
       if (Number.isFinite(numLat) && Number.isFinite(numLng)) {
+        const now = Date.now();
         list = list
           .map((g) => ({
             ...g,
             distance: haversine(numLat, numLng, g.latitude, g.longitude),
           }))
-          .sort((a, b) => (a.distance ?? 0) - (b.distance ?? 0));
+          .sort((a, b) => {
+            const aFeatured = a.featuredUntil ? new Date(a.featuredUntil).getTime() > now : false;
+            const bFeatured = b.featuredUntil ? new Date(b.featuredUntil).getTime() > now : false;
+            if (aFeatured !== bFeatured) return aFeatured ? -1 : 1;
+            return (a.distance ?? 0) - (b.distance ?? 0);
+          });
       }
     }
     return NextResponse.json({ gyms: list });

@@ -27,22 +27,57 @@ export async function GET(req: Request) {
     where: { gymId, status: "CAPTURED" },
     orderBy: { createdAt: "asc" },
   });
+  const allPayments = await prisma.payment.findMany({
+    where: { gymId },
+    orderBy: { createdAt: "asc" },
+  });
+  const memberships = await prisma.membership.findMany({
+    where: { gymId },
+    orderBy: { createdAt: "asc" },
+  });
   const totalRevenue = payments.reduce((s, p) => s + p.amount, 0);
   const byMonth: Record<string, number> = {};
   for (const p of payments) {
     const key = `${p.createdAt.getFullYear()}-${String(p.createdAt.getMonth() + 1).padStart(2, "0")}`;
     byMonth[key] = (byMonth[key] ?? 0) + p.amount;
   }
-  const activeMembers = await prisma.membership.count({
-    where: { gymId, active: true },
-  });
+  const activeMembers = memberships.filter((m) => m.active).length;
+  const totalMembers = memberships.length;
+  const inactiveMembers = totalMembers - activeMembers;
+  const newMembersByMonth: Record<string, number> = {};
+  for (const m of memberships) {
+    const key = `${m.createdAt.getFullYear()}-${String(m.createdAt.getMonth() + 1).padStart(2, "0")}`;
+    newMembersByMonth[key] = (newMembersByMonth[key] ?? 0) + 1;
+  }
+  const planDistribution = memberships.reduce<Record<string, number>>((acc, m) => {
+    acc[m.planType] = (acc[m.planType] ?? 0) + 1;
+    return acc;
+  }, {});
+  const revenueByPlan = memberships.reduce<Record<string, number>>((acc, m) => {
+    acc[m.planType] = (acc[m.planType] ?? 0) + m.finalPrice;
+    return acc;
+  }, {});
+  const paymentsByStatus = allPayments.reduce<Record<string, number>>((acc, p) => {
+    acc[p.status] = (acc[p.status] ?? 0) + 1;
+    return acc;
+  }, {});
   const activeDuos = await prisma.duo.count({
     where: { gymId, active: true },
   });
+  const avgRevenuePerMember = activeMembers > 0 ? Math.round(totalRevenue / activeMembers) : 0;
+  const duoRate = activeMembers > 0 ? Math.round((activeDuos / activeMembers) * 100) : 0;
   return NextResponse.json({
     totalRevenue,
     revenueByMonth: byMonth,
     activeMembers,
+    totalMembers,
+    inactiveMembers,
+    newMembersByMonth,
+    planDistribution,
+    revenueByPlan,
+    paymentsByStatus,
+    avgRevenuePerMember,
+    duoRate,
     activeDuos,
     payments: payments.slice(-50).reverse(),
   });

@@ -22,7 +22,9 @@ function RegisterForm() {
   const searchParams = useSearchParams();
   const roleParam = searchParams.get("role");
   const isOwnerFlow = roleParam === "owner" || roleParam === "OWNER";
-  const callbackUrl = searchParams.get("callbackUrl") ?? (isOwnerFlow ? "/dashboard/owner" : "/dashboard/user");
+  const rawCallbackUrl =
+    searchParams.get("callbackUrl") ??
+    (isOwnerFlow ? "/dashboard/owner" : "/dashboard/user");
   const [providers, setProviders] = useState<Record<string, { id: string }> | null>(null);
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
@@ -31,6 +33,18 @@ function RegisterForm() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [existingEmail, setExistingEmail] = useState(false);
+
+  const callbackUrl = (() => {
+    if (!rawCallbackUrl) return isOwnerFlow ? "/dashboard/owner" : "/dashboard/user";
+    if (rawCallbackUrl.startsWith("/")) return rawCallbackUrl;
+    try {
+      const url = new URL(rawCallbackUrl);
+      if (typeof window !== "undefined" && url.origin === window.location.origin) {
+        return `${url.pathname}${url.search}${url.hash}`;
+      }
+    } catch {}
+    return isOwnerFlow ? "/dashboard/owner" : "/dashboard/user";
+  })();
 
   useEffect(() => {
     getProviders().then(setProviders).catch(() => setProviders(null));

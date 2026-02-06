@@ -13,14 +13,27 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 
 function LoginForm() {
   const searchParams = useSearchParams();
-  const callbackUrl = searchParams.get("callbackUrl") ?? "/dashboard/user";
+  const rawCallbackUrl = searchParams.get("callbackUrl") ?? "/dashboard/user";
   const emailParam = searchParams.get("email") ?? "";
+  const errorParam = searchParams.get("error") ?? "";
   const [providers, setProviders] = useState<Record<string, { id: string }> | null>(null);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const passwordRef = useRef<HTMLInputElement | null>(null);
+
+  const callbackUrl = (() => {
+    if (!rawCallbackUrl) return "/dashboard/user";
+    if (rawCallbackUrl.startsWith("/")) return rawCallbackUrl;
+    try {
+      const url = new URL(rawCallbackUrl);
+      if (typeof window !== "undefined" && url.origin === window.location.origin) {
+        return `${url.pathname}${url.search}${url.hash}`;
+      }
+    } catch {}
+    return "/dashboard/user";
+  })();
 
   useEffect(() => {
     getProviders().then(setProviders).catch(() => setProviders(null));
@@ -32,6 +45,12 @@ function LoginForm() {
       requestAnimationFrame(() => passwordRef.current?.focus());
     }
   }, [emailParam, email]);
+
+  useEffect(() => {
+    if (errorParam) {
+      setError(resolveAuthError(errorParam));
+    }
+  }, [errorParam]);
 
   function resolveAuthError(code?: string) {
     if (code === "CredentialsSignin") return "Invalid email or password";

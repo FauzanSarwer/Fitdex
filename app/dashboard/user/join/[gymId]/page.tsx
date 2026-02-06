@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, Suspense } from "react";
-import { useParams, useRouter } from "next/navigation";
+import { useParams, useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { motion } from "framer-motion";
 import {
@@ -58,6 +58,7 @@ interface GymData {
 function JoinContent() {
   const params = useParams();
   const router = useRouter();
+  const searchParams = useSearchParams();
   const gymId = params.gymId as string;
   const { toast } = useToast();
   const [gym, setGym] = useState<GymData | null>(null);
@@ -65,6 +66,7 @@ function JoinContent() {
   const [selectedPlan, setSelectedPlan] = useState<PlanType>("MONTHLY");
   const [discountCode, setDiscountCode] = useState("");
   const [inviteCode, setInviteCode] = useState("");
+  const [inviteInfo, setInviteInfo] = useState<{ message: string; valid: boolean } | null>(null);
   const [checkingOut, setCheckingOut] = useState(false);
   const [hasDuo, setHasDuo] = useState(false);
   const [inviteCreated, setInviteCreated] = useState<{ code: string } | null>(null);
@@ -79,6 +81,37 @@ function JoinContent() {
         setLoading(false);
       });
   }, [gymId]);
+
+  useEffect(() => {
+    const inviteParam = searchParams.get("invite");
+    if (inviteParam && !inviteCode) {
+      setInviteCode(inviteParam.toUpperCase());
+    }
+  }, [inviteCode, searchParams]);
+
+  useEffect(() => {
+    if (!inviteCode.trim() || !gymId) {
+      setInviteInfo(null);
+      return;
+    }
+    const controller = new AbortController();
+    fetch("/api/invites/validate", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ code: inviteCode.trim(), gymId }),
+      signal: controller.signal,
+    })
+      .then((r) => r.json())
+      .then((d) => {
+        if (d?.valid) {
+          setInviteInfo({ valid: true, message: d.message ?? "Invite applied" });
+        } else {
+          setInviteInfo({ valid: false, message: d.message ?? "Invalid invite" });
+        }
+      })
+      .catch(() => {});
+    return () => controller.abort();
+  }, [inviteCode, gymId]);
 
   useEffect(() => {
     fetch("/api/duos")
@@ -337,22 +370,53 @@ function JoinContent() {
                     onChange={(e) => setInviteCode(e.target.value.toUpperCase())}
                     className="uppercase max-w-[200px]"
                   />
+                  {inviteInfo && (
+                    <p className={`mt-2 text-xs ${inviteInfo.valid ? "text-primary" : "text-destructive"}`}>
+                      {inviteInfo.message}
+                    </p>
+                  )}
                 </div>
                 <div>
                   <p className="text-sm font-medium mb-2">Or invite a partner to join with you:</p>
                   {inviteCreated ? (
-                    <div className="flex items-center gap-2">
-                      <code className="px-3 py-2 rounded-lg bg-amber-500/20 font-mono text-lg">
-                        {inviteCreated.code}
-                      </code>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => navigator.clipboard.writeText(inviteCreated.code)}
-                      >
-                        Copy
-                      </Button>
-                      <p className="text-xs text-muted-foreground">Share with your partner — they enter this when joining</p>
+                    <div className="space-y-2">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <code className="px-3 py-2 rounded-lg bg-amber-500/20 font-mono text-lg">
+                          {inviteCreated.code}
+                        </code>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => navigator.clipboard.writeText(inviteCreated.code)}
+                        >
+                          Copy code
+                        </Button>
+                        <p className="text-xs text-muted-foreground">Share the code with your partner</p>
+                      </div>
+                      <div className="flex flex-wrap items-center gap-2">
+                        <Button
+                          variant="secondary"
+                          size="sm"
+                          onClick={() => {
+                            const link = `${window.location.origin}/invite/${inviteCreated.code}`;
+                            navigator.clipboard.writeText(link);
+                            toast({ title: "Link copied", description: "Invite link copied to clipboard" });
+                          }}
+                        >
+                          Copy partner link
+                        </Button>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => {
+                            const link = `${window.location.origin}/invite/${inviteCreated.code}`;
+                            const text = `Join me at GymDuo and unlock partner discount: ${link}`;
+                            window.open(`https://wa.me/?text=${encodeURIComponent(text)}`, "_blank");
+                          }}
+                        >
+                          Send via WhatsApp
+                        </Button>
+                      </div>
                     </div>
                   ) : (
                     <Button
