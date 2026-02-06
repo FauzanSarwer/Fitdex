@@ -42,29 +42,48 @@ function UserDashboardContent() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    let active = true;
     const joinGymId = searchParams.get("join");
     if (joinGymId) {
       router.replace(`/dashboard/user/join/${joinGymId}`);
       return;
     }
 
-    Promise.all([
-      fetch("/api/memberships").then((r) => r.json()),
-      fetch("/api/duos").then((r) => r.json()),
-      fetch("/api/location").then((r) => r.json()),
-      fetch("/api/saved-gyms").then((r) => r.json()).catch(() => ({ saved: [] })),
-    ]).then(([mem, d, loc, saved]) => {
-      setMemberships(mem.memberships ?? []);
-      setDuos(d.duos ?? []);
-      if (loc.location?.latitude != null && loc.location?.longitude != null) {
-        setLocation({
-          latitude: loc.location.latitude,
-          longitude: loc.location.longitude,
-        });
+    const load = async () => {
+      try {
+        const results = await Promise.allSettled([
+          fetch("/api/memberships").then((r) => r.json()),
+          fetch("/api/duos").then((r) => r.json()),
+          fetch("/api/location").then((r) => r.json()),
+          fetch("/api/saved-gyms").then((r) => r.json()).catch(() => ({ saved: [] })),
+        ]);
+
+        if (!active) return;
+
+        const mem = results[0].status === "fulfilled" ? results[0].value : {};
+        const d = results[1].status === "fulfilled" ? results[1].value : {};
+        const loc = results[2].status === "fulfilled" ? results[2].value : {};
+        const saved = results[3].status === "fulfilled" ? results[3].value : { saved: [] };
+
+        setMemberships(mem.memberships ?? []);
+        setDuos(d.duos ?? []);
+        if (loc.location?.latitude != null && loc.location?.longitude != null) {
+          setLocation({
+            latitude: loc.location.latitude,
+            longitude: loc.location.longitude,
+          });
+        }
+        setSavedGyms(saved.saved ?? []);
+      } finally {
+        if (active) setLoading(false);
       }
-      setSavedGyms(saved.saved ?? []);
-      setLoading(false);
-    });
+    };
+
+    void load();
+
+    return () => {
+      active = false;
+    };
   }, [searchParams, router]);
 
   const activeMembership = memberships.find((m) => m.active);

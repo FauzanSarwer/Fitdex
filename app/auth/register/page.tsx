@@ -99,7 +99,8 @@ function RegisterForm() {
 
   async function handleGoogle() {
     setLoading(true);
-    await signIn("google", { callbackUrl });
+    const completeUrl = `/auth/complete?next=${encodeURIComponent(callbackUrl)}&role=${encodeURIComponent(role)}`;
+    await signIn("google", { callbackUrl: completeUrl });
   }
 
   return (

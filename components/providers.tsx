@@ -8,7 +8,7 @@ import { NotificationPoller } from "@/components/notifications/notification-poll
 
 export function Providers({ children }: { children: React.ReactNode }) {
   return (
-    <SessionProvider>
+    <SessionProvider refetchInterval={60} refetchOnWindowFocus>
       {children}
       <Suspense fallback={null}>
         <PageViewTracker />

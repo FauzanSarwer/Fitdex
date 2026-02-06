@@ -13,12 +13,24 @@ export default function OwnerDashboardPage() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    let active = true;
     fetch("/api/owner/gym")
       .then((r) => r.json())
       .then((d) => {
+        if (!active) return;
         setGyms(d.gyms ?? []);
-        setLoading(false);
+      })
+      .catch(() => {
+        if (!active) return;
+        setGyms([]);
+      })
+      .finally(() => {
+        if (active) setLoading(false);
       });
+
+    return () => {
+      active = false;
+    };
   }, []);
 
   if (loading) {

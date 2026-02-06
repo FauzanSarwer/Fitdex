@@ -68,7 +68,7 @@ function LoginForm() {
         password,
         redirect: false,
       });
-      if (res?.error) {
+      if (!res || res?.error || res?.ok === false) {
         setError(resolveAuthError(res.error));
         setLoading(false);
         return;
@@ -82,7 +82,9 @@ function LoginForm() {
 
   async function handleGoogle() {
     setLoading(true);
-    await signIn("google", { callbackUrl });
+    const inferredRole = callbackUrl.startsWith("/dashboard/owner") ? "OWNER" : "USER";
+    const completeUrl = `/auth/complete?next=${encodeURIComponent(callbackUrl)}&role=${encodeURIComponent(inferredRole)}`;
+    await signIn("google", { callbackUrl: completeUrl });
   }
 
   return (
