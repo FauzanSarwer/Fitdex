@@ -25,7 +25,7 @@ export async function POST(req: Request) {
     },
     include: {
       inviter: { select: { name: true } },
-      gym: { select: { name: true; partnerDiscountPercent: true } },
+      gym: { select: { name: true, partnerDiscountPercent: true } },
     },
   });
   if (!invite) {
