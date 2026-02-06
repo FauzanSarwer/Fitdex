@@ -41,29 +41,32 @@ export async function reverseGeocode(
   lat: number,
   lng: number
 ): Promise<{ city: string; state: string } | null> {
-  const key = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY;
-  if (!key || key === "XXXXX") {
-    if (isWithinDelhiNCR(lat, lng))
-      return { city: "Delhi", state: "Delhi" };
-    return null;
-  }
   try {
-    const url = `https://maps.googleapis.com/maps/api/geocode/json?latlng=${lat},${lng}&key=${key}`;
-    const res = await fetch(url);
+    // Use OpenStreetMap's Nominatim API (free, no API key required)
+    const url = `https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}`;
+    const res = await fetch(url, {
+      headers: {
+        'Accept': 'application/json',
+      },
+    });
     const data = await res.json();
-    if (data.status !== "OK" || !data.results?.length) return null;
-    const components = data.results[0].address_components as Array<{
-      long_name: string;
-      types: string[];
-    }>;
-    let city = "";
-    let state = "";
-    for (const c of components) {
-      if (c.types.includes("locality")) city = c.long_name;
-      if (c.types.includes("administrative_area_level_1")) state = c.long_name;
-    }
-    return { city: city || "Unknown", state: state || "Unknown" };
+    
+    if (!data.address) return null;
+    
+    // Extract city and state from OpenStreetMap address components
+    const address = data.address;
+    let city = address.city || address.town || address.village || address.county || "";
+    let state = address.state || "";
+    
+    return { 
+      city: city || "Unknown", 
+      state: state || "Unknown" 
+    };
   } catch {
-    return isWithinDelhiNCR(lat, lng) ? { city: "Delhi", state: "Delhi" } : null;
+    // Fallback: if within Delhi NCR, return Delhi
+    if (isWithinDelhiNCR(lat, lng)) {
+      return { city: "Delhi", state: "Delhi" };
+    }
+    return null;
   }
 }

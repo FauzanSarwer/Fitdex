@@ -16,7 +16,7 @@ A premium gym discovery and duo accountability platform for Delhi NCR.
 - **Backend**: Next.js API routes, Prisma ORM, SQLite
 - **Auth**: NextAuth (Email + Google OAuth)
 - **Payments**: Razorpay Checkout
-- **Maps**: Google Maps API
+- **Maps**: OpenStreetMap (Leaflet + Nominatim)
 
 ## Quick Start
 
@@ -72,7 +72,6 @@ See `.env.example` for all required variables. Key ones:
 - `NEXTAUTH_URL` — App URL
 - `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` — Google OAuth
 - `RAZORPAY_KEY_ID` / `RAZORPAY_KEY_SECRET` — Razorpay keys
-- `NEXT_PUBLIC_GOOGLE_MAPS_API_KEY` — Google Maps API key
 
 ## Features in Detail
 

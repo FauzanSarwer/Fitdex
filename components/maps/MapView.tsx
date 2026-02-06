@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef } from "react";
 import { cn } from "@/lib/utils";
 
 interface MapViewProps {
@@ -11,101 +11,97 @@ interface MapViewProps {
   zoom?: number;
 }
 
-interface GoogleMapsWindow {
-  google?: {
-    maps: {
-      Map: new (el: HTMLElement, opts: Record<string, unknown>) => unknown;
-      LatLng: new (lat: number, lng: number) => unknown;
-      Marker: new (opts: Record<string, unknown>) => void;
-    };
-  };
-}
-
 export function MapView({ latitude, longitude, gyms = [], className, zoom = 13 }: MapViewProps) {
   const containerRef = useRef<HTMLDivElement>(null);
-  const [scriptLoaded, setScriptLoaded] = useState(false);
-  const key = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY;
+  const mapRef = useRef<any>(null);
 
   useEffect(() => {
-    if (!key || key === "XXXXX") {
-      setScriptLoaded(true);
+    // Load Leaflet CSS and JS
+    if (typeof window === "undefined") return;
+    
+    // Check if Leaflet is already loaded
+    if ((window as any).L) {
+      initMap();
       return;
     }
-    const w = window as unknown as { google?: { maps?: unknown } };
-    if (w.google?.maps) {
-      setScriptLoaded(true);
-      return;
-    }
+
+    // Load Leaflet CSS
+    const cssLink = document.createElement("link");
+    cssLink.rel = "stylesheet";
+    cssLink.href = "https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css";
+    document.head.appendChild(cssLink);
+
+    // Load Leaflet JS
     const script = document.createElement("script");
-    script.src = `https://maps.googleapis.com/maps/api/js?key=${key}&libraries=places`;
+    script.src = "https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js";
     script.async = true;
-    script.defer = true;
-    script.onload = () => setScriptLoaded(true);
+    script.onload = initMap;
     document.head.appendChild(script);
-  }, [key]);
+  }, []);
+
+  const initMap = () => {
+    if (!containerRef.current || mapRef.current) return;
+
+    const L = (window as any).L;
+    if (!L) return;
+
+    // Create map
+    const map = L.map(containerRef.current).setView([latitude, longitude], zoom);
+
+    // Add OpenStreetMap tiles
+    L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+      maxZoom: 19,
+      attribution: '© OpenStreetMap contributors',
+    }).addTo(map);
+
+    // Add user marker
+    L.marker([latitude, longitude], {
+      title: "You",
+      icon: L.icon({
+        iconUrl: "https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-blue.png",
+        shadowUrl: "https://cdnjs.cloudflare.com/ajax/libs/leaflet/0.7.7/images/marker-shadow.png",
+        iconSize: [25, 41],
+        iconAnchor: [12, 41],
+        popupAnchor: [1, -34],
+        shadowSize: [41, 41],
+      }),
+    })
+      .addTo(map)
+      .bindPopup("Your location");
+
+    // Add gym markers
+    gyms.forEach((gym) => {
+      L.marker([gym.latitude, gym.longitude], {
+        title: gym.name,
+        icon: L.icon({
+          iconUrl: "https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-red.png",
+          shadowUrl: "https://cdnjs.cloudflare.com/ajax/libs/leaflet/0.7.7/images/marker-shadow.png",
+          iconSize: [25, 41],
+          iconAnchor: [12, 41],
+          popupAnchor: [1, -34],
+          shadowSize: [41, 41],
+        }),
+      })
+        .addTo(map)
+        .bindPopup(gym.name);
+    });
+
+    mapRef.current = map;
+  };
 
   useEffect(() => {
-    if (!scriptLoaded || !containerRef.current || !key || key === "XXXXX") return;
-    const g = (window as unknown as GoogleMapsWindow).google;
-    if (!g?.maps) return;
-    const map = new g.maps.Map(containerRef.current, {
-      center: { lat: latitude, lng: longitude },
-      zoom,
-      styles: [
-        { elementType: "geometry", stylers: [{ color: "#1d1d2e" }] },
-        { elementType: "labels.text.fill", stylers: [{ color: "#8a8a8a" }] },
-        { elementType: "labels.text.stroke", stylers: [{ color: "#1d1d2e" }] },
-      ],
-      disableDefaultUI: false,
-      zoomControl: true,
-    });
-    new g.maps.Marker({
-      position: new g.maps.LatLng(latitude, longitude),
-      map,
-      title: "You",
-    });
-    gyms.forEach((gym) => {
-      new g.maps.Marker({
-        position: new g.maps.LatLng(gym.latitude, gym.longitude),
-        map,
-        title: gym.name,
-      });
-    });
-  }, [scriptLoaded, latitude, longitude, gyms, key, zoom]);
+    if (!mapRef.current) return;
+    const L = (window as any).L;
+    if (!L) return;
+    
+    // Update map view when coordinates change
+    mapRef.current.setView([latitude, longitude], zoom);
+  }, [latitude, longitude, zoom]);
 
-  if (!key || key === "XXXXX") {
-    return (
-      <div
-        className={cn(
-          "rounded-2xl border border-white/10 bg-white/5 flex items-center justify-center text-muted-foreground text-sm",
-          className
-        )}
-      >
-        <div className="text-center p-6">
-          <p>Map preview (set NEXT_PUBLIC_GOOGLE_MAPS_API_KEY for live map)</p>
-          <p className="mt-2 text-xs">
-            Your location: {latitude.toFixed(4)}, {longitude.toFixed(4)}
-          </p>
-          {gyms.length > 0 && (
-            <p className="mt-1 text-xs">{gyms.length} gym(s) nearby</p>
-          )}
-        </div>
-      </div>
-    );
-  }
-
-  if (!scriptLoaded) {
-    return (
-      <div
-        className={cn(
-          "rounded-2xl border border-white/10 bg-white/5 animate-pulse flex items-center justify-center",
-          className
-        )}
-      >
-        <span className="text-muted-foreground text-sm">Loading map…</span>
-      </div>
-    );
-  }
-
-  return <div ref={containerRef} className={cn("rounded-2xl overflow-hidden min-h-[200px]", className)} />;
+  return (
+    <div
+      ref={containerRef}
+      className={cn("rounded-2xl overflow-hidden min-h-[200px] bg-white/5 border border-white/10", className)}
+    />
+  );
 }
