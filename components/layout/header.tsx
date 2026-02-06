@@ -37,6 +37,12 @@ export function Header() {
             <MapPin className="h-4 w-4" />
             Explore
           </Link>
+          <Link
+            href="/pricing"
+            className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors"
+          >
+            Pricing
+          </Link>
           <Button asChild size="sm" className="bg-gradient-to-r from-primary to-accent shadow-glow">
             <Link href="/owners">Gym Owner?</Link>
           </Button>

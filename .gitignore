@@ -4,3 +4,4 @@ node_modules
 backups
 db/*.db
 db/*.db-journal
+tsconfig.tsbuildinfo

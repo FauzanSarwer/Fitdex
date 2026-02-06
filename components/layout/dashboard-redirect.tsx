@@ -11,6 +11,7 @@ export function DashboardRedirect() {
   useEffect(() => {
     if (status !== "authenticated" || !pathname) return;
     const role = (session?.user as { role?: string })?.role;
+    if (!role) return;
     const isOwner = role === "OWNER" || role === "ADMIN";
     if (isOwner && pathname.startsWith("/dashboard/user")) {
       window.location.href = "/dashboard/owner";

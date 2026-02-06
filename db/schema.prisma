@@ -33,6 +33,7 @@ model User {
   savedGyms    SavedGym[]
   featuredPurchases FeaturedListingPurchase[]
   verifiedPurchases VerifiedBadgePurchase[]
+  notifications Notification[]
 }
 
 model Account {
@@ -78,6 +79,9 @@ model Gym {
   latitude               Float
   longitude              Float
   ownerId                String
+  openTime               String?  // "HH:mm"
+  closeTime              String?  // "HH:mm"
+  openDays               String?  // "MON,TUE,WED,THU,FRI,SAT,SUN"
   monthlyPrice           Int      // in paise
   quarterlyPrice         Int?     // in paise, null = computed as monthlyPrice * 3
   yearlyPrice            Int      // in paise
@@ -101,6 +105,21 @@ model Gym {
   savedBy      SavedGym[]
   featuredPurchases FeaturedListingPurchase[]
   verifiedPurchases VerifiedBadgePurchase[]
+}
+
+model Notification {
+  id        String   @id @default(cuid())
+  userId    String
+  type      String   // membership_expiring | duo_accepted
+  title     String
+  body      String
+  entityId  String?
+  read      Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, type, entityId])
 }
 
 model FeaturedListingPurchase {

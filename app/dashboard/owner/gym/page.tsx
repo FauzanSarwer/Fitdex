@@ -36,6 +36,9 @@ export default function OwnerGymPage() {
     address: "",
     latitude: "",
     longitude: "",
+    openTime: "",
+    closeTime: "",
+    openDays: ["MON", "TUE", "WED", "THU", "FRI", "SAT"] as string[],
     monthlyPrice: "",
     quarterlyPrice: "",
     yearlyPrice: "",
@@ -65,6 +68,9 @@ export default function OwnerGymPage() {
           address: form.address,
           latitude: parseFloat(form.latitude) || 28.6139,
           longitude: parseFloat(form.longitude) || 77.209,
+          openTime: form.openTime || null,
+          closeTime: form.closeTime || null,
+          openDays: form.openDays.length > 0 ? form.openDays.join(",") : null,
           monthlyPrice: Math.round(parseFloat(form.monthlyPrice) * 100) || 29900,
           quarterlyPrice: form.quarterlyPrice ? Math.round(parseFloat(form.quarterlyPrice) * 100) : null,
           yearlyPrice: Math.round(parseFloat(form.yearlyPrice) * 100) || 299000,
@@ -78,7 +84,18 @@ export default function OwnerGymPage() {
       }
       toast({ title: "Gym added", description: data.gym?.name });
       setGyms((prev) => [data.gym, ...prev]);
-      setForm({ name: "", address: "", latitude: "", longitude: "", monthlyPrice: "", quarterlyPrice: "", yearlyPrice: "" });
+      setForm({
+        name: "",
+        address: "",
+        latitude: "",
+        longitude: "",
+        openTime: "",
+        closeTime: "",
+        openDays: ["MON", "TUE", "WED", "THU", "FRI", "SAT"],
+        monthlyPrice: "",
+        quarterlyPrice: "",
+        yearlyPrice: "",
+      });
     } catch {
       toast({ title: "Error", variant: "destructive" });
     }
@@ -151,6 +168,48 @@ export default function OwnerGymPage() {
                   onChange={(e) => setForm((p) => ({ ...p, longitude: e.target.value }))}
                   placeholder="77.209"
                 />
+              </div>
+              <div className="space-y-2">
+                <Label>Opening time</Label>
+                <Input
+                  type="time"
+                  value={form.openTime}
+                  onChange={(e) => setForm((p) => ({ ...p, openTime: e.target.value }))}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>Closing time</Label>
+                <Input
+                  type="time"
+                  value={form.closeTime}
+                  onChange={(e) => setForm((p) => ({ ...p, closeTime: e.target.value }))}
+                />
+              </div>
+              <div className="space-y-2 md:col-span-2">
+                <Label>Open days</Label>
+                <div className="flex flex-wrap gap-2">
+                  {["MON", "TUE", "WED", "THU", "FRI", "SAT", "SUN"].map((day) => (
+                    <button
+                      key={day}
+                      type="button"
+                      onClick={() =>
+                        setForm((p) => ({
+                          ...p,
+                          openDays: p.openDays.includes(day)
+                            ? p.openDays.filter((d) => d !== day)
+                            : [...p.openDays, day],
+                        }))
+                      }
+                      className={`rounded-full border px-3 py-1 text-xs ${
+                        form.openDays.includes(day)
+                          ? "border-primary/60 bg-primary/10 text-primary"
+                          : "border-white/10 text-muted-foreground"
+                      }`}
+                    >
+                      {day}
+                    </button>
+                  ))}
+                </div>
               </div>
               <div className="space-y-2">
                 <Label>Monthly price (₹)</Label>

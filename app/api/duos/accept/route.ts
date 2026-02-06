@@ -71,5 +71,41 @@ export async function POST(req: Request) {
     where: { id: invite.id },
     data: { accepted: true },
   });
+  await Promise.all([
+    prisma.notification.upsert({
+      where: {
+        userId_type_entityId: {
+          userId: invite.inviterId,
+          type: "duo_accepted",
+          entityId: duo.id,
+        },
+      },
+      update: {},
+      create: {
+        userId: invite.inviterId,
+        type: "duo_accepted",
+        entityId: duo.id,
+        title: "Duo accepted",
+        body: `${duo.userTwo?.name ?? "Your partner"} accepted your duo invite at ${duo.gym.name}.`,
+      },
+    }),
+    prisma.notification.upsert({
+      where: {
+        userId_type_entityId: {
+          userId: uid,
+          type: "duo_accepted",
+          entityId: duo.id,
+        },
+      },
+      update: {},
+      create: {
+        userId: uid,
+        type: "duo_accepted",
+        entityId: duo.id,
+        title: "Duo created",
+        body: `You are now paired with ${duo.userOne?.name ?? "your partner"} at ${duo.gym.name}.`,
+      },
+    }),
+  ]);
   return NextResponse.json({ duo });
 }

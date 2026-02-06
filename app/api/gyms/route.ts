@@ -39,6 +39,9 @@ export async function GET(req: Request) {
       address: g.address,
       latitude: g.latitude,
       longitude: g.longitude,
+      openTime: g.openTime,
+      closeTime: g.closeTime,
+      openDays: g.openDays,
       monthlyPrice: g.monthlyPrice,
       yearlyPrice: g.yearlyPrice,
       partnerDiscountPercent: g.partnerDiscountPercent,
@@ -101,7 +104,6 @@ export async function POST(req: Request) {
       partnerId?: string;
       discountCodes?: string[];
     };
-
     if (!gymId) {
       return NextResponse.json({ error: "Missing gymId" }, { status: 400 });
     }

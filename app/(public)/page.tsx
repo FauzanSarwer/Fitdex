@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { motion } from "framer-motion";
-import { MapPin, Users, CreditCard, ArrowRight } from "lucide-react";
+import { MapPin, Users, CreditCard, ArrowRight, ShieldCheck, Sparkles, Star } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
 export default function HomePage() {
@@ -34,6 +34,23 @@ export default function HomePage() {
                 <ArrowRight className="ml-2 h-4 w-4" />
               </Link>
             </Button>
+            <Button asChild size="lg" variant="outline" className="text-base">
+              <Link href="/auth/register">Create account</Link>
+            </Button>
+          </div>
+          <div className="mt-8 flex flex-wrap items-center justify-center gap-6 text-xs text-muted-foreground">
+            <div className="flex items-center gap-2">
+              <ShieldCheck className="h-4 w-4 text-primary" />
+              Verified gyms
+            </div>
+            <div className="flex items-center gap-2">
+              <Sparkles className="h-4 w-4 text-primary" />
+              Duo discounts
+            </div>
+            <div className="flex items-center gap-2">
+              <Star className="h-4 w-4 text-primary" />
+              Premium support
+            </div>
           </div>
         </motion.div>
 
@@ -69,6 +86,64 @@ export default function HomePage() {
               <p className="text-sm text-muted-foreground mt-1">{item.desc}</p>
             </div>
           ))}
+        </motion.div>
+      </section>
+
+      <section className="relative container mx-auto px-4 pb-24">
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          whileInView={{ opacity: 1, y: 0 }}
+          viewport={{ once: true }}
+          className="grid gap-6 lg:grid-cols-3"
+        >
+          {[
+            { label: "Gyms onboarded", value: "120+" },
+            { label: "Active members", value: "6,500+" },
+            { label: "Avg. monthly savings", value: "₹850" },
+          ].map((stat) => (
+            <div key={stat.label} className="glass-card rounded-2xl border border-white/10 p-6">
+              <p className="text-sm text-muted-foreground">{stat.label}</p>
+              <p className="text-3xl font-bold mt-2">{stat.value}</p>
+            </div>
+          ))}
+        </motion.div>
+      </section>
+
+      <section className="container mx-auto px-4 pb-24">
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          whileInView={{ opacity: 1, y: 0 }}
+          viewport={{ once: true }}
+          className="max-w-5xl mx-auto"
+        >
+          <h2 className="text-2xl md:text-3xl font-semibold text-center">How it works</h2>
+          <div className="mt-10 grid gap-6 md:grid-cols-3">
+            {[
+              {
+                title: "Discover",
+                desc: "Browse verified gyms near you with transparent pricing and reviews.",
+              },
+              {
+                title: "Pair up",
+                desc: "Invite a partner to unlock stacked discounts and stay consistent.",
+              },
+              {
+                title: "Activate",
+                desc: "Pay securely and get instant access to your membership.",
+              },
+            ].map((step, idx) => (
+              <div key={step.title} className="glass-card rounded-2xl border border-white/10 p-6">
+                <div className="text-xs uppercase tracking-widest text-primary">Step {idx + 1}</div>
+                <h3 className="mt-2 text-lg font-semibold">{step.title}</h3>
+                <p className="mt-2 text-sm text-muted-foreground">{step.desc}</p>
+              </div>
+            ))}
+          </div>
+          <div className="mt-12 flex justify-center">
+            <Button asChild size="lg">
+              <Link href="/explore">Start exploring</Link>
+            </Button>
+          </div>
         </motion.div>
       </section>
     </div>

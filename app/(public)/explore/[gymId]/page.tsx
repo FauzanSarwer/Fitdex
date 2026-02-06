@@ -17,6 +17,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { formatPrice } from "@/lib/utils";
+import { getGymOpenStatus } from "@/lib/gym-hours";
 
 interface GymData {
   id: string;
@@ -25,6 +26,9 @@ interface GymData {
   latitude: number;
   longitude: number;
   coverImageUrl: string | null;
+  openTime?: string | null;
+  closeTime?: string | null;
+  openDays?: string | null;
   owner: { id: string; name: string | null };
   monthlyPrice: number;
   quarterlyPrice: number;
@@ -151,6 +155,9 @@ export default function GymProfilePage() {
                 <p className="text-sm text-muted-foreground flex items-center gap-1">
                   <MapPin className="h-4 w-4" />
                   {gym.address}
+                </p>
+                <p className={`text-xs mt-2 ${getGymOpenStatus(gym).isOpen ? "text-emerald-400" : "text-muted-foreground"}`}>
+                  {getGymOpenStatus(gym).label}
                 </p>
               </div>
               <div className="flex flex-col sm:flex-row gap-3">

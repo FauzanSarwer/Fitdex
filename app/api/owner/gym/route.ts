@@ -33,6 +33,9 @@ export async function POST(req: Request) {
     address,
     latitude,
     longitude,
+    openTime,
+    closeTime,
+    openDays,
     monthlyPrice,
     quarterlyPrice,
     yearlyPrice,
@@ -46,6 +49,9 @@ export async function POST(req: Request) {
     address: string;
     latitude: number;
     longitude: number;
+    openTime?: string | null;
+    closeTime?: string | null;
+    openDays?: string | null;
     monthlyPrice: number;
     quarterlyPrice?: number | null;
     yearlyPrice: number;
@@ -68,6 +74,9 @@ export async function POST(req: Request) {
       address,
       latitude: Number(latitude),
       longitude: Number(longitude),
+      openTime: openTime ?? null,
+      closeTime: closeTime ?? null,
+      openDays: openDays ?? null,
       monthlyPrice: Number(monthlyPrice),
       quarterlyPrice: quarterlyPrice != null ? Number(quarterlyPrice) : null,
       yearlyPrice: Number(yearlyPrice),
@@ -94,6 +103,9 @@ export async function PATCH(req: Request) {
     address?: string;
     latitude?: number;
     longitude?: number;
+    openTime?: string | null;
+    closeTime?: string | null;
+    openDays?: string | null;
     monthlyPrice?: number;
     quarterlyPrice?: number | null;
     yearlyPrice?: number;
@@ -117,6 +129,9 @@ export async function PATCH(req: Request) {
   if (data.address != null) update.address = data.address;
   if (data.latitude != null) update.latitude = data.latitude;
   if (data.longitude != null) update.longitude = data.longitude;
+  if (data.openTime !== undefined) update.openTime = data.openTime;
+  if (data.closeTime !== undefined) update.closeTime = data.closeTime;
+  if (data.openDays !== undefined) update.openDays = data.openDays;
   if (data.monthlyPrice != null) update.monthlyPrice = data.monthlyPrice;
   if (data.quarterlyPrice !== undefined) update.quarterlyPrice = data.quarterlyPrice;
   if (data.yearlyPrice != null) update.yearlyPrice = data.yearlyPrice;

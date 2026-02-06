@@ -98,7 +98,7 @@ function UserDashboardContent() {
       <motion.div
         initial={{ opacity: 0, y: 10 }}
         animate={{ opacity: 1, y: 0 }}
-        className="flex items-center justify-between"
+        className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between"
       >
         <div>
           <h1 className="text-2xl font-bold">
@@ -109,11 +109,14 @@ function UserDashboardContent() {
             {session?.user?.email}
           </p>
         </div>
-        {!activeMembership && (
-          <Button asChild>
+        <div className="flex flex-wrap gap-3">
+          <Button asChild variant={activeMembership ? "outline" : "default"}>
             <Link href="/explore">Find a gym</Link>
           </Button>
-        )}
+          <Button asChild variant="ghost">
+            <Link href="/dashboard/user/duo">Invite partner</Link>
+          </Button>
+        </div>
       </motion.div>
 
       {location && (
@@ -134,6 +137,47 @@ function UserDashboardContent() {
 
       {activeMembership ? (
         <>
+          <div className="grid gap-4 md:grid-cols-3">
+            <Card className="glass-card">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Sparkles className="h-5 w-5" />
+                  Current plan
+                </CardTitle>
+                <CardDescription>{activeMembership.planType}</CardDescription>
+              </CardHeader>
+              <CardContent className="text-sm text-muted-foreground">
+                {formatPrice(activeMembership.finalPrice)} per {activeMembership.planType === "YEARLY" ? "year" : "month"}
+              </CardContent>
+            </Card>
+            <Card className="glass-card">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Trophy className="h-5 w-5" />
+                  Streak
+                </CardTitle>
+                <CardDescription>Keep your momentum</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <p className="text-3xl font-bold text-primary">{streakDays} days</p>
+              </CardContent>
+            </Card>
+            <Card className="glass-card">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Users className="h-5 w-5" />
+                  Duo status
+                </CardTitle>
+                <CardDescription>{activeDuo ? "Active" : "No partner"}</CardDescription>
+              </CardHeader>
+              <CardContent className="text-sm text-muted-foreground">
+                {activeDuo
+                  ? "You’re paired up for extra discount."
+                  : "Invite a partner to unlock duo savings."}
+              </CardContent>
+            </Card>
+          </div>
+
           <Card className="glass-card">
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
@@ -165,19 +209,6 @@ function UserDashboardContent() {
             <Card className="glass-card">
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
-                  <Sparkles className="h-5 w-5" />
-                  Consistency streak
-                </CardTitle>
-                <CardDescription>Keep your momentum strong.</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <p className="text-3xl font-bold text-primary">{streakDays} days</p>
-                <p className="text-sm text-muted-foreground">Based on your active membership cycle.</p>
-              </CardContent>
-            </Card>
-            <Card className="glass-card">
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
                   <Trophy className="h-5 w-5" />
                   Badges
                 </CardTitle>
@@ -192,6 +223,36 @@ function UserDashboardContent() {
                   ))
                 ) : (
                   <span className="text-sm text-muted-foreground">No badges yet</span>
+                )}
+              </CardContent>
+            </Card>
+            <Card className="glass-card">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Bookmark className="h-5 w-5" />
+                  Saved gyms
+                </CardTitle>
+                <CardDescription>Jump back into gyms you liked.</CardDescription>
+              </CardHeader>
+              <CardContent>
+                {savedGyms.length > 0 ? (
+                  <div className="space-y-2">
+                    {savedGyms.slice(0, 3).map((s) => (
+                      <div key={s.id} className="flex items-center justify-between">
+                        <div>
+                          <p className="font-medium">{s.gym?.name}</p>
+                          <p className="text-sm text-muted-foreground">{s.gym?.address}</p>
+                        </div>
+                        <Button size="sm" variant="outline" asChild>
+                          <Link href={`/explore/${s.gym?.id}`}>View</Link>
+                        </Button>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <Button asChild size="sm" variant="outline">
+                    <Link href="/explore">Browse gyms</Link>
+                  </Button>
                 )}
               </CardContent>
             </Card>
@@ -223,37 +284,18 @@ function UserDashboardContent() {
             </CardContent>
           </Card>
 
-          {savedGyms.length > 0 && (
-            <Card className="glass-card">
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Bookmark className="h-5 w-5" />
-                  Saved gyms
-                </CardTitle>
-                <CardDescription>Quick access to gyms you liked.</CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-2">
-                {savedGyms.slice(0, 5).map((s) => (
-                  <div key={s.id} className="flex items-center justify-between py-2 border-b border-white/10 last:border-0">
-                    <div>
-                      <p className="font-medium">{s.gym?.name}</p>
-                      <p className="text-sm text-muted-foreground">{s.gym?.address}</p>
-                    </div>
-                    <Button size="sm" variant="outline" asChild>
-                      <Link href={`/explore/${s.gym?.id}`}>View</Link>
-                    </Button>
-                  </div>
-                ))}
-              </CardContent>
-            </Card>
-          )}
         </>
       ) : (
         <Card className="glass-card p-12 text-center">
           <p className="text-muted-foreground mb-4">No active membership</p>
-          <Button asChild>
-            <Link href="/explore">Explore gyms</Link>
-          </Button>
+          <div className="flex flex-col sm:flex-row gap-3 justify-center">
+            <Button asChild>
+              <Link href="/explore">Explore gyms</Link>
+            </Button>
+            <Button asChild variant="outline">
+              <Link href="/dashboard/user/duo">Find a duo</Link>
+            </Button>
+          </div>
         </Card>
       )}
     </div>
