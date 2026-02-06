@@ -1,6 +1,0 @@
-{
-  "/(public)/page": "app/(public)/page.js",
-  "/(public)/explore/page": "app/(public)/explore/page.js",
-  "/dashboard/user/settings/page": "app/dashboard/user/settings/page.js",
-  "/dashboard/user/membership/page": "app/dashboard/user/membership/page.js"
-}

@@ -16,7 +16,6 @@ const googleEnabled =
 
 export const authOptions: NextAuthOptions = {
   adapter: PrismaAdapter(prisma) as NextAuthOptions["adapter"],
-  trustHost: true,
   session: { strategy: "jwt", maxAge: 30 * 24 * 60 * 60 },
   pages: { signIn: "/auth/login" },
   providers: [
