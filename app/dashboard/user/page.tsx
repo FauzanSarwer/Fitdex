@@ -1,8 +1,9 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, Suspense } from "react";
 import Link from "next/link";
 import { useSession } from "next-auth/react";
+import { useSearchParams, useRouter } from "next/navigation";
 import { motion } from "framer-motion";
 import { MapPin, CreditCard, Users, Loader2 } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -29,14 +30,22 @@ interface Duo {
   userTwo: { name: string | null };
 }
 
-export default function UserDashboardPage() {
+function UserDashboardContent() {
   const { data: session } = useSession();
+  const searchParams = useSearchParams();
+  const router = useRouter();
   const [memberships, setMemberships] = useState<Membership[]>([]);
   const [duos, setDuos] = useState<Duo[]>([]);
   const [location, setLocation] = useState<{ latitude: number; longitude: number } | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    const joinGymId = searchParams.get("join");
+    if (joinGymId) {
+      router.replace(`/dashboard/user/membership?join=${joinGymId}`);
+      return;
+    }
+
     Promise.all([
       fetch("/api/memberships").then((r) => r.json()),
       fetch("/api/duos").then((r) => r.json()),
@@ -52,7 +61,7 @@ export default function UserDashboardPage() {
       }
       setLoading(false);
     });
-  }, []);
+  }, [searchParams, router]);
 
   const activeMembership = memberships.find((m) => m.active);
   const activeDuo = duos.find((d) => d.active);
@@ -169,5 +178,18 @@ export default function UserDashboardPage() {
         </Card>
       )}
     </div>
+  );
+}
+
+export default function UserDashboardPage() {
+  return (
+    <Suspense fallback={
+      <div className="p-6 space-y-6">
+        <Skeleton className="h-32 w-full rounded-2xl" />
+        <Skeleton className="h-48 w-full rounded-2xl" />
+      </div>
+    }>
+      <UserDashboardContent />
+    </Suspense>
   );
 }
