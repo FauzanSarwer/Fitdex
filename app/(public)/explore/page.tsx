@@ -88,7 +88,9 @@ export default function ExplorePage() {
     fetch("/api/saved-gyms")
       .then((r) => r.json())
       .then((d) => {
-        const ids = new Set((d.saved ?? []).map((s: any) => s.gymId));
+        const ids = new Set<string>(
+          (d.saved ?? []).map((s: { gymId: string }) => s.gymId)
+        );
         setSavedIds(ids);
       })
       .catch(() => {});
