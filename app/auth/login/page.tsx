@@ -55,6 +55,12 @@ function LoginForm() {
   function resolveAuthError(code?: string) {
     if (code === "CredentialsSignin") return "Invalid email or password";
     if (code === "Configuration") return "Auth is not configured. Check environment variables.";
+    if (code === "OAuthSignin") return "Google sign-in failed to start. Try again.";
+    if (code === "OAuthCallback") return "Google sign-in failed to complete. Check OAuth redirect settings.";
+    if (code === "OAuthAccountNotLinked") return "This email is linked to another sign-in method.";
+    if (code === "AccessDenied") return "Access denied. Please allow the requested permissions.";
+    if (code === "Callback") return "Sign-in callback failed. Try again.";
+    if (code === "Verification") return "Unable to verify sign-in request.";
     return "Something went wrong";
   }
 

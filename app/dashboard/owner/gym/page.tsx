@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
+import Link from "next/link";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -31,6 +32,7 @@ export default function OwnerGymPage() {
   const { toast } = useToast();
   const [gyms, setGyms] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [form, setForm] = useState({
     name: "",
     address: "",
@@ -48,12 +50,31 @@ export default function OwnerGymPage() {
   const [verifying, setVerifying] = useState<string | null>(null);
 
   useEffect(() => {
+    let active = true;
+    setLoading(true);
+    setError(null);
     fetch("/api/owner/gym")
-      .then((r) => r.json())
+      .then(async (r) => {
+        const payload = await r.json().catch(() => ({}));
+        if (!r.ok) throw new Error(payload?.error ?? "Failed to load gyms");
+        return payload;
+      })
       .then((d) => {
+        if (!active) return;
         setGyms(d.gyms ?? []);
-        setLoading(false);
+      })
+      .catch((e: any) => {
+        if (!active) return;
+        setGyms([]);
+        setError(e?.message ?? "Failed to load gyms");
+      })
+      .finally(() => {
+        if (active) setLoading(false);
       });
+
+    return () => {
+      active = false;
+    };
   }, []);
 
   async function handleCreate(e: React.FormEvent) {
@@ -122,6 +143,22 @@ export default function OwnerGymPage() {
         </h1>
         <p className="text-muted-foreground text-sm">Add or manage your gym.</p>
       </motion.div>
+
+      {error && (
+        <Card className="glass-card">
+          <CardHeader>
+            <CardTitle>Unable to load gyms</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <p className="text-sm text-muted-foreground">{error}</p>
+            <div className="flex flex-col sm:flex-row gap-3">
+              <Button asChild variant="outline">
+                <Link href="/auth/login?callbackUrl=/dashboard/owner/gym">Re-authenticate</Link>
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       <Card className="glass-card">
         <CardHeader>

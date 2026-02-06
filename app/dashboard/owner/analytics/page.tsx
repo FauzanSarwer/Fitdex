@@ -37,6 +37,7 @@ export default function OwnerAnalyticsPage() {
   const searchParams = useSearchParams();
   const [gyms, setGyms] = useState<any[]>([]);
   const [selectedGymId, setSelectedGymId] = useState<string>("");
+  const [error, setError] = useState<string | null>(null);
   const [data, setData] = useState<{
     totalRevenue: number;
     revenueByMonth: Record<string, number>;
@@ -53,32 +54,102 @@ export default function OwnerAnalyticsPage() {
     payments: any[];
   } | null>(null);
   const [loading, setLoading] = useState(true);
+  const [analyticsLoading, setAnalyticsLoading] = useState(false);
   const hasProAccess = false;
 
   useEffect(() => {
+    let active = true;
+    setLoading(true);
+    setError(null);
     fetch("/api/owner/gym")
-      .then((r) => r.json())
+      .then(async (r) => {
+        const payload = await r.json().catch(() => ({}));
+        if (!r.ok) throw new Error(payload?.error ?? "Failed to load gyms");
+        return payload;
+      })
       .then((d) => {
+        if (!active) return;
         const list = d.gyms ?? [];
         setGyms(list);
         const q = searchParams.get("gymId");
         if (q && list.some((g: any) => g.id === q)) setSelectedGymId(q);
         else if (list.length > 0) setSelectedGymId(list[0].id);
-        setLoading(false);
+        else setSelectedGymId("");
+      })
+      .catch((e: any) => {
+        if (!active) return;
+        setGyms([]);
+        setSelectedGymId("");
+        setError(e?.message ?? "Failed to load gyms");
+      })
+      .finally(() => {
+        if (active) setLoading(false);
       });
+
+    return () => {
+      active = false;
+    };
   }, [searchParams]);
 
   useEffect(() => {
-    if (!selectedGymId) return;
+    if (!selectedGymId) {
+      setData(null);
+      return;
+    }
+    let active = true;
+    setAnalyticsLoading(true);
     fetch(`/api/owner/analytics?gymId=${selectedGymId}`)
-      .then((r) => r.json())
-      .then(setData);
+      .then(async (r) => {
+        const payload = await r.json().catch(() => ({}));
+        if (!r.ok) throw new Error(payload?.error ?? "Failed to load analytics");
+        return payload;
+      })
+      .then((payload) => {
+        if (!active) return;
+        setData(payload);
+        setError(null);
+      })
+      .catch((e: any) => {
+        if (!active) return;
+        setData(null);
+        setError(e?.message ?? "Failed to load analytics");
+      })
+      .finally(() => {
+        if (active) setAnalyticsLoading(false);
+      });
+
+    return () => {
+      active = false;
+    };
   }, [selectedGymId]);
 
   if (loading) {
     return (
       <div className="p-6">
         <Skeleton className="h-64 rounded-2xl" />
+      </div>
+    );
+  }
+
+  if (error && gyms.length === 0) {
+    return (
+      <div className="p-6">
+        <Card className="glass-card">
+          <CardHeader>
+            <CardTitle>Unable to load analytics</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <p className="text-sm text-muted-foreground">{error}</p>
+            <div className="flex flex-col sm:flex-row gap-3">
+              <Button asChild>
+                <Link href="/dashboard/owner/gym">Add your first gym</Link>
+              </Button>
+              <Button asChild variant="outline">
+                <Link href="/auth/login?callbackUrl=/dashboard/owner/analytics">Re-authenticate</Link>
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
       </div>
     );
   }
@@ -149,7 +220,37 @@ export default function OwnerAnalyticsPage() {
         </div>
       )}
 
-      {data && (
+      {!analyticsLoading && error && gyms.length > 0 && (
+        <Card className="glass-card">
+          <CardContent className="p-6">
+            <p className="text-sm text-muted-foreground">{error}</p>
+          </CardContent>
+        </Card>
+      )}
+
+      {analyticsLoading && (
+        <Card className="glass-card">
+          <CardContent className="p-6">
+            <Skeleton className="h-32" />
+          </CardContent>
+        </Card>
+      )}
+
+      {!analyticsLoading && !data && gyms.length === 0 && (
+        <Card className="glass-card">
+          <CardHeader>
+            <CardTitle>No gyms found</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <p className="text-sm text-muted-foreground">Add a gym to unlock analytics.</p>
+            <Button asChild>
+              <Link href="/dashboard/owner/gym">Add your first gym</Link>
+            </Button>
+          </CardContent>
+        </Card>
+      )}
+
+      {!analyticsLoading && data && (
         <>
           <div className="grid gap-4 md:grid-cols-4">
             <Card className="glass-card">
