@@ -42,7 +42,7 @@ function UserDashboardContent() {
   useEffect(() => {
     const joinGymId = searchParams.get("join");
     if (joinGymId) {
-      router.replace(`/dashboard/user/membership?join=${joinGymId}`);
+      router.replace(`/dashboard/user/join/${joinGymId}`);
       return;
     }
 

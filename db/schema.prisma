@@ -69,26 +69,46 @@ model VerificationToken {
 }
 
 model Gym {
-  id                   String   @id @default(cuid())
-  name                 String
-  address              String
-  latitude             Float
-  longitude            Float
-  ownerId              String
-  monthlyPrice         Int      // in paise
-  yearlyPrice          Int      // in paise
-  partnerDiscountPercent Int     @default(10)
-  yearlyDiscountPercent  Int    @default(15)
-  welcomeDiscountPercent Int    @default(10)
-  maxDiscountCapPercent  Int    @default(40)
-  createdAt            DateTime @default(now())
-  updatedAt            DateTime @updatedAt
+  id                     String   @id @default(cuid())
+  name                   String
+  address                String
+  latitude               Float
+  longitude              Float
+  ownerId                String
+  monthlyPrice           Int      // in paise
+  quarterlyPrice         Int?     // in paise, null = computed as monthlyPrice * 3
+  yearlyPrice            Int      // in paise
+  partnerDiscountPercent Int      @default(10)
+  quarterlyDiscountPercent Int    @default(10)
+  yearlyDiscountPercent  Int      @default(15)
+  welcomeDiscountPercent Int      @default(10)
+  maxDiscountCapPercent  Int      @default(40)
+  coverImageUrl          String?  // optional gym photo
+  createdAt              DateTime @default(now())
+  updatedAt              DateTime @updatedAt
 
-  owner       User         @relation(fields: [ownerId], references: [id], onDelete: Cascade)
-  memberships Membership[]
-  duos        Duo[]
-  invites     Invite[]
-  payments    Payment[]
+  owner        User          @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  memberships  Membership[]
+  duos         Duo[]
+  invites      Invite[]
+  payments     Payment[]
+  discountCodes DiscountCode[]
+}
+
+model DiscountCode {
+  id             String   @id @default(cuid())
+  gymId          String
+  code           String
+  discountPercent Int
+  maxUses        Int      @default(100)
+  usedCount      Int      @default(0)
+  validFrom      DateTime @default(now())
+  validUntil     DateTime
+  createdAt      DateTime @default(now())
+
+  gym Gym @relation(fields: [gymId], references: [id], onDelete: Cascade)
+
+  @@unique([gymId, code])
 }
 
 model Membership {
@@ -123,13 +143,14 @@ model Duo {
 }
 
 model Invite {
-  id       String   @id @default(cuid())
-  email    String
-  code     String   @unique
-  gymId    String
-  inviterId String
-  accepted Boolean  @default(false)
-  createdAt DateTime @default(now())
+  id            String   @id @default(cuid())
+  email         String
+  code          String   @unique
+  gymId         String
+  inviterId     String
+  invitedUserId String?  // set when invitee joins (for join-together flow)
+  accepted      Boolean  @default(false)
+  createdAt     DateTime @default(now())
 
   gym    Gym  @relation(fields: [gymId], references: [id], onDelete: Cascade)
   inviter User @relation("Inviter", fields: [inviterId], references: [id], onDelete: Cascade)

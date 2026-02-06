@@ -27,8 +27,13 @@ export async function POST(req: Request) {
   }
   const uid = (session!.user as { id: string }).id;
   const body = await req.json();
-  const { gymId, planType } = body as { gymId: string; planType: PlanType };
-  if (!gymId || !planType || !["MONTHLY", "YEARLY"].includes(planType)) {
+  const { gymId, planType, discountCode, inviteCode } = body as {
+    gymId: string;
+    planType: PlanType;
+    discountCode?: string;
+    inviteCode?: string; // partner invite code (for join-together or invite-after-join)
+  };
+  if (!gymId || !planType || !["MONTHLY", "QUARTERLY", "YEARLY"].includes(planType)) {
     return NextResponse.json(
       { error: "Invalid gymId or planType" },
       { status: 400 }
@@ -38,8 +43,12 @@ export async function POST(req: Request) {
   if (!gym) {
     return NextResponse.json({ error: "Gym not found" }, { status: 404 });
   }
-  const basePrice =
-    planType === "MONTHLY" ? gym.monthlyPrice : gym.yearlyPrice;
+  let basePrice: number;
+  if (planType === "MONTHLY") basePrice = gym.monthlyPrice;
+  else if (planType === "QUARTERLY")
+    basePrice = gym.quarterlyPrice ?? Math.round(gym.monthlyPrice * 3 * 0.9); // 10% off if not set
+  else basePrice = gym.yearlyPrice;
+
   const existingActive = await prisma.membership.findFirst({
     where: { userId: uid, active: true },
   });
@@ -56,18 +65,69 @@ export async function POST(req: Request) {
       OR: [{ userOneId: uid }, { userTwoId: uid }],
     },
   });
-  const hasActiveDuo = !!activeDuo;
+  let hasActiveDuo = !!activeDuo;
+
+  // Partner discount via invite code: join-together (invitee uses code) or inviter's invitee already joined
+  let hasPartnerDiscountViaInvite = false;
+  let inviteForDuo: { id: string; inviterId: string; invitedUserId: string | null } | null = null;
+  if (inviteCode && inviteCode.trim() && gym.partnerDiscountPercent > 0) {
+    const invite = await prisma.invite.findFirst({
+      where: {
+        gymId,
+        code: inviteCode.trim().toUpperCase(),
+        accepted: false,
+      },
+    });
+    if (invite) {
+      if (invite.inviterId === uid) {
+        // User is the inviter: partner discount if invitee has already joined
+        if (invite.invitedUserId) {
+          const inviteeMembership = await prisma.membership.findFirst({
+            where: { userId: invite.invitedUserId, gymId, active: true },
+          });
+          if (inviteeMembership) {
+            hasPartnerDiscountViaInvite = true;
+            inviteForDuo = { id: invite.id, inviterId: invite.inviterId, invitedUserId: invite.invitedUserId };
+          }
+        }
+      } else {
+        // User is the invitee: partner discount (joining with partner)
+        hasPartnerDiscountViaInvite = true;
+        inviteForDuo = { id: invite.id, inviterId: invite.inviterId, invitedUserId: null };
+      }
+    }
+  }
+  if (hasPartnerDiscountViaInvite) hasActiveDuo = true;
   const hasEverHadMembership = await prisma.membership.findFirst({
     where: { userId: uid },
   });
   const isFirstTimeUser = !hasEverHadMembership;
+
+  let promoPercent = 0;
+  if (discountCode && discountCode.trim()) {
+    const code = await prisma.discountCode.findFirst({
+      where: {
+        gymId,
+        code: discountCode.trim(),
+        validFrom: { lte: new Date() },
+        validUntil: { gte: new Date() },
+      },
+    });
+    if (code && code.usedCount < code.maxUses) {
+      promoPercent = code.discountPercent;
+    }
+  }
+
   const { finalPrice, breakdown } = computeDiscount(basePrice, planType, {
     isFirstTimeUser,
     hasActiveDuo,
+    promoPercent,
     gym: {
       monthlyPrice: gym.monthlyPrice,
+      quarterlyPrice: gym.quarterlyPrice ?? undefined,
       yearlyPrice: gym.yearlyPrice,
       partnerDiscountPercent: gym.partnerDiscountPercent,
+      quarterlyDiscountPercent: gym.quarterlyDiscountPercent,
       yearlyDiscountPercent: gym.yearlyDiscountPercent,
       welcomeDiscountPercent: gym.welcomeDiscountPercent,
       maxDiscountCapPercent: gym.maxDiscountCapPercent,
@@ -75,6 +135,7 @@ export async function POST(req: Request) {
   });
   const expiresAt = new Date();
   if (planType === "MONTHLY") expiresAt.setMonth(expiresAt.getMonth() + 1);
+  else if (planType === "QUARTERLY") expiresAt.setMonth(expiresAt.getMonth() + 3);
   else expiresAt.setFullYear(expiresAt.getFullYear() + 1);
   const membership = await prisma.membership.create({
     data: {
@@ -89,6 +150,16 @@ export async function POST(req: Request) {
     },
     include: { gym: true },
   });
+
+  // Post-creation: update invite (duo is created in Razorpay verify when both have active membership)
+  if (inviteForDuo && !inviteForDuo.invitedUserId) {
+    // User is invitee — mark them as joined (invitedUserId); duo created when invitee pays
+    await prisma.invite.update({
+      where: { id: inviteForDuo.id },
+      data: { invitedUserId: uid },
+    });
+  }
+
   return NextResponse.json({
     membership,
     finalPricePaise: finalPrice,

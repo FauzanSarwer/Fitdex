@@ -110,7 +110,9 @@ export default function DuoPage() {
           <Users className="h-6 w-6" />
           Duo
         </h1>
-        <p className="text-muted-foreground text-sm">Invite a partner and stack discounts.</p>
+        <p className="text-muted-foreground text-sm">
+          Invite a partner to join your gym. If they join, your partner discount will apply on your next renewal.
+        </p>
       </motion.div>
 
       {activeDuo && (
@@ -127,8 +129,10 @@ export default function DuoPage() {
       {activeMembership && !activeDuo && (
         <Card className="glass-card">
           <CardHeader>
-            <CardTitle>Invite partner</CardTitle>
-            <CardDescription>Send an invite by email or share a code.</CardDescription>
+            <CardTitle>Invite partner (discount on next renewal)</CardTitle>
+            <CardDescription>
+              Invite someone to join your gym. They get the discount when they join. Your partner discount applies on your next renewal cycle. Discount % is set by the gym owner.
+            </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="space-y-2">

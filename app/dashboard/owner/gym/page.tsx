@@ -20,6 +20,7 @@ export default function OwnerGymPage() {
     latitude: "",
     longitude: "",
     monthlyPrice: "",
+    quarterlyPrice: "",
     yearlyPrice: "",
   });
   const [saving, setSaving] = useState(false);
@@ -46,6 +47,7 @@ export default function OwnerGymPage() {
           latitude: parseFloat(form.latitude) || 28.6139,
           longitude: parseFloat(form.longitude) || 77.209,
           monthlyPrice: Math.round(parseFloat(form.monthlyPrice) * 100) || 29900,
+          quarterlyPrice: form.quarterlyPrice ? Math.round(parseFloat(form.quarterlyPrice) * 100) : null,
           yearlyPrice: Math.round(parseFloat(form.yearlyPrice) * 100) || 299000,
         }),
       });
@@ -57,7 +59,7 @@ export default function OwnerGymPage() {
       }
       toast({ title: "Gym added", description: data.gym?.name });
       setGyms((prev) => [data.gym, ...prev]);
-      setForm({ name: "", address: "", latitude: "", longitude: "", monthlyPrice: "", yearlyPrice: "" });
+      setForm({ name: "", address: "", latitude: "", longitude: "", monthlyPrice: "", quarterlyPrice: "", yearlyPrice: "" });
     } catch {
       toast({ title: "Error", variant: "destructive" });
     }
@@ -140,6 +142,17 @@ export default function OwnerGymPage() {
                   value={form.monthlyPrice}
                   onChange={(e) => setForm((p) => ({ ...p, monthlyPrice: e.target.value }))}
                   placeholder="299"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>Quarterly price (₹) — optional, auto-calculated if blank</Label>
+                <Input
+                  type="number"
+                  min="0"
+                  step="1"
+                  value={form.quarterlyPrice}
+                  onChange={(e) => setForm((p) => ({ ...p, quarterlyPrice: e.target.value }))}
+                  placeholder="807 (≈10% off)"
                 />
               </div>
               <div className="space-y-2">

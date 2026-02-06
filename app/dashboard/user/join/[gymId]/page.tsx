@@ -1,0 +1,431 @@
+"use client";
+
+import { useState, useEffect, Suspense } from "react";
+import { useParams, useRouter } from "next/navigation";
+import Link from "next/link";
+import { motion } from "framer-motion";
+import {
+  MapPin,
+  User,
+  Dumbbell,
+  Users,
+  Tag,
+  Loader2,
+  Check,
+  Sparkles,
+  ArrowRight,
+} from "lucide-react";
+import { Card, CardContent, CardHeader } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { formatPrice } from "@/lib/utils";
+import { useToast } from "@/hooks/use-toast";
+import { Skeleton } from "@/components/ui/skeleton";
+
+declare global {
+  interface Window {
+    Razorpay?: new (options: {
+      key: string;
+      amount: number;
+      currency: string;
+      name: string;
+      order_id: string;
+      handler: (res: {
+        razorpay_payment_id: string;
+        razorpay_order_id: string;
+        razorpay_signature: string;
+      }) => void;
+    }) => { open: () => void };
+  }
+}
+
+type PlanType = "MONTHLY" | "QUARTERLY" | "YEARLY";
+
+interface GymData {
+  id: string;
+  name: string;
+  address: string;
+  coverImageUrl: string | null;
+  owner: { id: string; name: string | null };
+  monthlyPrice: number;
+  quarterlyPrice: number;
+  yearlyPrice: number;
+  partnerDiscountPercent: number;
+  yearlySavePercent: number;
+  quarterlySavePercent: number;
+}
+
+function JoinContent() {
+  const params = useParams();
+  const router = useRouter();
+  const gymId = params.gymId as string;
+  const { toast } = useToast();
+  const [gym, setGym] = useState<GymData | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [selectedPlan, setSelectedPlan] = useState<PlanType>("MONTHLY");
+  const [discountCode, setDiscountCode] = useState("");
+  const [inviteCode, setInviteCode] = useState("");
+  const [checkingOut, setCheckingOut] = useState(false);
+  const [hasDuo, setHasDuo] = useState(false);
+  const [inviteCreated, setInviteCreated] = useState<{ code: string } | null>(null);
+  const [creatingInvite, setCreatingInvite] = useState(false);
+
+  useEffect(() => {
+    if (!gymId) return;
+    fetch(`/api/gyms/${gymId}`)
+      .then((r) => r.json())
+      .then((d) => {
+        if (d.gym) setGym(d.gym);
+        setLoading(false);
+      });
+  }, [gymId]);
+
+  useEffect(() => {
+    fetch("/api/duos")
+      .then((r) => r.json())
+      .then((d) => {
+        const active = (d.duos ?? []).find((x: any) => x.active && x.gym?.id === gymId);
+        setHasDuo(!!active);
+      });
+  }, [gymId]);
+
+  async function handleCreateInvite() {
+    if (!gymId) return;
+    setCreatingInvite(true);
+    try {
+      const res = await fetch("/api/duos", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ gymId, joinTogether: true }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        toast({ title: "Error", description: data.error ?? "Failed to create invite", variant: "destructive" });
+        setCreatingInvite(false);
+        return;
+      }
+      setInviteCreated({ code: data.code });
+      toast({ title: "Invite created", description: "Share this code with your partner" });
+    } catch {
+      toast({ title: "Error", variant: "destructive" });
+    }
+    setCreatingInvite(false);
+  }
+
+  async function handleCheckout() {
+    if (!gymId || !selectedPlan) return;
+    setCheckingOut(true);
+    try {
+      const res = await fetch("/api/memberships", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          gymId,
+          planType: selectedPlan,
+          discountCode: discountCode.trim() || undefined,
+          inviteCode: inviteCode.trim() || undefined,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        toast({
+          title: "Error",
+          description: data.error ?? "Failed to create membership",
+          variant: "destructive",
+        });
+        setCheckingOut(false);
+        return;
+      }
+      toast({
+        title: "Redirecting to checkout",
+        description: "Complete payment to activate your membership.",
+      });
+      await openRazorpay(data.membership.id, data.finalPricePaise);
+      router.push("/dashboard/user/membership");
+    } catch {
+      toast({ title: "Something went wrong", variant: "destructive" });
+    }
+    setCheckingOut(false);
+  }
+
+  async function openRazorpay(membershipId: string, amountPaise: number) {
+    try {
+      const orderRes = await fetch("/api/razorpay/order", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ membershipId }),
+      });
+      const orderData = await orderRes.json();
+      if (!orderRes.ok) {
+        toast({
+          title: "Error",
+          description: orderData.error ?? "Failed to create order",
+          variant: "destructive",
+        });
+        return;
+      }
+      const key = process.env.NEXT_PUBLIC_RAZORPAY_KEY_ID ?? "XXXXX";
+      if (typeof window.Razorpay === "undefined") {
+        const script = document.createElement("script");
+        script.src = "https://checkout.razorpay.com/v1/checkout.js";
+        script.async = true;
+        document.body.appendChild(script);
+        await new Promise((r) => (script.onload = r));
+      }
+      const rzp = new window.Razorpay!({
+        key,
+        amount: orderData.amount,
+        currency: orderData.currency ?? "INR",
+        name: "GYMDUO",
+        order_id: orderData.orderId,
+        handler: async () => {
+          toast({ title: "Payment successful", description: "Membership activated." });
+        },
+      });
+      rzp.open();
+    } catch {
+      toast({ title: "Payment failed", variant: "destructive" });
+    }
+  }
+
+  if (loading || !gym) {
+    return (
+      <div className="p-6 max-w-2xl mx-auto">
+        <Skeleton className="h-48 rounded-2xl mb-6" />
+        <Skeleton className="h-32 rounded-2xl" />
+      </div>
+    );
+  }
+
+  const plans = [
+    {
+      type: "MONTHLY" as PlanType,
+      label: "Monthly",
+      price: gym.monthlyPrice,
+      savePercent: null,
+      desc: "Pay as you go",
+    },
+    {
+      type: "QUARTERLY" as PlanType,
+      label: "Quarterly",
+      price: gym.quarterlyPrice,
+      savePercent: gym.quarterlySavePercent,
+      desc: "3 months",
+    },
+    {
+      type: "YEARLY" as PlanType,
+      label: "Yearly",
+      price: gym.yearlyPrice,
+      savePercent: gym.yearlySavePercent,
+      desc: "Best value",
+    },
+  ];
+
+  return (
+    <div className="p-6 max-w-2xl mx-auto">
+      <motion.div
+        initial={{ opacity: 0, y: 10 }}
+        animate={{ opacity: 1, y: 0 }}
+        className="space-y-6"
+      >
+        <div className="flex items-center gap-2 text-sm text-muted-foreground">
+          <Link href="/explore" className="hover:text-foreground">
+            Explore
+          </Link>
+          <span>/</span>
+          <span className="text-foreground">{gym.name}</span>
+        </div>
+
+        {/* Gym hero – photo, name, owner, address */}
+        <Card className="glass-card overflow-hidden border-primary/20">
+          <div className="relative h-40 bg-gradient-to-br from-primary/30 via-primary/10 to-accent/20 flex items-center justify-center">
+            {gym.coverImageUrl ? (
+              <img
+                src={gym.coverImageUrl}
+                alt={gym.name}
+                className="absolute inset-0 w-full h-full object-cover"
+              />
+            ) : (
+              <div className="flex flex-col items-center gap-2 text-primary/80">
+                <Dumbbell className="h-16 w-16" />
+                <span className="text-sm font-medium">{gym.name}</span>
+              </div>
+            )}
+            <div className="absolute top-3 right-3 flex items-center gap-1 rounded-full bg-black/40 px-2 py-1 text-xs">
+              <Sparkles className="h-3 w-3" />
+              Popular in your area
+            </div>
+          </div>
+          <CardHeader>
+            <h1 className="text-2xl font-bold">{gym.name}</h1>
+            <div className="flex items-center gap-2 text-sm text-muted-foreground">
+              <User className="h-4 w-4" />
+              <span>Owner: {gym.owner?.name ?? "Gym"}</span>
+            </div>
+            <div className="flex items-center gap-2 text-sm text-muted-foreground">
+              <MapPin className="h-4 w-4 shrink-0" />
+              <span>{gym.address}</span>
+            </div>
+          </CardHeader>
+        </Card>
+
+        {/* Plan selection */}
+        <Card className="glass-card">
+          <CardHeader>
+            <h2 className="text-lg font-semibold">Choose your plan</h2>
+            <p className="text-sm text-muted-foreground">
+              Longer plans = bigger savings. Lock in your rate now.
+            </p>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            {plans.map((p) => (
+              <button
+                key={p.type}
+                type="button"
+                onClick={() => setSelectedPlan(p.type)}
+                className={`w-full flex items-center justify-between p-4 rounded-xl border transition-all text-left ${
+                  selectedPlan === p.type
+                    ? "border-primary bg-primary/10"
+                    : "border-white/10 hover:border-white/20"
+                }`}
+              >
+                <div>
+                  <div className="flex items-center gap-2">
+                    <span className="font-semibold">{p.label}</span>
+                    {p.savePercent != null && p.savePercent > 0 && (
+                      <span className="text-xs font-medium text-primary bg-primary/20 px-2 py-0.5 rounded-full">
+                        Save {p.savePercent}%
+                      </span>
+                    )}
+                  </div>
+                  <p className="text-sm text-muted-foreground">{p.desc}</p>
+                </div>
+                <div className="text-right">
+                  <span className="font-bold">{formatPrice(p.price)}</span>
+                  {p.type !== "MONTHLY" && (
+                    <p className="text-xs text-muted-foreground">
+                      {formatPrice(Math.round(p.price / (p.type === "QUARTERLY" ? 3 : 12)))}/mo
+                    </p>
+                  )}
+                </div>
+              </button>
+            ))}
+          </CardContent>
+        </Card>
+
+        {/* Partner invite — join together */}
+        {gym.partnerDiscountPercent > 0 && (
+          <Card className="glass-card border-amber-500/30 bg-amber-500/5">
+            <CardHeader>
+              <div className="flex items-center gap-2">
+                <Users className="h-5 w-5 text-amber-500" />
+                <span className="font-semibold">Join with a partner — save {gym.partnerDiscountPercent}%</span>
+              </div>
+              <p className="text-sm text-muted-foreground">
+                {hasDuo
+                  ? "You have an active duo — discount applies!"
+                  : "Invite someone to join this gym with you. Both get the partner discount. (Set by gym owner.)"}
+              </p>
+            </CardHeader>
+            {!hasDuo && (
+              <CardContent className="space-y-4">
+                <div>
+                  <p className="text-sm font-medium mb-2">Partner invited you? Enter their code:</p>
+                  <Input
+                    placeholder="Partner invite code"
+                    value={inviteCode}
+                    onChange={(e) => setInviteCode(e.target.value.toUpperCase())}
+                    className="uppercase max-w-[200px]"
+                  />
+                </div>
+                <div>
+                  <p className="text-sm font-medium mb-2">Or invite a partner to join with you:</p>
+                  {inviteCreated ? (
+                    <div className="flex items-center gap-2">
+                      <code className="px-3 py-2 rounded-lg bg-amber-500/20 font-mono text-lg">
+                        {inviteCreated.code}
+                      </code>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => navigator.clipboard.writeText(inviteCreated.code)}
+                      >
+                        Copy
+                      </Button>
+                      <p className="text-xs text-muted-foreground">Share with your partner — they enter this when joining</p>
+                    </div>
+                  ) : (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={handleCreateInvite}
+                      disabled={creatingInvite}
+                    >
+                      {creatingInvite ? <Loader2 className="h-4 w-4 animate-spin" /> : "Get invite code"}
+                    </Button>
+                  )}
+                </div>
+              </CardContent>
+            )}
+          </Card>
+        )}
+
+        {/* Discount code */}
+        <Card className="glass-card">
+          <CardContent className="pt-4">
+            <div className="flex items-center gap-2 mb-2">
+              <Tag className="h-4 w-4 text-muted-foreground" />
+              <span className="text-sm font-medium">Have a promo code?</span>
+            </div>
+            <div className="flex gap-2">
+              <Input
+                placeholder="Enter code"
+                value={discountCode}
+                onChange={(e) => setDiscountCode(e.target.value)}
+                className="uppercase"
+              />
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Checkout CTA */}
+        <Card className="glass-card border-primary/30">
+          <CardContent className="pt-6">
+            <Button
+              className="w-full h-12 text-base"
+              size="lg"
+              onClick={handleCheckout}
+              disabled={checkingOut}
+            >
+              {checkingOut ? (
+                <Loader2 className="h-5 w-5 animate-spin" />
+              ) : (
+                <>
+                  Proceed to checkout
+                  <ArrowRight className="ml-2 h-4 w-4" />
+                </>
+              )}
+            </Button>
+            <p className="text-center text-xs text-muted-foreground mt-3">
+              You’ll complete payment on the next screen
+            </p>
+          </CardContent>
+        </Card>
+      </motion.div>
+    </div>
+  );
+}
+
+export default function JoinGymPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="p-6">
+          <Skeleton className="h-64 rounded-2xl" />
+        </div>
+      }
+    >
+      <JoinContent />
+    </Suspense>
+  );
+}

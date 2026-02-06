@@ -34,8 +34,10 @@ export async function POST(req: Request) {
     latitude,
     longitude,
     monthlyPrice,
+    quarterlyPrice,
     yearlyPrice,
     partnerDiscountPercent,
+    quarterlyDiscountPercent,
     yearlyDiscountPercent,
     welcomeDiscountPercent,
     maxDiscountCapPercent,
@@ -45,8 +47,10 @@ export async function POST(req: Request) {
     latitude: number;
     longitude: number;
     monthlyPrice: number;
+    quarterlyPrice?: number | null;
     yearlyPrice: number;
     partnerDiscountPercent?: number;
+    quarterlyDiscountPercent?: number;
     yearlyDiscountPercent?: number;
     welcomeDiscountPercent?: number;
     maxDiscountCapPercent?: number;
@@ -65,8 +69,10 @@ export async function POST(req: Request) {
       latitude: Number(latitude),
       longitude: Number(longitude),
       monthlyPrice: Number(monthlyPrice),
+      quarterlyPrice: quarterlyPrice != null ? Number(quarterlyPrice) : null,
       yearlyPrice: Number(yearlyPrice),
       partnerDiscountPercent: Number(partnerDiscountPercent ?? 10),
+      quarterlyDiscountPercent: Number(quarterlyDiscountPercent ?? 10),
       yearlyDiscountPercent: Number(yearlyDiscountPercent ?? 15),
       welcomeDiscountPercent: Number(welcomeDiscountPercent ?? 10),
       maxDiscountCapPercent: Number(maxDiscountCapPercent ?? 40),
@@ -89,8 +95,10 @@ export async function PATCH(req: Request) {
     latitude?: number;
     longitude?: number;
     monthlyPrice?: number;
+    quarterlyPrice?: number | null;
     yearlyPrice?: number;
     partnerDiscountPercent?: number;
+    quarterlyDiscountPercent?: number;
     yearlyDiscountPercent?: number;
     welcomeDiscountPercent?: number;
     maxDiscountCapPercent?: number;
@@ -110,8 +118,10 @@ export async function PATCH(req: Request) {
   if (data.latitude != null) update.latitude = data.latitude;
   if (data.longitude != null) update.longitude = data.longitude;
   if (data.monthlyPrice != null) update.monthlyPrice = data.monthlyPrice;
+  if (data.quarterlyPrice !== undefined) update.quarterlyPrice = data.quarterlyPrice;
   if (data.yearlyPrice != null) update.yearlyPrice = data.yearlyPrice;
   if (data.partnerDiscountPercent != null) update.partnerDiscountPercent = data.partnerDiscountPercent;
+  if (data.quarterlyDiscountPercent != null) update.quarterlyDiscountPercent = data.quarterlyDiscountPercent;
   if (data.yearlyDiscountPercent != null) update.yearlyDiscountPercent = data.yearlyDiscountPercent;
   if (data.welcomeDiscountPercent != null) update.welcomeDiscountPercent = data.welcomeDiscountPercent;
   if (data.maxDiscountCapPercent != null) update.maxDiscountCapPercent = data.maxDiscountCapPercent;

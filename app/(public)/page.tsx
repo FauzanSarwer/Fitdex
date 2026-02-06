@@ -30,7 +30,7 @@ export default function HomePage() {
               </Link>
             </Button>
             <Button asChild variant="outline" size="lg" className="text-base">
-              <Link href="/pricing">Pricing</Link>
+              <Link href="/owners">Gym Owner?</Link>
             </Button>
           </div>
         </motion.div>

@@ -20,11 +20,13 @@ import {
 
 function RegisterForm() {
   const searchParams = useSearchParams();
-  const callbackUrl = searchParams.get("callbackUrl") ?? "/dashboard/user";
+  const roleParam = searchParams.get("role");
+  const isOwnerFlow = roleParam === "owner" || roleParam === "OWNER";
+  const callbackUrl = searchParams.get("callbackUrl") ?? (isOwnerFlow ? "/dashboard/owner" : "/dashboard/user");
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [role, setRole] = useState<"USER" | "OWNER">("USER");
+  const [role, setRole] = useState<"USER" | "OWNER">(isOwnerFlow ? "OWNER" : "USER");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 

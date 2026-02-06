@@ -153,7 +153,7 @@ export default function ExplorePage() {
                     )}
                   </div>
                   <Button asChild size="sm">
-                    <Link href={status === "authenticated" ? `/dashboard/user?join=${gym.id}` : `/auth/register?redirect=/explore`}>
+                    <Link href={status === "authenticated" ? `/dashboard/user/join/${gym.id}` : `/auth/register?redirect=/explore`}>
                       Join
                     </Link>
                   </Button>

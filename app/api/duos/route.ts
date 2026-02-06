@@ -28,16 +28,20 @@ export async function POST(req: Request) {
   }
   const uid = (session!.user as { id: string }).id;
   const body = await req.json();
-  const { email, gymId } = body as { email?: string; gymId: string };
+  const { email, gymId, joinTogether } = body as {
+    email?: string;
+    gymId: string;
+    joinTogether?: boolean; // true = invite for joining together (no membership required)
+  };
   if (!gymId) {
     return NextResponse.json({ error: "gymId required" }, { status: 400 });
   }
   const myMembership = await prisma.membership.findFirst({
     where: { userId: uid, gymId, active: true },
   });
-  if (!myMembership) {
+  if (!myMembership && !joinTogether) {
     return NextResponse.json(
-      { error: "You need an active membership at this gym to invite" },
+      { error: "You need an active membership to invite. Or use joinTogether for inviting a partner to join with you." },
       { status: 400 }
     );
   }

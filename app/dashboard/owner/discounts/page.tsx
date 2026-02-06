@@ -25,10 +25,16 @@ export default function OwnerDiscountsPage() {
   const [saving, setSaving] = useState(false);
   const [form, setForm] = useState({
     partnerDiscountPercent: "",
+    quarterlyDiscountPercent: "",
     yearlyDiscountPercent: "",
     welcomeDiscountPercent: "",
     maxDiscountCapPercent: "",
   });
+  const [promoCode, setPromoCode] = useState("");
+  const [promoPercent, setPromoPercent] = useState("");
+  const [promoValidUntil, setPromoValidUntil] = useState("");
+  const [promoSaving, setPromoSaving] = useState(false);
+  const [promoCodes, setPromoCodes] = useState<any[]>([]);
 
   useEffect(() => {
     fetch("/api/owner/gym")
@@ -41,6 +47,7 @@ export default function OwnerDiscountsPage() {
           const g = list[0];
           setForm({
             partnerDiscountPercent: String(g.partnerDiscountPercent ?? 10),
+            quarterlyDiscountPercent: String(g.quarterlyDiscountPercent ?? 10),
             yearlyDiscountPercent: String(g.yearlyDiscountPercent ?? 15),
             welcomeDiscountPercent: String(g.welcomeDiscountPercent ?? 10),
             maxDiscountCapPercent: String(g.maxDiscountCapPercent ?? 40),
@@ -55,12 +62,52 @@ export default function OwnerDiscountsPage() {
     if (g) {
       setForm({
         partnerDiscountPercent: String(g.partnerDiscountPercent ?? 10),
+        quarterlyDiscountPercent: String(g.quarterlyDiscountPercent ?? 10),
         yearlyDiscountPercent: String(g.yearlyDiscountPercent ?? 15),
         welcomeDiscountPercent: String(g.welcomeDiscountPercent ?? 10),
         maxDiscountCapPercent: String(g.maxDiscountCapPercent ?? 40),
       });
     }
   }, [selectedGymId, gyms]);
+
+  useEffect(() => {
+    if (selectedGymId) {
+      fetch(`/api/owner/discount-codes?gymId=${selectedGymId}`)
+        .then((r) => r.json())
+        .then((d) => setPromoCodes(d.codes ?? []));
+    }
+  }, [selectedGymId]);
+
+  async function handleAddPromo() {
+    if (!selectedGymId || !promoCode.trim() || !promoPercent) return;
+    setPromoSaving(true);
+    try {
+      const res = await fetch("/api/owner/discount-codes", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          gymId: selectedGymId,
+          code: promoCode.trim(),
+          discountPercent: parseInt(promoPercent, 10) || 0,
+          validUntil: promoValidUntil || undefined,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        toast({ title: "Error", description: data.error ?? "Failed", variant: "destructive" });
+        setPromoSaving(false);
+        return;
+      }
+      toast({ title: "Promo code added" });
+      setPromoCodes((prev) => [data.code, ...prev]);
+      setPromoCode("");
+      setPromoPercent("");
+      setPromoValidUntil("");
+    } catch {
+      toast({ title: "Error", variant: "destructive" });
+    }
+    setPromoSaving(false);
+  }
 
   async function handleSave() {
     if (!selectedGymId) return;
@@ -72,6 +119,7 @@ export default function OwnerDiscountsPage() {
         body: JSON.stringify({
           gymId: selectedGymId,
           partnerDiscountPercent: parseInt(form.partnerDiscountPercent, 10) || 0,
+          quarterlyDiscountPercent: parseInt(form.quarterlyDiscountPercent, 10) || 0,
           yearlyDiscountPercent: parseInt(form.yearlyDiscountPercent, 10) || 0,
           welcomeDiscountPercent: parseInt(form.welcomeDiscountPercent, 10) || 0,
           maxDiscountCapPercent: parseInt(form.maxDiscountCapPercent, 10) || 40,
@@ -136,7 +184,7 @@ export default function OwnerDiscountsPage() {
             <CardHeader>
               <CardTitle>Discount configuration</CardTitle>
               <CardDescription>
-                Partner (duo), yearly, and welcome discounts stack. Total is capped at max %.
+                Partner (duo), quarterly, yearly, and welcome discounts stack. Total is capped at max %. Partner discount % is set here — applies when members invite partners to join (together or after joining; inviter gets discount on next renewal).
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
@@ -150,6 +198,18 @@ export default function OwnerDiscountsPage() {
                     value={form.partnerDiscountPercent}
                     onChange={(e) =>
                       setForm((p) => ({ ...p, partnerDiscountPercent: e.target.value }))
+                    }
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label>Quarterly discount (%)</Label>
+                  <Input
+                    type="number"
+                    min="0"
+                    max="100"
+                    value={form.quarterlyDiscountPercent}
+                    onChange={(e) =>
+                      setForm((p) => ({ ...p, quarterlyDiscountPercent: e.target.value }))
                     }
                   />
                 </div>
@@ -193,6 +253,56 @@ export default function OwnerDiscountsPage() {
               <Button onClick={handleSave} disabled={saving}>
                 {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : "Save"}
               </Button>
+            </CardContent>
+          </Card>
+
+          <Card className="glass-card">
+            <CardHeader>
+              <CardTitle>Promo codes</CardTitle>
+              <CardDescription>
+                Create discount codes for members to use at checkout.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="flex flex-wrap gap-2">
+                <Input
+                  placeholder="Code (e.g. SAVE10)"
+                  value={promoCode}
+                  onChange={(e) => setPromoCode(e.target.value)}
+                  className="w-32"
+                />
+                <Input
+                  type="number"
+                  placeholder="% off"
+                  value={promoPercent}
+                  onChange={(e) => setPromoPercent(e.target.value)}
+                  className="w-20"
+                />
+                <Input
+                  type="date"
+                  placeholder="Valid until"
+                  value={promoValidUntil}
+                  onChange={(e) => setPromoValidUntil(e.target.value)}
+                  className="w-40"
+                />
+                <Button size="sm" onClick={handleAddPromo} disabled={promoSaving}>
+                  {promoSaving ? <Loader2 className="h-4 w-4 animate-spin" /> : "Add"}
+                </Button>
+              </div>
+              {promoCodes.length > 0 && (
+                <div className="space-y-1">
+                  <p className="text-sm font-medium">Active codes</p>
+                  {promoCodes.map((c) => (
+                    <div
+                      key={c.id}
+                      className="flex justify-between py-1 text-sm text-muted-foreground"
+                    >
+                      <span className="font-mono">{c.code}</span>
+                      <span>{c.discountPercent}% · {c.usedCount}/{c.maxUses} uses · until {new Date(c.validUntil).toLocaleDateString()}</span>
+                    </div>
+                  ))}
+                </div>
+              )}
             </CardContent>
           </Card>
         </>

@@ -60,21 +60,38 @@ export async function POST(req: Request) {
       where: { id: membershipId },
       data: { active: true },
     });
-    const activeDuo = await prisma.duo.findFirst({
+    const { gymId } = membership;
+
+    // Create duo if both inviter and invitee now have active membership (join-together or invite-after-join)
+    const invite = await prisma.invite.findFirst({
       where: {
-        gymId: membership.gymId,
-        OR: [{ userOneId: uid }, { userTwoId: uid }],
+        gymId,
+        accepted: false,
+        OR: [{ inviterId: uid }, { invitedUserId: uid }],
       },
     });
-    if (activeDuo) {
-      const otherId = activeDuo.userOneId === uid ? activeDuo.userTwoId : activeDuo.userOneId;
-      const otherMembership = await prisma.membership.findFirst({
-        where: { userId: otherId, gymId: membership.gymId, active: true },
+    if (invite && invite.invitedUserId) {
+      const inviterActive = await prisma.membership.findFirst({
+        where: { userId: invite.inviterId, gymId, active: true },
       });
-      if (otherMembership) {
-        await prisma.duo.update({
-          where: { id: activeDuo.id },
-          data: { active: true },
+      const inviteeActive = await prisma.membership.findFirst({
+        where: { userId: invite.invitedUserId, gymId, active: true },
+      });
+      if (inviterActive && inviteeActive) {
+        const [u1, u2] =
+          invite.inviterId < invite.invitedUserId
+            ? [invite.inviterId, invite.invitedUserId]
+            : [invite.invitedUserId, invite.inviterId];
+        await prisma.duo.upsert({
+          where: {
+            userOneId_userTwoId_gymId: { userOneId: u1, userTwoId: u2, gymId },
+          },
+          create: { userOneId: u1, userTwoId: u2, gymId, active: true },
+          update: {},
+        });
+        await prisma.invite.update({
+          where: { id: invite.id },
+          data: { accepted: true },
         });
       }
     }
