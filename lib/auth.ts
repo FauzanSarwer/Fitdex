@@ -5,15 +5,28 @@ import GoogleProvider from "next-auth/providers/google";
 import { prisma } from "./prisma";
 import bcrypt from "bcryptjs";
 
+const googleClientId = process.env.GOOGLE_CLIENT_ID;
+const googleClientSecret = process.env.GOOGLE_CLIENT_SECRET;
+const passwordPepper = process.env.PASSWORD_PEPPER ?? "";
+const googleEnabled =
+  !!googleClientId &&
+  !!googleClientSecret &&
+  googleClientId !== "XXXXX" &&
+  googleClientSecret !== "XXXXX";
+
 export const authOptions: NextAuthOptions = {
   adapter: PrismaAdapter(prisma) as NextAuthOptions["adapter"],
   session: { strategy: "jwt", maxAge: 30 * 24 * 60 * 60 },
   pages: { signIn: "/auth/login" },
   providers: [
-    GoogleProvider({
-      clientId: process.env.GOOGLE_CLIENT_ID ?? "XXXXX",
-      clientSecret: process.env.GOOGLE_CLIENT_SECRET ?? "XXXXX",
-    }),
+    ...(googleEnabled
+      ? [
+          GoogleProvider({
+            clientId: googleClientId,
+            clientSecret: googleClientSecret,
+          }),
+        ]
+      : []),
     CredentialsProvider({
       name: "credentials",
       credentials: {
@@ -22,11 +35,15 @@ export const authOptions: NextAuthOptions = {
       },
       async authorize(credentials) {
         if (!credentials?.email || !credentials?.password) return null;
+        const email = credentials.email.toLowerCase().trim();
         const user = await prisma.user.findUnique({
-          where: { email: credentials.email },
+          where: { email },
         });
         if (!user || !user.password) return null;
-        const ok = await bcrypt.compare(credentials.password, user.password);
+        const ok = await bcrypt.compare(
+          `${credentials.password}${passwordPepper}`,
+          user.password
+        );
         if (!ok) return null;
         return {
           id: user.id,

@@ -2,6 +2,8 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import bcrypt from "bcryptjs";
 
+const passwordPepper = process.env.PASSWORD_PEPPER ?? "";
+
 export async function POST(req: Request) {
   try {
     const body = await req.json();
@@ -27,7 +29,7 @@ export async function POST(req: Request) {
         { status: 400 }
       );
     }
-    const hashed = await bcrypt.hash(password, 10);
+    const hashed = await bcrypt.hash(`${password}${passwordPepper}`, 12);
     const user = await prisma.user.create({
       data: {
         email: email.toLowerCase().trim(),

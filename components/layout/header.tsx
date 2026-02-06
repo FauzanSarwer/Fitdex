@@ -29,7 +29,7 @@ export function Header() {
           </div>
           <span className="text-xl font-bold tracking-tight">GYMDUO</span>
         </Link>
-        <nav className="hidden md:flex items-center gap-6">
+        <nav className="hidden md:flex items-center gap-4">
           <Link
             href="/explore"
             className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors flex items-center gap-1"
@@ -37,12 +37,9 @@ export function Header() {
             <MapPin className="h-4 w-4" />
             Explore
           </Link>
-          <Link
-            href="/owners"
-            className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors"
-          >
-            Gym Owner?
-          </Link>
+          <Button asChild size="sm" className="bg-gradient-to-r from-primary to-accent shadow-glow">
+            <Link href="/owners">Gym Owner?</Link>
+          </Button>
         </nav>
         <div className="flex items-center gap-3">
           {status === "loading" ? (

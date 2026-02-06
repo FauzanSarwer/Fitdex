@@ -2,9 +2,8 @@
 
 import { useState, useEffect } from "react";
 import Link from "next/link";
-import { useSession } from "next-auth/react";
 import { motion } from "framer-motion";
-import { MapPin, List, LayoutGrid, Loader2 } from "lucide-react";
+import { MapPin, List, LayoutGrid } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { MapView } from "@/components/maps/MapView";
@@ -26,7 +25,6 @@ interface Gym {
 }
 
 export default function ExplorePage() {
-  const { status } = useSession();
   const [view, setView] = useState<ViewMode>("list");
   const [gyms, setGyms] = useState<Gym[]>([]);
   const [loading, setLoading] = useState(true);
@@ -68,7 +66,7 @@ export default function ExplorePage() {
   return (
     <div className="container mx-auto px-4 py-8">
       <div className="flex items-center justify-between mb-6">
-        <h1 className="text-2xl font-bold flex items-center gap-2">
+        <h1 className="text-2xl font-bold flex items-center gap-2 bg-clip-text text-transparent bg-gradient-to-r from-white to-white/70">
           <MapPin className="h-6 w-6 text-primary" />
           Explore gyms
         </h1>
@@ -133,7 +131,7 @@ export default function ExplorePage() {
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: i * 0.05 }}
             >
-              <Card className="glass-card overflow-hidden hover:border-primary/30 transition-colors">
+              <Card className="glass-card overflow-hidden hover:border-primary/30 transition-all duration-300 hover:-translate-y-1">
                 <CardHeader className="pb-2">
                   <h3 className="font-semibold text-lg">{gym.name}</h3>
                   <p className="text-sm text-muted-foreground flex items-center gap-1">
@@ -153,9 +151,7 @@ export default function ExplorePage() {
                     )}
                   </div>
                   <Button asChild size="sm">
-                    <Link href={status === "authenticated" ? `/dashboard/user/join/${gym.id}` : `/auth/register?redirect=/explore`}>
-                      Join
-                    </Link>
+                    <Link href={`/dashboard/user/join/${gym.id}`}>Join</Link>
                   </Button>
                 </CardContent>
               </Card>

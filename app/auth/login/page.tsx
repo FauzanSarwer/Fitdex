@@ -1,8 +1,8 @@
 "use client";
 
-import { useState, Suspense } from "react";
+import { useEffect, useRef, useState, Suspense } from "react";
 import Link from "next/link";
-import { signIn } from "next-auth/react";
+import { getProviders, signIn } from "next-auth/react";
 import { useSearchParams } from "next/navigation";
 import { motion } from "framer-motion";
 import { Loader2 } from "lucide-react";
@@ -14,10 +14,30 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 function LoginForm() {
   const searchParams = useSearchParams();
   const callbackUrl = searchParams.get("callbackUrl") ?? "/dashboard/user";
+  const emailParam = searchParams.get("email") ?? "";
+  const [providers, setProviders] = useState<Record<string, { id: string }> | null>(null);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const passwordRef = useRef<HTMLInputElement | null>(null);
+
+  useEffect(() => {
+    getProviders().then(setProviders).catch(() => setProviders(null));
+  }, []);
+
+  useEffect(() => {
+    if (emailParam && !email) {
+      setEmail(emailParam);
+      requestAnimationFrame(() => passwordRef.current?.focus());
+    }
+  }, [emailParam, email]);
+
+  function resolveAuthError(code?: string) {
+    if (code === "CredentialsSignin") return "Invalid email or password";
+    if (code === "Configuration") return "Auth is not configured. Check environment variables.";
+    return "Something went wrong";
+  }
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -30,7 +50,7 @@ function LoginForm() {
         redirect: false,
       });
       if (res?.error) {
-        setError("Invalid email or password");
+        setError(resolveAuthError(res.error));
         setLoading(false);
         return;
       }
@@ -68,6 +88,7 @@ function LoginForm() {
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 required
+                autoComplete="email"
               />
             </div>
             <div className="space-y-2">
@@ -78,6 +99,8 @@ function LoginForm() {
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 required
+                ref={passwordRef}
+                autoComplete="current-password"
               />
             </div>
             {error && (
@@ -95,15 +118,17 @@ function LoginForm() {
               Or
             </span>
           </div>
-          <Button
-            type="button"
-            variant="outline"
-            className="w-full"
-            onClick={handleGoogle}
-            disabled={loading}
-          >
-            Continue with Google
-          </Button>
+          {providers?.google ? (
+            <Button
+              type="button"
+              variant="outline"
+              className="w-full"
+              onClick={handleGoogle}
+              disabled={loading}
+            >
+              Continue with Google
+            </Button>
+          ) : null}
           <p className="text-center text-sm text-muted-foreground">
             Don’t have an account?{" "}
             <Link href="/auth/register" className="text-primary hover:underline">

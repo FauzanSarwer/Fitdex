@@ -6,16 +6,18 @@ import { cva, type VariantProps } from "class-variance-authority";
 import { cn } from "@/lib/utils";
 
 const buttonVariants = cva(
-  "inline-flex items-center justify-center whitespace-nowrap rounded-xl text-sm font-medium transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background disabled:pointer-events-none disabled:opacity-50",
+  "inline-flex items-center justify-center whitespace-nowrap rounded-xl text-sm font-medium transition-all duration-300 ease-out focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background disabled:pointer-events-none disabled:opacity-50",
   {
     variants: {
       variant: {
         default:
-          "bg-primary text-primary-foreground shadow-glow-sm hover:opacity-90",
-        destructive: "bg-destructive text-destructive-foreground hover:opacity-90",
+          "bg-gradient-to-r from-primary to-accent text-primary-foreground shadow-glow-sm hover:shadow-glow hover:-translate-y-0.5",
+        destructive:
+          "bg-destructive text-destructive-foreground hover:opacity-90 hover:-translate-y-0.5",
         outline:
-          "border border-white/20 bg-transparent hover:bg-white/10",
-        secondary: "bg-secondary text-secondary-foreground hover:bg-secondary/80",
+          "border border-white/20 bg-transparent hover:bg-white/10 hover:-translate-y-0.5",
+        secondary:
+          "bg-secondary text-secondary-foreground hover:bg-secondary/80 hover:-translate-y-0.5",
         ghost: "hover:bg-white/10",
         link: "text-primary underline-offset-4 hover:underline",
       },

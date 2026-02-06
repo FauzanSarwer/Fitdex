@@ -1,4 +1,5 @@
 import { Header } from "@/components/layout/header";
+import { Footer } from "@/components/layout/footer";
 import { LocationGate } from "@/components/layout/location-gate";
 
 export default function PublicLayout({
@@ -11,6 +12,7 @@ export default function PublicLayout({
       <div className="min-h-screen bg-background">
         <Header />
         <main className="pt-16">{children}</main>
+        <Footer />
       </div>
     </LocationGate>
   );

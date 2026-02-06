@@ -1,8 +1,8 @@
 "use client";
 
-import { useState, Suspense } from "react";
+import { useEffect, useState, Suspense } from "react";
 import Link from "next/link";
-import { signIn } from "next-auth/react";
+import { getProviders, signIn } from "next-auth/react";
 import { useSearchParams } from "next/navigation";
 import { motion } from "framer-motion";
 import { Loader2 } from "lucide-react";
@@ -23,16 +23,29 @@ function RegisterForm() {
   const roleParam = searchParams.get("role");
   const isOwnerFlow = roleParam === "owner" || roleParam === "OWNER";
   const callbackUrl = searchParams.get("callbackUrl") ?? (isOwnerFlow ? "/dashboard/owner" : "/dashboard/user");
+  const [providers, setProviders] = useState<Record<string, { id: string }> | null>(null);
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [role, setRole] = useState<"USER" | "OWNER">(isOwnerFlow ? "OWNER" : "USER");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const [existingEmail, setExistingEmail] = useState(false);
+
+  useEffect(() => {
+    getProviders().then(setProviders).catch(() => setProviders(null));
+  }, []);
+
+  function resolveAuthError(code?: string) {
+    if (code === "CredentialsSignin") return "Invalid email or password";
+    if (code === "Configuration") return "Auth is not configured. Check environment variables.";
+    return "Something went wrong";
+  }
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError("");
+    setExistingEmail(false);
     setLoading(true);
     try {
       const res = await fetch("/api/auth/register", {
@@ -42,7 +55,13 @@ function RegisterForm() {
       });
       const data = await res.json();
       if (!res.ok) {
-        setError(data.error ?? "Registration failed");
+        const apiError = (data?.error ?? "Registration failed") as string;
+        if (apiError.toLowerCase().includes("email already")) {
+          setExistingEmail(true);
+          setError("This email is already used. Log in with this email.");
+        } else {
+          setError(apiError);
+        }
         setLoading(false);
         return;
       }
@@ -52,7 +71,8 @@ function RegisterForm() {
         redirect: false,
       });
       if (signInRes?.error) {
-        setError("Account created. Please log in.");
+        const msg = resolveAuthError(signInRes.error);
+        setError(msg === "Invalid email or password" ? "Account created. Please log in." : msg);
         setLoading(false);
         return;
       }
@@ -126,7 +146,20 @@ function RegisterForm() {
               </Select>
             </div>
             {error && (
-              <p className="text-sm text-destructive">{error}</p>
+              <div className="space-y-2">
+                <p className="text-sm text-destructive">{error}</p>
+                {existingEmail && (
+                  <Button asChild variant="secondary" className="w-full">
+                    <Link
+                      href={`/auth/login?email=${encodeURIComponent(email)}&callbackUrl=${encodeURIComponent(
+                        callbackUrl
+                      )}`}
+                    >
+                      Log in with this email
+                    </Link>
+                  </Button>
+                )}
+              </div>
             )}
             <Button type="submit" className="w-full" disabled={loading}>
               {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : "Sign up"}
@@ -140,15 +173,17 @@ function RegisterForm() {
               Or
             </span>
           </div>
-          <Button
-            type="button"
-            variant="outline"
-            className="w-full"
-            onClick={handleGoogle}
-            disabled={loading}
-          >
-            Continue with Google
-          </Button>
+          {providers?.google ? (
+            <Button
+              type="button"
+              variant="outline"
+              className="w-full"
+              onClick={handleGoogle}
+              disabled={loading}
+            >
+              Continue with Google
+            </Button>
+          ) : null}
           <p className="text-center text-sm text-muted-foreground">
             Already have an account?{" "}
             <Link href="/auth/login" className="text-primary hover:underline">
