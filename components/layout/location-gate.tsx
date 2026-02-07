@@ -47,7 +47,18 @@ export function LocationGate({ children }: { children: React.ReactNode }) {
             body: JSON.stringify({ latitude: lat, longitude: lng }),
             retries: 1,
           });
-          const data = result.data ?? {};
+          if (!result.ok || !result.data || typeof result.data.serviceable !== "boolean") {
+            // If API fails or doesn't return serviceability, allow access and avoid caching.
+            setLocation({
+              status: "ready",
+              latitude: lat,
+              longitude: lng,
+              serviceable: true,
+            });
+            return;
+          }
+
+          const data = result.data;
           if (data.serviceable) {
             const loc = {
               status: "ready" as const,
@@ -107,6 +118,12 @@ export function LocationGate({ children }: { children: React.ReactNode }) {
 
     // Cached location — use it and skip request
     try {
+      const override = localStorage.getItem("gymduo_location_override");
+      if (override === "true") {
+        setLocation({ status: "ready", serviceable: true });
+        hasRequestedRef.current = true;
+        return;
+      }
       const cached = localStorage.getItem("gymduo_location");
       if (cached) {
         const parsed = JSON.parse(cached);
@@ -238,6 +255,17 @@ export function LocationGate({ children }: { children: React.ReactNode }) {
                   Notify me
                 </Button>
               </div>
+              <Button
+                onClick={() => {
+                  try {
+                    localStorage.setItem("gymduo_location_override", "true");
+                  } catch {}
+                  setLocation({ status: "ready", serviceable: true });
+                }}
+                className="w-full"
+              >
+                Continue to site
+              </Button>
               <Button variant="outline" onClick={() => {
                 hasRequestedRef.current = false;
                 requestLocation();

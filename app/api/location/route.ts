@@ -117,7 +117,18 @@ export async function POST(req: Request) {
         );
       }
 
-      if (!geoResult.ok || !geoResult.result) {
+      // Defensive checking
+      const inDelhi: boolean = Boolean(delhiResult.result);
+      let city: string | null = null;
+      let state: string | null = null;
+
+      if (geoResult.ok && geoResult.result) {
+        city = typeof geoResult.result?.city === "string" ? geoResult.result.city : null;
+        state = typeof geoResult.result?.state === "string" ? geoResult.result.state : null;
+      } else if (inDelhi) {
+        city = "Delhi";
+        state = "Delhi";
+      } else {
         return NextResponse.json(
           {
             error: "Could not retrieve city/state from your location.",
@@ -127,11 +138,6 @@ export async function POST(req: Request) {
           { status: 502 }
         );
       }
-
-      // Defensive checking
-      const inDelhi: boolean = Boolean(delhiResult.result);
-      let city: string | null = typeof geoResult.result?.city === "string" ? geoResult.result.city : null;
-      let state: string | null = typeof geoResult.result?.state === "string" ? geoResult.result.state : null;
 
       // Normalize Delhi
       if (isDelhiCity(city)) city = "Delhi";

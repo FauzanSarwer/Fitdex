@@ -128,6 +128,9 @@ export default function OwnerDashboardPage() {
           <MapPin className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
           <p className="text-muted-foreground mb-4">No gyms yet</p>
           <div className="flex flex-col sm:flex-row gap-3 justify-center">
+            <Button asChild>
+              <Link href="/dashboard/owner/gym">Add your first gym</Link>
+            </Button>
             <Button asChild variant="outline">
               <Link href="/owners">See plans</Link>
             </Button>
