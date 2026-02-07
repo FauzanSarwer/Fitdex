@@ -1,5 +1,5 @@
 import type { Session } from "next-auth";
-import { getSessionUser } from "./auth";
+import { getSessionUser } from "./session-user";
 
 export function isOwner(session: Session | null): boolean {
   const user = getSessionUser(session);

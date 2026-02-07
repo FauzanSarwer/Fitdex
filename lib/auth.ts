@@ -1,4 +1,4 @@
-import type { NextAuthOptions, Session } from "next-auth";
+import type { NextAuthOptions } from "next-auth";
 import { PrismaAdapter } from "@auth/prisma-adapter";
 import CredentialsProvider from "next-auth/providers/credentials";
 import GoogleProvider from "next-auth/providers/google";
@@ -6,6 +6,7 @@ import { prisma } from "./prisma";
 import { getOptionalEnv, getRequiredEnv } from "./env";
 import bcrypt from "bcryptjs";
 import { z } from "zod";
+import { SessionUserSchema } from "./session-user";
 
 const googleClientId = getOptionalEnv("GOOGLE_CLIENT_ID");
 const googleClientSecret = getOptionalEnv("GOOGLE_CLIENT_SECRET");
@@ -14,21 +15,6 @@ const passwordPepper = getRequiredEnv("PASSWORD_PEPPER", {
 });
 const nextAuthSecret = getRequiredEnv("NEXTAUTH_SECRET", { allowEmptyInDev: true });
 const googleEnabled = !!googleClientId && !!googleClientSecret;
-
-// Central contract for user session/role
-export const SessionUserSchema = z.object({
-  id: z.string(),
-  email: z.string().email().optional().nullable(),
-  name: z.string().optional().nullable(),
-  image: z.string().optional().nullable(),
-  role: z.enum(["USER", "OWNER", "ADMIN"]).optional(),
-});
-
-export function getSessionUser(session: Session | null) {
-  if (!session?.user) return null;
-  const parsed = SessionUserSchema.safeParse(session.user);
-  return parsed.success ? parsed.data : null;
-}
 
 export const authOptions: NextAuthOptions = {
   secret: nextAuthSecret,
