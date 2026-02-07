@@ -1,10 +1,15 @@
-import { getRequiredEnv } from "./env";
+import { getOptionalEnv } from "./env";
 
-const RAZORPAY_KEY_ID = getRequiredEnv("RAZORPAY_KEY_ID", { allowEmptyInDev: true });
-const RAZORPAY_KEY_SECRET = getRequiredEnv("RAZORPAY_KEY_SECRET", { allowEmptyInDev: true });
+function requireEnv(name: string) {
+  const value = getOptionalEnv(name);
+  if (!value) {
+    throw new Error(`Missing required environment variable: ${name}`);
+  }
+  return value;
+}
 
 export function getRazorpayKeyId() {
-  return RAZORPAY_KEY_ID;
+  return requireEnv("RAZORPAY_KEY_ID");
 }
 
 export async function createRazorpayOrder(
@@ -13,7 +18,9 @@ export async function createRazorpayOrder(
   notes?: Record<string, string>
 ) {
   const crypto = await import("crypto");
-  const key = Buffer.from(RAZORPAY_KEY_ID + ":" + RAZORPAY_KEY_SECRET).toString(
+  const keyId = requireEnv("RAZORPAY_KEY_ID");
+  const keySecret = requireEnv("RAZORPAY_KEY_SECRET");
+  const key = Buffer.from(keyId + ":" + keySecret).toString(
     "base64"
   );
   const res = await fetch("https://api.razorpay.com/v1/orders", {
@@ -42,9 +49,10 @@ export function verifyRazorpayPaymentSignature(
   signature: string
 ): boolean {
   const crypto = require("crypto");
+  const keySecret = requireEnv("RAZORPAY_KEY_SECRET");
   const body = orderId + "|" + paymentId;
   const expected = crypto
-    .createHmac("sha256", RAZORPAY_KEY_SECRET)
+    .createHmac("sha256", keySecret)
     .update(body)
     .digest("hex");
   return timingSafeEqualHex(expected, signature);
@@ -55,7 +63,7 @@ export function verifyRazorpayWebhookSignature(
   signature: string
 ): boolean {
   const crypto = require("crypto");
-  const secret = getRequiredEnv("RAZORPAY_WEBHOOK_SECRET", { allowEmptyInDev: true });
+  const secret = requireEnv("RAZORPAY_WEBHOOK_SECRET");
   const expected = crypto
     .createHmac("sha256", secret)
     .update(body)
