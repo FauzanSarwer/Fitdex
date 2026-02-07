@@ -14,7 +14,7 @@ import { useToast } from "@/hooks/use-toast";
 
 export default function OwnerVerificationPage() {
   const { toast } = useToast();
-  const MAX_UPLOAD_BYTES = 500 * 1024;
+  const MAX_UPLOAD_BYTES = 2 * 1024 * 1024;
   const [gyms, setGyms] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -261,7 +261,7 @@ export default function OwnerVerificationPage() {
                               />
                             </div>
                             <div className="space-y-2">
-                              <Label>GST certificate (image only, max 500KB)</Label>
+                              <Label>GST certificate (image only, max 2MB)</Label>
                               <Input
                                 type="file"
                                 accept="image/*"
@@ -273,7 +273,7 @@ export default function OwnerVerificationPage() {
                                     return;
                                   }
                                   if (file.size > MAX_UPLOAD_BYTES) {
-                                    toast({ title: "File too large", description: "Image must be 500KB or less.", variant: "destructive" });
+                                    toast({ title: "File too large", description: "Image must be 2MB or less.", variant: "destructive" });
                                     return;
                                   }
                                   setUploading(true);

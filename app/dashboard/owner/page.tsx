@@ -29,7 +29,7 @@ type Transaction = {
 export default function OwnerDashboardPage() {
   const { data: session } = useSession();
   const { toast } = useToast();
-  const MAX_UPLOAD_BYTES = 500 * 1024;
+  const MAX_UPLOAD_BYTES = 2 * 1024 * 1024;
   const [gyms, setGyms] = useState<any[]>([]);
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [loading, setLoading] = useState(true);
@@ -159,7 +159,7 @@ export default function OwnerDashboardPage() {
     setSubmittingGst(false);
   };
 
-  const displayName = session?.user?.name ?? session?.user?.email?.split("@")[0] ?? "there";
+  const displayName = session?.user?.name ?? "there";
 
   return (
     <div className="p-6 space-y-6">
@@ -267,7 +267,7 @@ export default function OwnerDashboardPage() {
                             />
                           </div>
                           <div className="space-y-2">
-                            <Label>GST certificate (image only, ≤ 500KB)</Label>
+                            <Label>GST certificate (image only, ≤ 2MB)</Label>
                             <Input
                               type="file"
                               accept="image/*"
@@ -279,7 +279,7 @@ export default function OwnerDashboardPage() {
                                   return;
                                 }
                                 if (file.size > MAX_UPLOAD_BYTES) {
-                                  toast({ title: "File too large", description: "Image must be 500KB or less.", variant: "destructive" });
+                                  toast({ title: "File too large", description: "Image must be 2MB or less.", variant: "destructive" });
                                   return;
                                 }
                                 setUploading(true);

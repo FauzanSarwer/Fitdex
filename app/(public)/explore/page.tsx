@@ -120,6 +120,9 @@ export default function ExplorePage() {
     if (!navigator.geolocation) {
       setLocationError("Location is not supported on this device.");
       setLocationGate(false);
+      try {
+        localStorage.setItem("fitdex_explore_skip", "true");
+      } catch {}
       loadGyms("/api/gyms");
       return;
     }
@@ -133,15 +136,47 @@ export default function ExplorePage() {
         setLocationGate(false);
         setLocationLoading(false);
         loadGyms(`/api/gyms?lat=${lat}&lng=${lng}`);
+        try {
+          localStorage.setItem(
+            "fitdex_location",
+            JSON.stringify({ latitude: lat, longitude: lng, serviceable: true })
+          );
+          localStorage.removeItem("fitdex_explore_skip");
+        } catch {}
       },
       () => {
         setLocationError("Location access denied. Showing gyms without distance sorting.");
         setLocationGate(false);
         setLocationLoading(false);
+        try {
+          localStorage.setItem("fitdex_explore_skip", "true");
+        } catch {}
         loadGyms("/api/gyms");
       }
     );
   };
+
+  useEffect(() => {
+    try {
+      const skip = localStorage.getItem("fitdex_explore_skip");
+      if (skip === "true") {
+        setLocationGate(false);
+        loadGyms("/api/gyms");
+        return;
+      }
+      const cached = localStorage.getItem("fitdex_location");
+      if (cached) {
+        const parsed = JSON.parse(cached);
+        if (parsed?.latitude && parsed?.longitude) {
+          setUserLat(parsed.latitude);
+          setUserLng(parsed.longitude);
+          setLocationGate(false);
+          loadGyms(`/api/gyms?lat=${parsed.latitude}&lng=${parsed.longitude}`);
+          return;
+        }
+      }
+    } catch {}
+  }, []);
 
   useEffect(() => {
     if (!locationGate && gyms.length === 0 && !loading) {
@@ -333,6 +368,9 @@ export default function ExplorePage() {
                 variant="outline"
                 onClick={() => {
                   setLocationGate(false);
+                  try {
+                    localStorage.setItem("fitdex_explore_skip", "true");
+                  } catch {}
                   loadGyms("/api/gyms");
                 }}
               >

@@ -17,6 +17,7 @@ function LoginForm() {
   const emailParam = searchParams.get("email") ?? "";
   const errorParam = searchParams.get("error") ?? "";
   const [providers, setProviders] = useState<Record<string, { id: string }> | null>(null);
+  const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
@@ -70,6 +71,7 @@ function LoginForm() {
     setLoading(true);
     try {
       const res = await signIn("credentials", {
+        name: name.trim() || undefined,
         email,
         password,
         redirect: false,
@@ -111,6 +113,17 @@ function LoginForm() {
         </CardHeader>
         <CardContent className="space-y-4">
           <form onSubmit={handleSubmit} className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="name">Name (optional)</Label>
+              <Input
+                id="name"
+                type="text"
+                placeholder="Your name"
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                autoComplete="name"
+              />
+            </div>
             <div className="space-y-2">
               <Label htmlFor="email">Email</Label>
               <Input

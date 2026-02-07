@@ -39,18 +39,25 @@ export const authOptions: NextAuthOptions = {
           GoogleProvider({
             clientId: googleClientId,
             clientSecret: googleClientSecret,
+            authorization: {
+              params: {
+                prompt: "select_account",
+              },
+            },
           }),
         ]
       : []),
     CredentialsProvider({
       name: "credentials",
       credentials: {
+        name: { label: "Name", type: "text" },
         email: { label: "Email", type: "email" },
         password: { label: "Password", type: "password" },
       },
       async authorize(credentials) {
         // Strict contract for credentials
         const CredsSchema = z.object({
+          name: z.string().min(2).max(80).optional(),
           email: z.string().email(),
           password: z.string().min(6),
         });
@@ -64,6 +71,21 @@ export const authOptions: NextAuthOptions = {
           user.password
         );
         if (!ok) return null;
+        if (!user.name && parsed.data.name) {
+          try {
+            const updated = await prisma.user.update({
+              where: { id: user.id },
+              data: { name: parsed.data.name.trim() },
+            });
+            return {
+              id: updated.id,
+              email: updated.email,
+              name: updated.name,
+              image: updated.image,
+              role: updated.role,
+            };
+          } catch {}
+        }
         return {
           id: user.id,
           email: user.email,

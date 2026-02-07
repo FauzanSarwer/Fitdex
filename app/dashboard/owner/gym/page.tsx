@@ -15,7 +15,7 @@ import { isPaymentsEnabled, openRazorpayCheckout } from "@/lib/razorpay-checkout
 
 export default function OwnerGymPage() {
   const { toast } = useToast();
-  const MAX_UPLOAD_BYTES = 500 * 1024;
+  const MAX_UPLOAD_BYTES = 2 * 1024 * 1024;
   const [gyms, setGyms] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -254,7 +254,7 @@ export default function OwnerGymPage() {
                       return;
                     }
                     if (file.size > MAX_UPLOAD_BYTES) {
-                      toast({ title: "File too large", description: "Image must be 500KB or less.", variant: "destructive" });
+                      toast({ title: "File too large", description: "Image must be 2MB or less.", variant: "destructive" });
                       return;
                     }
                     setUploading(true);
@@ -289,7 +289,11 @@ export default function OwnerGymPage() {
                       );
                       const uploadJson = await uploadRes.json();
                       if (!uploadRes.ok || !uploadJson.secure_url) {
-                        toast({ title: "Upload failed", description: "Could not upload image", variant: "destructive" });
+                        toast({
+                          title: "Upload failed",
+                          description: uploadJson?.error?.message ?? "Could not upload image",
+                          variant: "destructive",
+                        });
                         setUploading(false);
                         return;
                       }

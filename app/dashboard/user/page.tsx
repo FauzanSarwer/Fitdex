@@ -138,7 +138,7 @@ function UserDashboardContent() {
     );
   }
 
-  const displayName = session?.user?.name ?? session?.user?.email?.split("@")[0] ?? "there";
+  const displayName = session?.user?.name ?? "there";
 
   return (
     <div className="p-6 space-y-6">

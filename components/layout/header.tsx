@@ -24,7 +24,7 @@ export function Header() {
   const [sendingVerification, setSendingVerification] = useState(false);
   const [verificationSent, setVerificationSent] = useState(false);
 
-  const displayName = session?.user?.name ?? session?.user?.email?.split("@")[0] ?? "Account";
+  const displayName = session?.user?.name ?? "Account";
 
   return (
     <motion.header
@@ -83,18 +83,6 @@ export function Header() {
             className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors"
           >
             Owners
-          </Link>
-          <Link
-            href="/privacy"
-            className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors"
-          >
-            Privacy
-          </Link>
-          <Link
-            href="/terms"
-            className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors"
-          >
-            Terms
           </Link>
           {status === "authenticated" && (
             <Link

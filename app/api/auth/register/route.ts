@@ -20,8 +20,8 @@ export async function POST(req: Request) {
       return jsonError("Invalid JSON body", 400);
     }
     const { email, password, name, role } = parsed.data;
-    if (!email || !password) {
-      return jsonError("Email and password required", 400);
+    if (!email || !password || !name?.trim()) {
+      return jsonError("Name, email, and password required", 400);
     }
     if (password.length < 8) {
       return jsonError("Password must be at least 8 characters", 400);
