@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { jsonError, safeJson } from "@/lib/api";
+import { computeDiscount } from "@/lib/discounts";
 import { logServerError } from "@/lib/logger";
 
 function haversine(
@@ -42,6 +43,7 @@ export async function GET(req: Request) {
       address: g.address,
       latitude: g.latitude,
       longitude: g.longitude,
+      verificationStatus: g.verificationStatus,
       openTime: g.openTime,
       closeTime: g.closeTime,
       openDays: g.openDays,
@@ -49,9 +51,12 @@ export async function GET(req: Request) {
       monthlyPrice: g.monthlyPrice,
       yearlyPrice: g.yearlyPrice,
       partnerDiscountPercent: g.partnerDiscountPercent,
-      yearlyDiscountPercent: g.yearlyDiscountPercent,
-      welcomeDiscountPercent: g.welcomeDiscountPercent,
-      maxDiscountCapPercent: g.maxDiscountCapPercent,
+      yearlyDiscountType: g.yearlyDiscountType,
+      yearlyDiscountValue: g.yearlyDiscountValue,
+      quarterlyDiscountType: g.quarterlyDiscountType,
+      quarterlyDiscountValue: g.quarterlyDiscountValue,
+      welcomeDiscountType: g.welcomeDiscountType,
+      welcomeDiscountValue: g.welcomeDiscountValue,
       ownerId: g.ownerId,
       featuredUntil: g.featuredUntil,
       verifiedUntil: g.verifiedUntil,
@@ -147,11 +152,10 @@ export async function POST(req: Request) {
         price: gym.yearlyPrice,
         originalPrice: gym.yearlyPrice,
         available: typeof gym.yearlyPrice === "number" && gym.yearlyPrice > 0,
-        yearlyDiscountPercent: gym.yearlyDiscountPercent,
       },
     ];
 
-    // Assume you apply welcome/partner/discount coupons/logic here
+    // Compute pricing/discounts
     let selectedPlan = plan ?? "monthly";
     let appliedDiscounts: { type: string; value: number; label: string }[] = [];
 
@@ -164,75 +168,51 @@ export async function POST(req: Request) {
     }
 
     let finalPrice = planData ? planData.price : 0;
+    const hasEverHadMembership = await prisma.membership.findFirst({
+      where: { userId: uid },
+    });
+    const isFirstTimeUser = !hasEverHadMembership;
 
-    // Apply discounts
-    // Welcome Discount
-    if (
-      typeof gym.welcomeDiscountPercent === "number" &&
-      gym.welcomeDiscountPercent > 0
-    ) {
-      const discountValue = (finalPrice * gym.welcomeDiscountPercent) / 100;
-      appliedDiscounts.push({
-        type: "welcome",
-        value: discountValue,
-        label: `Welcome Discount (${gym.welcomeDiscountPercent}%)`
+    let promo: { type: "PERCENT" | "FLAT"; value: number } | null = null;
+    if (discountCodes && Array.isArray(discountCodes) && discountCodes.length > 0) {
+      const code = await prisma.discountCode.findFirst({
+        where: {
+          gymId,
+          code: discountCodes[0],
+          validFrom: { lte: new Date() },
+          validUntil: { gte: new Date() },
+        },
       });
-      finalPrice -= discountValue;
-    }
-
-    // Yearly Discount (if yearly plan)
-    if (
-      selectedPlan === "yearly" &&
-      typeof gym.yearlyDiscountPercent === "number" &&
-      gym.yearlyDiscountPercent > 0
-    ) {
-      const discountValue = (finalPrice * gym.yearlyDiscountPercent) / 100;
-      appliedDiscounts.push({
-        type: "yearly",
-        value: discountValue,
-        label: `Yearly Plan Discount (${gym.yearlyDiscountPercent}%)`
-      });
-      finalPrice -= discountValue;
-    }
-
-    // Partner Discount
-    if (partnerId && typeof gym.partnerDiscountPercent === "number" && gym.partnerDiscountPercent > 0) {
-      const discountValue = (finalPrice * gym.partnerDiscountPercent) / 100;
-      appliedDiscounts.push({
-        type: "partner",
-        value: discountValue,
-        label: `Partner Discount (${gym.partnerDiscountPercent}%)`
-      });
-      finalPrice -= discountValue;
-    }
-
-    // Discount codes (stub: logic to validate & apply can be added)
-    if (discountCodes && Array.isArray(discountCodes)) {
-      // For now, just mock a 5% total discount if any codes are passed
-      if (discountCodes.length > 0) {
-        const codeDiscount = (finalPrice * 5) / 100;
-        appliedDiscounts.push({
-          type: "promo",
-          value: codeDiscount,
-          label: "Promo Code (5%)",
-        });
-        finalPrice -= codeDiscount;
+      if (code && code.usedCount < code.maxUses) {
+        promo = { type: code.discountType as "PERCENT" | "FLAT", value: code.discountValue };
       }
     }
 
-    // Max total discount cap
-    if (
-      typeof gym.maxDiscountCapPercent === "number" &&
-      gym.maxDiscountCapPercent > 0
-    ) {
-      const maxDiscount = (planData!.originalPrice * gym.maxDiscountCapPercent) / 100;
-      const totalDiscount = planData!.originalPrice - finalPrice;
-      if (totalDiscount > maxDiscount) {
-        finalPrice = planData!.originalPrice - maxDiscount;
-      }
-    }
+    const discountResult = computeDiscount(planData?.originalPrice ?? 0, selectedPlan.toUpperCase() as any, {
+      isFirstTimeUser,
+      hasActiveDuo: !!partnerId,
+      promo,
+      gym: {
+        monthlyPrice: gym.monthlyPrice,
+        quarterlyPrice: gym.quarterlyPrice ?? undefined,
+        yearlyPrice: gym.yearlyPrice,
+        partnerDiscountPercent: gym.partnerDiscountPercent,
+        quarterlyDiscountType: gym.quarterlyDiscountType as "PERCENT" | "FLAT",
+        quarterlyDiscountValue: gym.quarterlyDiscountValue,
+        yearlyDiscountType: gym.yearlyDiscountType as "PERCENT" | "FLAT",
+        yearlyDiscountValue: gym.yearlyDiscountValue,
+        welcomeDiscountType: gym.welcomeDiscountType as "PERCENT" | "FLAT",
+        welcomeDiscountValue: gym.welcomeDiscountValue,
+      },
+    });
 
-    if (finalPrice < 0) finalPrice = 0;
+    finalPrice = discountResult.finalPrice;
+    const b = discountResult.breakdown;
+    if (b.welcomeAmount > 0) appliedDiscounts.push({ type: "welcome", value: b.welcomeAmount, label: "Welcome discount" });
+    if (b.quarterlyAmount > 0) appliedDiscounts.push({ type: "quarterly", value: b.quarterlyAmount, label: "Quarterly discount" });
+    if (b.yearlyAmount > 0) appliedDiscounts.push({ type: "yearly", value: b.yearlyAmount, label: "Yearly discount" });
+    if (b.partnerAmount > 0) appliedDiscounts.push({ type: "partner", value: b.partnerAmount, label: "Partner discount" });
+    if (b.promoAmount > 0) appliedDiscounts.push({ type: "promo", value: b.promoAmount, label: "Promo code" });
 
     // Respond with structured data the UI can render (like the "district" app join flow)
     return NextResponse.json({
@@ -250,7 +230,6 @@ export async function POST(req: Request) {
           type: p.type,
           price: p.price,
           originalPrice: p.originalPrice,
-          yearlyDiscountPercent: p.yearlyDiscountPercent ?? undefined
         })),
       selectedPlan,
       partnerId: partnerId || null,

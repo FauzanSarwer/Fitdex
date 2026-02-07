@@ -89,26 +89,6 @@ export default function HomePage() {
         </motion.div>
       </section>
 
-      <section className="relative container mx-auto px-4 pb-24">
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          whileInView={{ opacity: 1, y: 0 }}
-          viewport={{ once: true }}
-          className="grid gap-6 lg:grid-cols-3"
-        >
-          {[
-            { label: "Gyms onboarded", value: "120+" },
-            { label: "Active members", value: "6,500+" },
-            { label: "Avg. monthly savings", value: "₹850" },
-          ].map((stat) => (
-            <div key={stat.label} className="glass-card rounded-2xl border border-white/10 p-6">
-              <p className="text-sm text-muted-foreground">{stat.label}</p>
-              <p className="text-3xl font-bold mt-2">{stat.value}</p>
-            </div>
-          ))}
-        </motion.div>
-      </section>
-
       <section className="container mx-auto px-4 pb-24">
         <motion.div
           initial={{ opacity: 0, y: 20 }}

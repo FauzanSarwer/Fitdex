@@ -26,6 +26,7 @@ interface GymData {
   address: string;
   latitude: number;
   longitude: number;
+  verificationStatus: string;
   coverImageUrl: string | null;
   openTime?: string | null;
   closeTime?: string | null;
@@ -36,10 +37,12 @@ interface GymData {
   quarterlyPrice: number;
   yearlyPrice: number;
   partnerDiscountPercent: number;
-  quarterlyDiscountPercent: number;
-  yearlyDiscountPercent: number;
-  welcomeDiscountPercent: number;
-  maxDiscountCapPercent: number;
+  quarterlyDiscountType: "PERCENT" | "FLAT";
+  quarterlyDiscountValue: number;
+  yearlyDiscountType: "PERCENT" | "FLAT";
+  yearlyDiscountValue: number;
+  welcomeDiscountType: "PERCENT" | "FLAT";
+  welcomeDiscountValue: number;
   yearlySavePercent: number;
   quarterlySavePercent: number;
   featuredUntil?: string | Date | null;
@@ -78,6 +81,11 @@ export default function GymProfilePage() {
     return () => {
       active = false;
     };
+  }, [gymId]);
+
+  useEffect(() => {
+    if (!gymId) return;
+    fetch(`/api/gyms/${gymId}/views`, { method: "POST" }).catch(() => undefined);
   }, [gymId]);
 
   useEffect(() => {
@@ -144,6 +152,11 @@ export default function GymProfilePage() {
     ];
   }, [gym]);
 
+  const formatDiscount = (type: "PERCENT" | "FLAT", value: number) => {
+    if (!value || value <= 0) return "0";
+    return type === "PERCENT" ? `${value}%` : formatPrice(value);
+  };
+
   if (loading) {
     return (
       <div className="container mx-auto px-4 py-10">
@@ -169,6 +182,8 @@ export default function GymProfilePage() {
     );
   }
 
+  const isVerified = gym.verificationStatus === "VERIFIED";
+
   return (
     <div className="container mx-auto px-4 py-10">
       <motion.div
@@ -187,15 +202,17 @@ export default function GymProfilePage() {
             ) : (
               <div className="text-center text-primary/80">
                 <Sparkles className="mx-auto h-14 w-14" />
-                <p className="text-sm">Premium verified gym</p>
+                <p className="text-sm">Gym photo coming soon</p>
               </div>
             )}
             <div className="absolute top-4 right-4 flex items-center gap-2">
               {gym.featuredUntil && new Date(gym.featuredUntil).getTime() > Date.now() && (
                 <span className="rounded-full bg-primary/20 text-primary px-3 py-1 text-xs">Featured</span>
               )}
-              {gym.verifiedUntil && new Date(gym.verifiedUntil).getTime() > Date.now() && (
+              {isVerified ? (
                 <span className="rounded-full bg-emerald-500/20 text-emerald-400 px-3 py-1 text-xs">Verified</span>
+              ) : (
+                <span className="rounded-full bg-amber-500/20 text-amber-400 px-3 py-1 text-xs">Unverified</span>
               )}
             </div>
           </div>
@@ -217,21 +234,29 @@ export default function GymProfilePage() {
                     {saved ? "Saved" : "Save"}
                   </Button>
                 )}
-                <Button asChild size="lg">
-                  <Link href={`/dashboard/user/join/${gym.id}`}>
-                    Join this gym
-                    <ArrowRight className="ml-2 h-4 w-4" />
-                  </Link>
-                </Button>
+                {isVerified ? (
+                  <Button asChild size="lg">
+                    <Link href={`/dashboard/user/join/${gym.id}`}>
+                      Join this gym
+                      <ArrowRight className="ml-2 h-4 w-4" />
+                    </Link>
+                  </Button>
+                ) : (
+                  <Button size="lg" variant="outline" disabled>
+                    Verification pending
+                  </Button>
+                )}
               </div>
             </div>
           </CardHeader>
           <CardContent className="grid gap-4 md:grid-cols-3">
             <div className="flex items-center gap-3">
-              <ShieldCheck className="h-6 w-6 text-primary" />
+              <ShieldCheck className={`h-6 w-6 ${isVerified ? "text-primary" : "text-muted-foreground"}`} />
               <div>
-                <div className="text-sm font-medium">Verified partner</div>
-                <div className="text-xs text-muted-foreground">Secure payments & support</div>
+                <div className="text-sm font-medium">{isVerified ? "Verified partner" : "Unverified gym"}</div>
+                <div className="text-xs text-muted-foreground">
+                  {isVerified ? "Secure payments & support" : "Verification pending. Joining is disabled."}
+                </div>
               </div>
             </div>
             <div className="flex items-center gap-3">
@@ -250,6 +275,17 @@ export default function GymProfilePage() {
             </div>
           </CardContent>
         </Card>
+
+        {!isVerified && (
+          <Card className="glass-card border-amber-500/30 bg-amber-500/10">
+            <CardHeader>
+              <CardTitle className="text-lg">Verification pending</CardTitle>
+            </CardHeader>
+            <CardContent className="text-sm text-muted-foreground">
+              This gym is visible but can’t accept new members until the owner’s verification is complete.
+            </CardContent>
+          </Card>
+        )}
 
         <div className="grid gap-4 md:grid-cols-3">
           {pricing.map((p) => (
@@ -272,20 +308,25 @@ export default function GymProfilePage() {
             <CardTitle>Discounts & perks</CardTitle>
           </CardHeader>
           <CardContent className="grid gap-3 md:grid-cols-2 text-sm text-muted-foreground">
-            <div>Welcome discount: up to {gym.welcomeDiscountPercent}%</div>
-            <div>Yearly discount: up to {gym.yearlyDiscountPercent}%</div>
-            <div>Quarterly discount: up to {gym.quarterlyDiscountPercent}%</div>
-            <div>Max stack cap: {gym.maxDiscountCapPercent}%</div>
+            <div>Welcome discount: up to {formatDiscount(gym.welcomeDiscountType, gym.welcomeDiscountValue)}</div>
+            <div>Yearly discount: up to {formatDiscount(gym.yearlyDiscountType, gym.yearlyDiscountValue)}</div>
+            <div>Quarterly discount: up to {formatDiscount(gym.quarterlyDiscountType, gym.quarterlyDiscountValue)}</div>
           </CardContent>
         </Card>
 
         <div className="text-center">
-          <Button asChild size="lg" className="text-base">
-            <Link href={`/dashboard/user/join/${gym.id}`}>
-              Continue to join
-              <ArrowRight className="ml-2 h-4 w-4" />
-            </Link>
-          </Button>
+          {isVerified ? (
+            <Button asChild size="lg" className="text-base">
+              <Link href={`/dashboard/user/join/${gym.id}`}>
+                Continue to join
+                <ArrowRight className="ml-2 h-4 w-4" />
+              </Link>
+            </Button>
+          ) : (
+            <Button size="lg" className="text-base" variant="outline" disabled>
+              Verification pending
+            </Button>
+          )}
         </div>
       </motion.div>
     </div>

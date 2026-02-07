@@ -78,3 +78,32 @@ export async function reverseGeocode(
     return null;
   }
 }
+
+export async function forwardGeocode(
+  address: string
+): Promise<{ latitude: number; longitude: number } | null> {
+  try {
+    const q = encodeURIComponent(address);
+    const url = `https://nominatim.openstreetmap.org/search?format=json&q=${q}&limit=1`;
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 5000);
+    const res = await fetch(url, {
+      headers: {
+        Accept: "application/json",
+        "User-Agent": process.env.NOMINATIM_USER_AGENT ?? "GymDuo/1.0",
+      },
+      signal: controller.signal,
+    });
+    clearTimeout(timeout);
+    if (!res.ok) return null;
+    const data = await res.json();
+    if (!Array.isArray(data) || data.length === 0) return null;
+    const first = data[0];
+    const lat = parseFloat(first?.lat);
+    const lng = parseFloat(first?.lon);
+    if (!Number.isFinite(lat) || !Number.isFinite(lng)) return null;
+    return { latitude: lat, longitude: lng };
+  } catch {
+    return null;
+  }
+}

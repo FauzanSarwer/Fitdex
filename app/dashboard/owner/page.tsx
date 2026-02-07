@@ -9,6 +9,16 @@ import { MapPin, Users } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { fetchJson } from "@/lib/client-fetch";
 import { formatPrice } from "@/lib/utils";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { useToast } from "@/hooks/use-toast";
 
 type Transaction = {
   id: string;
@@ -21,10 +31,21 @@ type Transaction = {
 };
 
 export default function OwnerDashboardPage() {
+  const { toast } = useToast();
+  const MAX_UPLOAD_BYTES = 500 * 1024;
   const [gyms, setGyms] = useState<any[]>([]);
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [gstGym, setGstGym] = useState<any | null>(null);
+  const [gstForm, setGstForm] = useState({
+    gstNumber: "",
+    gstLegalName: "",
+    gstCity: "",
+    gstCertificateUrl: "",
+  });
+  const [uploading, setUploading] = useState(false);
+  const [submittingGst, setSubmittingGst] = useState(false);
 
   useEffect(() => {
     let active = true;
@@ -92,6 +113,52 @@ export default function OwnerDashboardPage() {
   );
 
   const formatStatus = (status: string) => status.replace(/_/g, " ");
+
+  const openGstDialog = (gym: any) => {
+    setGstGym(gym);
+    setGstForm({
+      gstNumber: gym.gstNumber ?? "",
+      gstLegalName: "",
+      gstCity: "",
+      gstCertificateUrl: gym.gstCertificateUrl ?? "",
+    });
+  };
+
+  const submitGst = async () => {
+    if (!gstGym?.id) return;
+    if (!gstForm.gstNumber.trim() || !gstForm.gstCertificateUrl) {
+      toast({ title: "Missing info", description: "GST number and certificate are required.", variant: "destructive" });
+      return;
+    }
+    setSubmittingGst(true);
+    try {
+      const result = await fetchJson<{ ok?: boolean; error?: string; verificationNotes?: string }>(
+        "/api/owner/gym/verification/gst",
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            gymId: gstGym.id,
+            gstNumber: gstForm.gstNumber.trim(),
+            gstCertificateUrl: gstForm.gstCertificateUrl,
+            gstLegalName: gstForm.gstLegalName.trim() || undefined,
+            gstCity: gstForm.gstCity.trim() || undefined,
+          }),
+          retries: 1,
+        }
+      );
+      if (!result.ok) {
+        toast({ title: "Submission failed", description: result.error ?? "Please try again.", variant: "destructive" });
+        setSubmittingGst(false);
+        return;
+      }
+      toast({ title: "GST submitted", description: result.data?.verificationNotes ?? "Verification is pending." });
+      setGstGym(null);
+    } catch {
+      toast({ title: "Submission failed", variant: "destructive" });
+    }
+    setSubmittingGst(false);
+  };
 
   return (
     <div className="p-6 space-y-6">
@@ -163,6 +230,114 @@ export default function OwnerDashboardPage() {
                     <div className="text-muted-foreground">
                       Notes: {gym.verificationNotes ?? "No admin notes yet."}
                     </div>
+                    <Dialog open={gstGym?.id === gym.id} onOpenChange={(open) => !open && setGstGym(null)}>
+                      <DialogTrigger asChild>
+                        <Button size="sm" variant="secondary" onClick={() => openGstDialog(gym)}>
+                          Submit GST certificate
+                        </Button>
+                      </DialogTrigger>
+                      <DialogContent className="max-w-xl">
+                        <DialogHeader>
+                          <DialogTitle>GST verification</DialogTitle>
+                        </DialogHeader>
+                        <div className="grid gap-4">
+                          <div className="space-y-2">
+                            <Label>GST number</Label>
+                            <Input
+                              value={gstForm.gstNumber}
+                              onChange={(e) => setGstForm((p) => ({ ...p, gstNumber: e.target.value }))}
+                              placeholder="22AAAAA0000A1Z5"
+                            />
+                          </div>
+                          <div className="space-y-2">
+                            <Label>Legal name (optional)</Label>
+                            <Input
+                              value={gstForm.gstLegalName}
+                              onChange={(e) => setGstForm((p) => ({ ...p, gstLegalName: e.target.value }))}
+                              placeholder="Legal entity name"
+                            />
+                          </div>
+                          <div className="space-y-2">
+                            <Label>GST city (optional)</Label>
+                            <Input
+                              value={gstForm.gstCity}
+                              onChange={(e) => setGstForm((p) => ({ ...p, gstCity: e.target.value }))}
+                              placeholder="City"
+                            />
+                          </div>
+                          <div className="space-y-2">
+                            <Label>GST certificate (image only, ≤ 500KB)</Label>
+                            <Input
+                              type="file"
+                              accept="image/*"
+                              onChange={async (e) => {
+                                const file = e.target.files?.[0];
+                                if (!file) return;
+                                if (!file.type.startsWith("image/")) {
+                                  toast({ title: "Invalid file", description: "Only image files are allowed.", variant: "destructive" });
+                                  return;
+                                }
+                                if (file.size > MAX_UPLOAD_BYTES) {
+                                  toast({ title: "File too large", description: "Image must be 500KB or less.", variant: "destructive" });
+                                  return;
+                                }
+                                setUploading(true);
+                                try {
+                                  const sigResult = await fetchJson<{
+                                    signature?: string;
+                                    timestamp?: number;
+                                    cloudName?: string;
+                                    apiKey?: string;
+                                    folder?: string;
+                                    error?: string;
+                                  }>("/api/uploads/signature", { retries: 1 });
+                                  if (!sigResult.ok || !sigResult.data?.signature || !sigResult.data.cloudName) {
+                                    toast({ title: "Upload failed", description: sigResult.error ?? "Missing upload config", variant: "destructive" });
+                                    setUploading(false);
+                                    return;
+                                  }
+                                  if (!sigResult.data.apiKey || !sigResult.data.timestamp) {
+                                    toast({ title: "Upload failed", description: "Upload configuration incomplete.", variant: "destructive" });
+                                    setUploading(false);
+                                    return;
+                                  }
+                                  const formData = new FormData();
+                                  formData.append("file", file);
+                                  formData.append("api_key", sigResult.data.apiKey ?? "");
+                                  formData.append("timestamp", String(sigResult.data.timestamp));
+                                  formData.append("signature", sigResult.data.signature);
+                                  if (sigResult.data.folder) formData.append("folder", sigResult.data.folder);
+                                  const uploadRes = await fetch(
+                                    `https://api.cloudinary.com/v1_1/${sigResult.data.cloudName}/image/upload`,
+                                    { method: "POST", body: formData }
+                                  );
+                                  const uploadJson = await uploadRes.json();
+                                  if (!uploadRes.ok || !uploadJson.secure_url) {
+                                    toast({ title: "Upload failed", description: "Could not upload image", variant: "destructive" });
+                                    setUploading(false);
+                                    return;
+                                  }
+                                  setGstForm((p) => ({ ...p, gstCertificateUrl: uploadJson.secure_url }));
+                                } catch {
+                                  toast({ title: "Upload failed", variant: "destructive" });
+                                }
+                                setUploading(false);
+                              }}
+                            />
+                            {gstForm.gstCertificateUrl && (
+                              <img src={gstForm.gstCertificateUrl} alt="GST certificate" className="h-32 w-full rounded-lg object-cover" />
+                            )}
+                            {uploading && <p className="text-xs text-muted-foreground">Uploading…</p>}
+                          </div>
+                        </div>
+                        <div className="mt-4 flex justify-end gap-2">
+                          <Button variant="outline" onClick={() => setGstGym(null)}>Cancel</Button>
+                          <Button onClick={submitGst} disabled={uploading || submittingGst}>
+                            {uploading || submittingGst ? "Submitting…" : "Submit"}
+                          </Button>
+                        </div>
+                      </DialogContent>
+                    </Dialog>
                   </div>
                 )}
 

@@ -27,16 +27,22 @@ export default function OwnerDiscountsPage() {
   const [saving, setSaving] = useState(false);
   const [form, setForm] = useState({
     partnerDiscountPercent: "",
-    quarterlyDiscountPercent: "",
-    yearlyDiscountPercent: "",
-    welcomeDiscountPercent: "",
-    maxDiscountCapPercent: "",
+    quarterlyDiscountType: "PERCENT",
+    quarterlyDiscountValue: "",
+    yearlyDiscountType: "PERCENT",
+    yearlyDiscountValue: "",
+    welcomeDiscountType: "PERCENT",
+    welcomeDiscountValue: "",
   });
   const [promoCode, setPromoCode] = useState("");
-  const [promoPercent, setPromoPercent] = useState("");
+  const [promoType, setPromoType] = useState<"PERCENT" | "FLAT">("PERCENT");
+  const [promoValue, setPromoValue] = useState("");
   const [promoValidUntil, setPromoValidUntil] = useState("");
   const [promoSaving, setPromoSaving] = useState(false);
   const [promoCodes, setPromoCodes] = useState<any[]>([]);
+
+  const toRupees = (value: number) => String(Math.round(value / 100));
+  const toPaise = (value: string) => Math.round((parseFloat(value || "0") || 0) * 100);
 
   useEffect(() => {
     let active = true;
@@ -55,10 +61,21 @@ export default function OwnerDiscountsPage() {
           const g = list[0];
           setForm({
             partnerDiscountPercent: String(g.partnerDiscountPercent ?? 10),
-            quarterlyDiscountPercent: String(g.quarterlyDiscountPercent ?? 10),
-            yearlyDiscountPercent: String(g.yearlyDiscountPercent ?? 15),
-            welcomeDiscountPercent: String(g.welcomeDiscountPercent ?? 10),
-            maxDiscountCapPercent: String(g.maxDiscountCapPercent ?? 40),
+            quarterlyDiscountType: g.quarterlyDiscountType ?? "PERCENT",
+            quarterlyDiscountValue:
+              (g.quarterlyDiscountType ?? "PERCENT") === "FLAT"
+                ? toRupees(g.quarterlyDiscountValue ?? 0)
+                : String(g.quarterlyDiscountValue ?? 10),
+            yearlyDiscountType: g.yearlyDiscountType ?? "PERCENT",
+            yearlyDiscountValue:
+              (g.yearlyDiscountType ?? "PERCENT") === "FLAT"
+                ? toRupees(g.yearlyDiscountValue ?? 0)
+                : String(g.yearlyDiscountValue ?? 15),
+            welcomeDiscountType: g.welcomeDiscountType ?? "PERCENT",
+            welcomeDiscountValue:
+              (g.welcomeDiscountType ?? "PERCENT") === "FLAT"
+                ? toRupees(g.welcomeDiscountValue ?? 0)
+                : String(g.welcomeDiscountValue ?? 10),
           });
         }
         setLoading(false);
@@ -78,10 +95,21 @@ export default function OwnerDiscountsPage() {
     if (g) {
       setForm({
         partnerDiscountPercent: String(g.partnerDiscountPercent ?? 10),
-        quarterlyDiscountPercent: String(g.quarterlyDiscountPercent ?? 10),
-        yearlyDiscountPercent: String(g.yearlyDiscountPercent ?? 15),
-        welcomeDiscountPercent: String(g.welcomeDiscountPercent ?? 10),
-        maxDiscountCapPercent: String(g.maxDiscountCapPercent ?? 40),
+        quarterlyDiscountType: g.quarterlyDiscountType ?? "PERCENT",
+        quarterlyDiscountValue:
+          (g.quarterlyDiscountType ?? "PERCENT") === "FLAT"
+            ? toRupees(g.quarterlyDiscountValue ?? 0)
+            : String(g.quarterlyDiscountValue ?? 10),
+        yearlyDiscountType: g.yearlyDiscountType ?? "PERCENT",
+        yearlyDiscountValue:
+          (g.yearlyDiscountType ?? "PERCENT") === "FLAT"
+            ? toRupees(g.yearlyDiscountValue ?? 0)
+            : String(g.yearlyDiscountValue ?? 15),
+        welcomeDiscountType: g.welcomeDiscountType ?? "PERCENT",
+        welcomeDiscountValue:
+          (g.welcomeDiscountType ?? "PERCENT") === "FLAT"
+            ? toRupees(g.welcomeDiscountValue ?? 0)
+            : String(g.welcomeDiscountValue ?? 10),
       });
     }
   }, [selectedGymId, gyms]);
@@ -110,7 +138,7 @@ export default function OwnerDiscountsPage() {
   }, [selectedGymId]);
 
   async function handleAddPromo() {
-    if (!selectedGymId || !promoCode.trim() || !promoPercent) return;
+    if (!selectedGymId || !promoCode.trim() || !promoValue) return;
     setPromoSaving(true);
     try {
       const result = await fetchJson<{ code?: any; error?: string }>("/api/owner/discount-codes", {
@@ -119,7 +147,8 @@ export default function OwnerDiscountsPage() {
         body: JSON.stringify({
           gymId: selectedGymId,
           code: promoCode.trim(),
-          discountPercent: parseInt(promoPercent, 10) || 0,
+          discountType: promoType,
+          discountValue: promoType === "FLAT" ? toPaise(promoValue) : parseInt(promoValue, 10) || 0,
           validUntil: promoValidUntil || undefined,
         }),
         retries: 1,
@@ -135,7 +164,7 @@ export default function OwnerDiscountsPage() {
         setPromoCodes((prev) => [createdCode, ...prev]);
       }
       setPromoCode("");
-      setPromoPercent("");
+      setPromoValue("");
       setPromoValidUntil("");
     } catch {
       toast({ title: "Error", variant: "destructive" });
@@ -153,10 +182,21 @@ export default function OwnerDiscountsPage() {
         body: JSON.stringify({
           gymId: selectedGymId,
           partnerDiscountPercent: parseInt(form.partnerDiscountPercent, 10) || 0,
-          quarterlyDiscountPercent: parseInt(form.quarterlyDiscountPercent, 10) || 0,
-          yearlyDiscountPercent: parseInt(form.yearlyDiscountPercent, 10) || 0,
-          welcomeDiscountPercent: parseInt(form.welcomeDiscountPercent, 10) || 0,
-          maxDiscountCapPercent: parseInt(form.maxDiscountCapPercent, 10) || 40,
+          quarterlyDiscountType: form.quarterlyDiscountType,
+          quarterlyDiscountValue:
+            form.quarterlyDiscountType === "FLAT"
+              ? toPaise(form.quarterlyDiscountValue)
+              : parseInt(form.quarterlyDiscountValue, 10) || 0,
+          yearlyDiscountType: form.yearlyDiscountType,
+          yearlyDiscountValue:
+            form.yearlyDiscountType === "FLAT"
+              ? toPaise(form.yearlyDiscountValue)
+              : parseInt(form.yearlyDiscountValue, 10) || 0,
+          welcomeDiscountType: form.welcomeDiscountType,
+          welcomeDiscountValue:
+            form.welcomeDiscountType === "FLAT"
+              ? toPaise(form.welcomeDiscountValue)
+              : parseInt(form.welcomeDiscountValue, 10) || 0,
         }),
         retries: 1,
       });
@@ -234,7 +274,7 @@ export default function OwnerDiscountsPage() {
             <CardHeader>
               <CardTitle>Discount configuration</CardTitle>
               <CardDescription>
-                Partner (duo), quarterly, yearly, and welcome discounts stack. Total is capped at max %. Partner discount % is set here — applies when members invite partners to join (together or after joining; inviter gets discount on next renewal).
+                Discounts follow GymDuo stacking rules. Welcome cannot stack. Duo stacks only with quarterly/yearly. Promo stacks with quarterly/yearly.
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
@@ -252,52 +292,79 @@ export default function OwnerDiscountsPage() {
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label>Quarterly discount (%)</Label>
-                  <Input
-                    type="number"
-                    min="0"
-                    max="100"
-                    value={form.quarterlyDiscountPercent}
-                    onChange={(e) =>
-                      setForm((p) => ({ ...p, quarterlyDiscountPercent: e.target.value }))
-                    }
-                  />
+                  <Label>Quarterly discount</Label>
+                  <div className="flex gap-2">
+                    <Select
+                      value={form.quarterlyDiscountType}
+                      onValueChange={(v) => setForm((p) => ({ ...p, quarterlyDiscountType: v }))}
+                    >
+                      <SelectTrigger className="w-32">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="PERCENT">Percent</SelectItem>
+                        <SelectItem value="FLAT">Flat ₹</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <Input
+                      type="number"
+                      min="0"
+                      value={form.quarterlyDiscountValue}
+                      onChange={(e) =>
+                        setForm((p) => ({ ...p, quarterlyDiscountValue: e.target.value }))
+                      }
+                    />
+                  </div>
                 </div>
                 <div className="space-y-2">
-                  <Label>Yearly discount (%)</Label>
-                  <Input
-                    type="number"
-                    min="0"
-                    max="100"
-                    value={form.yearlyDiscountPercent}
-                    onChange={(e) =>
-                      setForm((p) => ({ ...p, yearlyDiscountPercent: e.target.value }))
-                    }
-                  />
+                  <Label>Yearly discount</Label>
+                  <div className="flex gap-2">
+                    <Select
+                      value={form.yearlyDiscountType}
+                      onValueChange={(v) => setForm((p) => ({ ...p, yearlyDiscountType: v }))}
+                    >
+                      <SelectTrigger className="w-32">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="PERCENT">Percent</SelectItem>
+                        <SelectItem value="FLAT">Flat ₹</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <Input
+                      type="number"
+                      min="0"
+                      value={form.yearlyDiscountValue}
+                      onChange={(e) =>
+                        setForm((p) => ({ ...p, yearlyDiscountValue: e.target.value }))
+                      }
+                    />
+                  </div>
                 </div>
                 <div className="space-y-2">
-                  <Label>Welcome discount (%)</Label>
-                  <Input
-                    type="number"
-                    min="0"
-                    max="100"
-                    value={form.welcomeDiscountPercent}
-                    onChange={(e) =>
-                      setForm((p) => ({ ...p, welcomeDiscountPercent: e.target.value }))
-                    }
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label>Max total discount cap (%)</Label>
-                  <Input
-                    type="number"
-                    min="0"
-                    max="100"
-                    value={form.maxDiscountCapPercent}
-                    onChange={(e) =>
-                      setForm((p) => ({ ...p, maxDiscountCapPercent: e.target.value }))
-                    }
-                  />
+                  <Label>Welcome discount</Label>
+                  <div className="flex gap-2">
+                    <Select
+                      value={form.welcomeDiscountType}
+                      onValueChange={(v) => setForm((p) => ({ ...p, welcomeDiscountType: v }))}
+                    >
+                      <SelectTrigger className="w-32">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="PERCENT">Percent</SelectItem>
+                        <SelectItem value="FLAT">Flat ₹</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <Input
+                      type="number"
+                      min="0"
+                      value={form.welcomeDiscountValue}
+                      onChange={(e) =>
+                        setForm((p) => ({ ...p, welcomeDiscountValue: e.target.value }))
+                      }
+                    />
+                  </div>
                 </div>
               </div>
               <Button onClick={handleSave} disabled={saving}>
@@ -321,12 +388,21 @@ export default function OwnerDiscountsPage() {
                   onChange={(e) => setPromoCode(e.target.value)}
                   className="w-32"
                 />
+                <Select value={promoType} onValueChange={(v) => setPromoType(v as "PERCENT" | "FLAT")}>
+                  <SelectTrigger className="w-32">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="PERCENT">Percent</SelectItem>
+                    <SelectItem value="FLAT">Flat ₹</SelectItem>
+                  </SelectContent>
+                </Select>
                 <Input
                   type="number"
-                  placeholder="% off"
-                  value={promoPercent}
-                  onChange={(e) => setPromoPercent(e.target.value)}
-                  className="w-20"
+                  placeholder={promoType === "FLAT" ? "₹ off" : "% off"}
+                  value={promoValue}
+                  onChange={(e) => setPromoValue(e.target.value)}
+                  className="w-28"
                 />
                 <Input
                   type="date"
@@ -348,7 +424,10 @@ export default function OwnerDiscountsPage() {
                       className="flex justify-between py-1 text-sm text-muted-foreground"
                     >
                       <span className="font-mono">{c.code}</span>
-                      <span>{c.discountPercent}% · {c.usedCount}/{c.maxUses} uses · until {new Date(c.validUntil).toLocaleDateString()}</span>
+                      <span>
+                        {c.discountType === "FLAT" ? `₹${Math.round(c.discountValue / 100)}` : `${c.discountValue}%`}
+                        {" "}· {c.usedCount}/{c.maxUses} uses · until {new Date(c.validUntil).toLocaleDateString()}
+                      </span>
                     </div>
                   ))}
                 </div>

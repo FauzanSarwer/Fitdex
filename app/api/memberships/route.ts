@@ -116,7 +116,7 @@ export async function POST(req: Request) {
     });
     const isFirstTimeUser = !hasEverHadMembership;
 
-    let promoPercent = 0;
+    let promo: { type: "PERCENT" | "FLAT"; value: number } | null = null;
     if (discountCode) {
       const code = await prisma.discountCode.findFirst({
         where: {
@@ -127,23 +127,25 @@ export async function POST(req: Request) {
         },
       });
       if (code && code.usedCount < code.maxUses) {
-        promoPercent = code.discountPercent;
+        promo = { type: code.discountType as "PERCENT" | "FLAT", value: code.discountValue };
       }
     }
 
     const { finalPrice, breakdown } = computeDiscount(basePrice, planType, {
       isFirstTimeUser,
       hasActiveDuo,
-      promoPercent,
+      promo,
       gym: {
         monthlyPrice: gym.monthlyPrice,
         quarterlyPrice: gym.quarterlyPrice ?? undefined,
         yearlyPrice: gym.yearlyPrice,
         partnerDiscountPercent: gym.partnerDiscountPercent,
-        quarterlyDiscountPercent: gym.quarterlyDiscountPercent,
-        yearlyDiscountPercent: gym.yearlyDiscountPercent,
-        welcomeDiscountPercent: gym.welcomeDiscountPercent,
-        maxDiscountCapPercent: gym.maxDiscountCapPercent,
+        quarterlyDiscountType: gym.quarterlyDiscountType as "PERCENT" | "FLAT",
+        quarterlyDiscountValue: gym.quarterlyDiscountValue,
+        yearlyDiscountType: gym.yearlyDiscountType as "PERCENT" | "FLAT",
+        yearlyDiscountValue: gym.yearlyDiscountValue,
+        welcomeDiscountType: gym.welcomeDiscountType as "PERCENT" | "FLAT",
+        welcomeDiscountValue: gym.welcomeDiscountValue,
       },
     });
     const expiresAt = new Date();

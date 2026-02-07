@@ -31,6 +31,7 @@ interface Gym {
   address: string;
   latitude: number;
   longitude: number;
+  verificationStatus: string;
   openTime?: string | null;
   closeTime?: string | null;
   openDays?: string | null;
@@ -179,7 +180,7 @@ export default function ExplorePage() {
     }
     if (onlyVerified) {
       list = list.filter(
-        (g) => g.verifiedUntil && new Date(g.verifiedUntil).getTime() > Date.now()
+        (g) => g.verificationStatus === "VERIFIED"
       );
     }
 
@@ -484,9 +485,13 @@ export default function ExplorePage() {
                           Featured
                         </span>
                       )}
-                      {gym.verifiedUntil && new Date(gym.verifiedUntil).getTime() > Date.now() && (
+                      {gym.verificationStatus === "VERIFIED" ? (
                         <span className="text-[10px] uppercase tracking-wide bg-emerald-500/20 text-emerald-400 px-2 py-0.5 rounded-full">
                           Verified
+                        </span>
+                      ) : (
+                        <span className="text-[10px] uppercase tracking-wide bg-amber-500/20 text-amber-400 px-2 py-0.5 rounded-full">
+                          Unverified
                         </span>
                       )}
                       {status === "authenticated" && (

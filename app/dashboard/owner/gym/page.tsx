@@ -15,14 +15,14 @@ import { isPaymentsEnabled, openRazorpayCheckout } from "@/lib/razorpay-checkout
 
 export default function OwnerGymPage() {
   const { toast } = useToast();
+  const MAX_UPLOAD_BYTES = 500 * 1024;
   const [gyms, setGyms] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [form, setForm] = useState({
     name: "",
     address: "",
-    latitude: "",
-    longitude: "",
+    coverImageUrl: "",
     openTime: "",
     closeTime: "",
     openDays: ["MON", "TUE", "WED", "THU", "FRI", "SAT"] as string[],
@@ -32,6 +32,7 @@ export default function OwnerGymPage() {
     yearlyPrice: "",
   });
   const [saving, setSaving] = useState(false);
+  const [uploading, setUploading] = useState(false);
   const [featuring, setFeaturing] = useState<string | null>(null);
   const [verifying, setVerifying] = useState<string | null>(null);
   const paymentsEnabled = isPaymentsEnabled();
@@ -74,8 +75,7 @@ export default function OwnerGymPage() {
         body: JSON.stringify({
           name: form.name,
           address: form.address,
-          latitude: parseFloat(form.latitude) || 28.6139,
-          longitude: parseFloat(form.longitude) || 77.209,
+          coverImageUrl: form.coverImageUrl,
           openTime: form.openTime || null,
           closeTime: form.closeTime || null,
           openDays: form.openDays.length > 0 ? form.openDays.join(",") : null,
@@ -99,8 +99,7 @@ export default function OwnerGymPage() {
       setForm({
         name: "",
         address: "",
-        latitude: "",
-        longitude: "",
+        coverImageUrl: "",
         openTime: "",
         closeTime: "",
         openDays: ["MON", "TUE", "WED", "THU", "FRI", "SAT"],
@@ -179,24 +178,71 @@ export default function OwnerGymPage() {
                 />
               </div>
               <div className="space-y-2">
-                <Label>Latitude</Label>
+                <Label>Gym photo (required)</Label>
                 <Input
-                  type="number"
-                  step="any"
-                  value={form.latitude}
-                  onChange={(e) => setForm((p) => ({ ...p, latitude: e.target.value }))}
-                  placeholder="28.6139"
+                  type="file"
+                  accept="image/*"
+                  onChange={async (e) => {
+                    const file = e.target.files?.[0];
+                    if (!file) return;
+                    if (!file.type.startsWith("image/")) {
+                      toast({ title: "Invalid file", description: "Only image files are allowed.", variant: "destructive" });
+                      return;
+                    }
+                    if (file.size > MAX_UPLOAD_BYTES) {
+                      toast({ title: "File too large", description: "Image must be 500KB or less.", variant: "destructive" });
+                      return;
+                    }
+                    setUploading(true);
+                    try {
+                      const sigResult = await fetchJson<{
+                        signature?: string;
+                        timestamp?: number;
+                        cloudName?: string;
+                        apiKey?: string;
+                        folder?: string;
+                        error?: string;
+                      }>("/api/uploads/signature", { retries: 1 });
+                      if (!sigResult.ok || !sigResult.data?.signature || !sigResult.data.cloudName) {
+                        toast({ title: "Upload failed", description: sigResult.error ?? "Missing upload config", variant: "destructive" });
+                        setUploading(false);
+                        return;
+                      }
+                      if (!sigResult.data.apiKey || !sigResult.data.timestamp) {
+                        toast({ title: "Upload failed", description: "Upload configuration incomplete.", variant: "destructive" });
+                        setUploading(false);
+                        return;
+                      }
+                      const formData = new FormData();
+                      formData.append("file", file);
+                      formData.append("api_key", sigResult.data.apiKey ?? "");
+                      formData.append("timestamp", String(sigResult.data.timestamp));
+                      formData.append("signature", sigResult.data.signature);
+                      if (sigResult.data.folder) formData.append("folder", sigResult.data.folder);
+                      const uploadRes = await fetch(
+                        `https://api.cloudinary.com/v1_1/${sigResult.data.cloudName}/image/upload`,
+                        { method: "POST", body: formData }
+                      );
+                      const uploadJson = await uploadRes.json();
+                      if (!uploadRes.ok || !uploadJson.secure_url) {
+                        toast({ title: "Upload failed", description: "Could not upload image", variant: "destructive" });
+                        setUploading(false);
+                        return;
+                      }
+                      setForm((p) => ({ ...p, coverImageUrl: uploadJson.secure_url }));
+                    } catch {
+                      toast({ title: "Upload failed", variant: "destructive" });
+                    }
+                    setUploading(false);
+                  }}
+                  required={!form.coverImageUrl}
                 />
-              </div>
-              <div className="space-y-2">
-                <Label>Longitude</Label>
-                <Input
-                  type="number"
-                  step="any"
-                  value={form.longitude}
-                  onChange={(e) => setForm((p) => ({ ...p, longitude: e.target.value }))}
-                  placeholder="77.209"
-                />
+                {form.coverImageUrl && (
+                  <div className="mt-2 overflow-hidden rounded-xl border border-white/10">
+                    <img src={form.coverImageUrl} alt="Gym cover" className="h-32 w-full object-cover" />
+                  </div>
+                )}
+                {uploading && <p className="text-xs text-muted-foreground">Uploading image…</p>}
               </div>
               <div className="space-y-2">
                 <Label>Opening time</Label>
@@ -285,8 +331,8 @@ export default function OwnerGymPage() {
                 />
               </div>
             </div>
-            <Button type="submit" disabled={saving}>
-              {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : "Add gym"}
+            <Button type="submit" disabled={saving || uploading}>
+              {saving || uploading ? <Loader2 className="h-4 w-4 animate-spin" /> : "Add gym"}
             </Button>
           </form>
         </CardContent>

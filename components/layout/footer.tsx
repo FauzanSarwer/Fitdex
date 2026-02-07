@@ -2,10 +2,14 @@
 
 import Link from "next/link";
 import { motion } from "framer-motion";
+import { useSession } from "next-auth/react";
 import { Dumbbell } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
 export function Footer() {
+  const { data: session, status } = useSession();
+  const showOwnerCta = status !== "loading" && !session;
+
   return (
     <footer className="mt-auto border-t border-white/10 bg-white/5 backdrop-blur">
       <div className="container mx-auto px-4 py-12">
@@ -32,9 +36,11 @@ export function Footer() {
             <Link href="/pricing" className="text-muted-foreground hover:text-foreground transition-colors">
               Pricing
             </Link>
-            <Button asChild size="sm" className="bg-gradient-to-r from-primary to-accent shadow-glow">
-              <Link href="/owners">Gym Owner?</Link>
-            </Button>
+            {showOwnerCta && (
+              <Button asChild size="sm" className="bg-gradient-to-r from-primary to-accent shadow-glow">
+                <Link href="/owners">Gym Owner?</Link>
+              </Button>
+            )}
           </div>
         </motion.div>
         <div className="mt-8 text-xs text-muted-foreground">

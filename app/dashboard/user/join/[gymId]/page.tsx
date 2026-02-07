@@ -48,6 +48,7 @@ interface GymData {
   name: string;
   address: string;
   coverImageUrl: string | null;
+  verificationStatus: string;
   owner: { id: string; name: string | null };
   dayPassPrice?: number | null;
   monthlyPrice: number;
@@ -167,6 +168,10 @@ function JoinContent() {
 
   async function handleCheckout() {
     if (!gymId || !selectedPlan) return;
+    if (gym?.verificationStatus !== "VERIFIED") {
+      toast({ title: "Verification pending", description: "This gym can't accept new members yet." });
+      return;
+    }
     setCheckingOut(true);
     try {
       const result = await fetchJson<{ membership?: { id: string }; finalPricePaise?: number; error?: string }>("/api/memberships", {
@@ -321,6 +326,8 @@ function JoinContent() {
     },
   ];
 
+  const isVerified = gym.verificationStatus === "VERIFIED";
+
   return (
     <div className="p-6 max-w-2xl mx-auto">
       <motion.div
@@ -368,6 +375,17 @@ function JoinContent() {
             </div>
           </CardHeader>
         </Card>
+
+        {!isVerified && (
+          <Card className="glass-card border-amber-500/30 bg-amber-500/10">
+            <CardHeader>
+              <CardTitle className="text-lg">Verification pending</CardTitle>
+            </CardHeader>
+            <CardContent className="text-sm text-muted-foreground">
+              This gym is visible but can’t accept new members until verification is complete.
+            </CardContent>
+          </Card>
+        )}
 
         {/* Plan selection */}
         <Card className="glass-card">
@@ -526,10 +544,12 @@ function JoinContent() {
               className="w-full h-12 text-base"
               size="lg"
               onClick={handleCheckout}
-              disabled={checkingOut || !paymentsEnabled}
+              disabled={checkingOut || !paymentsEnabled || !isVerified}
             >
               {checkingOut ? (
                 <Loader2 className="h-5 w-5 animate-spin" />
+              ) : !isVerified ? (
+                "Verification pending"
               ) : !paymentsEnabled ? (
                 "Payments not available yet"
               ) : (
@@ -540,7 +560,11 @@ function JoinContent() {
               )}
             </Button>
             <p className="text-center text-xs text-muted-foreground mt-3">
-              {paymentsEnabled ? "You’ll complete payment on the next screen" : "Payments are not available yet."}
+              {!isVerified
+                ? "Verification is required before joining."
+                : paymentsEnabled
+                  ? "You’ll complete payment on the next screen"
+                  : "Payments are not available yet."}
             </p>
           </CardContent>
         </Card>

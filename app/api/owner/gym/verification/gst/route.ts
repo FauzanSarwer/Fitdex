@@ -29,6 +29,10 @@ function hasCityMatch(address: string, city?: string) {
   return address.toLowerCase().includes(city.toLowerCase());
 }
 
+function isLikelyImageUrl(url: string) {
+  return /\.(png|jpe?g|webp|gif|bmp|heic|heif)(\?|$)/i.test(url);
+}
+
 export async function POST(req: Request) {
   const session = await getServerSession(authOptions);
   if (!requireOwner(session)) {
@@ -50,6 +54,9 @@ export async function POST(req: Request) {
   const gstCertificateUrl = parsed.data.gstCertificateUrl?.trim();
   if (!gymId || !gstNumber || !gstCertificateUrl) {
     return jsonError("gymId, gstNumber, gstCertificateUrl required", 400);
+  }
+  if (!isLikelyImageUrl(gstCertificateUrl)) {
+    return jsonError("GST certificate must be an image", 400);
   }
   if (!GSTIN_REGEX.test(gstNumber)) {
     return jsonError("Invalid GST number format", 400);

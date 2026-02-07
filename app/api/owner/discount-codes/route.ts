@@ -44,7 +44,8 @@ export async function POST(req: Request) {
   const parsed = await safeJson<{
     gymId?: string;
     code?: string;
-    discountPercent?: number;
+    discountType?: "PERCENT" | "FLAT";
+    discountValue?: number;
     maxUses?: number;
     validUntil?: string;
   }>(req);
@@ -53,14 +54,18 @@ export async function POST(req: Request) {
   }
   const gymId = parsed.data.gymId?.trim();
   const code = parsed.data.code?.trim();
-  const discountPercent = parsed.data.discountPercent;
+  const discountType = parsed.data.discountType ?? "PERCENT";
+  const discountValue = parsed.data.discountValue;
   const maxUses = parsed.data.maxUses;
   const validUntil = parsed.data.validUntil;
-  if (!gymId || !code || discountPercent == null) {
-    return jsonError("gymId, code, discountPercent required", 400);
+  if (!gymId || !code || discountValue == null) {
+    return jsonError("gymId, code, discountValue required", 400);
   }
-  if (discountPercent <= 0 || discountPercent > 100) {
-    return jsonError("discountPercent must be between 1 and 100", 400);
+  if (discountType === "PERCENT" && (discountValue <= 0 || discountValue > 100)) {
+    return jsonError("discountValue must be between 1 and 100 for percent", 400);
+  }
+  if (discountType === "FLAT" && discountValue <= 0) {
+    return jsonError("discountValue must be greater than 0 for flat", 400);
   }
   try {
     const gym = await prisma.gym.findFirst({
@@ -76,7 +81,8 @@ export async function POST(req: Request) {
       data: {
         gymId,
         code: code.toUpperCase(),
-        discountPercent: Number(discountPercent),
+        discountType,
+        discountValue: Number(discountValue),
         maxUses: Number(maxUses ?? 100),
         validUntil: validUntilDate,
       },

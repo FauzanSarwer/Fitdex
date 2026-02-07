@@ -12,6 +12,8 @@ import {
   Settings,
   BarChart3,
   Percent,
+  Dumbbell,
+  Compass,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -26,6 +28,7 @@ const USER_LINKS = [
 const OWNER_LINKS = [
   { href: "/dashboard/owner", label: "Overview", icon: LayoutDashboard },
   { href: "/dashboard/owner/gym", label: "Gym", icon: MapPin },
+  { href: "/dashboard/owner/explore", label: "Explore", icon: Compass },
   { href: "/dashboard/owner/members", label: "Members", icon: Users },
   { href: "/dashboard/owner/analytics", label: "Analytics", icon: BarChart3 },
   { href: "/dashboard/owner/discounts", label: "Discounts", icon: Percent },
@@ -40,8 +43,11 @@ export function DashboardNav({ role, isOwner }: { role: string; isOwner?: boolea
     <>
       <header className="fixed top-0 left-0 right-0 z-40 glass border-b border-white/10 md:pl-56">
         <div className="flex h-16 items-center px-4">
-          <Link href="/" className="font-bold text-lg">
-            GYMDUO
+          <Link href="/" className="flex items-center gap-2">
+            <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-br from-primary to-accent shadow-glow-sm">
+              <Dumbbell className="h-5 w-5 text-white" />
+            </div>
+            <span className="text-lg font-bold">GYMDUO</span>
           </Link>
         </div>
       </header>

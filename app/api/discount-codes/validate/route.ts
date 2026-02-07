@@ -32,14 +32,19 @@ export async function POST(req: Request) {
     if (!discountCode || discountCode.usedCount >= discountCode.maxUses) {
       return NextResponse.json({
         valid: false,
-        discountPercent: 0,
+        discountType: "PERCENT",
+        discountValue: 0,
         message: "Invalid or expired code",
       });
     }
     return NextResponse.json({
       valid: true,
-      discountPercent: discountCode.discountPercent,
-      message: `${discountCode.discountPercent}% off applied`,
+      discountType: discountCode.discountType,
+      discountValue: discountCode.discountValue,
+      message:
+        discountCode.discountType === "FLAT"
+          ? `₹${Math.round(discountCode.discountValue / 100)} off applied`
+          : `${discountCode.discountValue}% off applied`,
     });
   } catch (error) {
     logServerError(error as Error, { route: "/api/discount-codes/validate" });

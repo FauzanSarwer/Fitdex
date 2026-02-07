@@ -80,6 +80,36 @@ export async function GET() {
       )
     );
 
+    // Owner verification reminders
+    const ownerGyms = await prisma.gym.findMany({
+      where: {
+        ownerId: uid,
+        verificationStatus: { not: "VERIFIED" },
+      },
+    });
+
+    await Promise.all(
+      ownerGyms.map((gym) =>
+        prisma.notification.upsert({
+          where: {
+            userId_type_entityId: {
+              userId: uid,
+              type: "owner_verification_required",
+              entityId: gym.id,
+            },
+          },
+          update: {},
+          create: {
+            userId: uid,
+            type: "owner_verification_required",
+            entityId: gym.id,
+            title: `Verify ${gym.name}`,
+            body: "Complete verification to enable memberships for this gym.",
+          },
+        })
+      )
+    );
+
     const notifications = await prisma.notification.findMany({
       where: { userId: uid, read: false },
       orderBy: { createdAt: "desc" },

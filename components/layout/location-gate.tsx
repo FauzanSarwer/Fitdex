@@ -55,6 +55,13 @@ export function LocationGate({ children }: { children: React.ReactNode }) {
               longitude: lng,
               serviceable: true,
             });
+            try {
+              localStorage.setItem("gymduo_location", JSON.stringify({
+                latitude: lat,
+                longitude: lng,
+                serviceable: true,
+              }));
+            } catch {}
             return;
           }
 
@@ -102,6 +109,13 @@ export function LocationGate({ children }: { children: React.ReactNode }) {
             longitude: lng,
             serviceable: true,
           });
+          try {
+            localStorage.setItem("gymduo_location", JSON.stringify({
+              latitude: lat,
+              longitude: lng,
+              serviceable: true,
+            }));
+          } catch {}
         }
       },
       (err) => {
@@ -179,21 +193,23 @@ export function LocationGate({ children }: { children: React.ReactNode }) {
     return <>{children}</>;
   }
 
-  if (location.status === "ready") {
-    return <>{children}</>;
-  }
+  const showOverlay = location.status !== "ready";
 
   return (
-    <AnimatePresence mode="wait">
-      {location.status === "denied" && (
-        <motion.div
-          key="denied"
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          exit={{ opacity: 0 }}
-          className="min-h-screen flex items-center justify-center p-4 bg-background"
-        >
-          <Card className="max-w-md w-full glass-card">
+    <>
+      <div className={showOverlay ? "blur-sm pointer-events-none select-none transition" : "transition"}>
+        {children}
+      </div>
+      <AnimatePresence mode="wait">
+        {location.status === "denied" && (
+          <motion.div
+            key="denied"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm"
+          >
+            <Card className="w-full max-w-xl max-h-[40vh] overflow-auto glass-card">
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <MapPin className="h-5 w-5" />
@@ -211,19 +227,19 @@ export function LocationGate({ children }: { children: React.ReactNode }) {
                 Try again
               </Button>
             </CardContent>
-          </Card>
-        </motion.div>
-      )}
+            </Card>
+          </motion.div>
+        )}
 
-      {location.status === "not_serviceable" && (
-        <motion.div
-          key="not_serviceable"
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          exit={{ opacity: 0 }}
-          className="min-h-screen flex items-center justify-center p-4 bg-background"
-        >
-          <Card className="max-w-md w-full glass-card text-center">
+        {location.status === "not_serviceable" && (
+          <motion.div
+            key="not_serviceable"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm"
+          >
+            <Card className="w-full max-w-xl max-h-[40vh] overflow-auto glass-card text-center">
             <CardHeader>
               <CardTitle className="text-2xl">Currently not serviceable</CardTitle>
               <CardDescription>
@@ -273,19 +289,19 @@ export function LocationGate({ children }: { children: React.ReactNode }) {
                 Re-check location
               </Button>
             </CardContent>
-          </Card>
-        </motion.div>
-      )}
+            </Card>
+          </motion.div>
+        )}
 
-      {(location.status === "idle" || location.status === "requesting") && (
-        <motion.div
-          key="request"
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          exit={{ opacity: 0 }}
-          className="min-h-screen flex items-center justify-center p-4 bg-background"
-        >
-          <Card className="max-w-md w-full glass-card text-center">
+        {(location.status === "idle" || location.status === "requesting") && (
+          <motion.div
+            key="request"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm"
+          >
+            <Card className="w-full max-w-xl max-h-[40vh] overflow-auto glass-card text-center">
             <CardHeader>
               <CardTitle className="flex items-center justify-center gap-2">
                 {location.status === "requesting" ? (
@@ -318,9 +334,10 @@ export function LocationGate({ children }: { children: React.ReactNode }) {
                 </p>
               )}
             </CardContent>
-          </Card>
-        </motion.div>
-      )}
-    </AnimatePresence>
+            </Card>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </>
   );
 }

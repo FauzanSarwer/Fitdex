@@ -11,9 +11,10 @@ const DELHI_GYMS = [
     monthlyPrice: 29900, // ₹299 in paise → 29900
     yearlyPrice: 299000, // ₹2990
     partnerDiscountPercent: 15,
-    yearlyDiscountPercent: 20,
-    welcomeDiscountPercent: 10,
-    maxDiscountCapPercent: 40,
+    yearlyDiscountType: "PERCENT",
+    yearlyDiscountValue: 20,
+    welcomeDiscountType: "PERCENT",
+    welcomeDiscountValue: 10,
   },
   {
     name: "Anytime Fitness – Saket",
@@ -23,9 +24,10 @@ const DELHI_GYMS = [
     monthlyPrice: 34900,
     yearlyPrice: 349000,
     partnerDiscountPercent: 10,
-    yearlyDiscountPercent: 18,
-    welcomeDiscountPercent: 10,
-    maxDiscountCapPercent: 40,
+    yearlyDiscountType: "PERCENT",
+    yearlyDiscountValue: 18,
+    welcomeDiscountType: "PERCENT",
+    welcomeDiscountValue: 10,
   },
   {
     name: "Cult.fit – Defence Colony",
@@ -35,9 +37,10 @@ const DELHI_GYMS = [
     monthlyPrice: 19900,
     yearlyPrice: 199000,
     partnerDiscountPercent: 12,
-    yearlyDiscountPercent: 15,
-    welcomeDiscountPercent: 10,
-    maxDiscountCapPercent: 40,
+    yearlyDiscountType: "PERCENT",
+    yearlyDiscountValue: 15,
+    welcomeDiscountType: "PERCENT",
+    welcomeDiscountValue: 10,
   },
 ];
 

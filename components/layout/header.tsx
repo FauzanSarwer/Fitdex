@@ -16,6 +16,7 @@ import {
 export function Header() {
   const { data: session, status } = useSession();
   const owner = status === "authenticated" && isOwner(session);
+  const showOwnerCta = status !== "loading" && !session;
 
   return (
     <motion.header
@@ -44,9 +45,11 @@ export function Header() {
           >
             Pricing
           </Link>
-          <Button asChild size="sm" className="bg-gradient-to-r from-primary to-accent shadow-glow">
-            <Link href="/owners">Gym Owner?</Link>
-          </Button>
+          {showOwnerCta && (
+            <Button asChild size="sm" className="bg-gradient-to-r from-primary to-accent shadow-glow">
+              <Link href="/owners">Gym Owner?</Link>
+            </Button>
+          )}
         </nav>
         <div className="flex items-center gap-3">
           {status === "loading" ? (

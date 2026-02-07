@@ -3,20 +3,22 @@ export type PlanType = "DAY_PASS" | "MONTHLY" | "QUARTERLY" | "YEARLY";
 export interface DiscountBreakdown {
   basePrice: number;
   planType: PlanType;
-  welcomeDiscountPercent: number;
+  welcomeDiscountType: "PERCENT" | "FLAT" | "NONE";
+  welcomeDiscountValue: number;
   welcomeAmount: number;
-  quarterlyDiscountPercent: number;
+  quarterlyDiscountType: "PERCENT" | "FLAT" | "NONE";
+  quarterlyDiscountValue: number;
   quarterlyAmount: number;
-  yearlyDiscountPercent: number;
+  yearlyDiscountType: "PERCENT" | "FLAT" | "NONE";
+  yearlyDiscountValue: number;
   yearlyAmount: number;
   partnerDiscountPercent: number;
   partnerAmount: number;
-  promoDiscountPercent: number;
+  promoDiscountType: "PERCENT" | "FLAT" | "NONE";
+  promoDiscountValue: number;
   promoAmount: number;
-  totalDiscountPercent: number;
   totalDiscountAmount: number;
   finalPrice: number;
-  capped: boolean;
 }
 
 export interface GymDiscountConfig {
@@ -24,10 +26,12 @@ export interface GymDiscountConfig {
   quarterlyPrice?: number;
   yearlyPrice: number;
   partnerDiscountPercent: number;
-  quarterlyDiscountPercent?: number;
-  yearlyDiscountPercent: number;
-  welcomeDiscountPercent: number;
-  maxDiscountCapPercent: number;
+  quarterlyDiscountType?: "PERCENT" | "FLAT";
+  quarterlyDiscountValue?: number;
+  yearlyDiscountType: "PERCENT" | "FLAT";
+  yearlyDiscountValue: number;
+  welcomeDiscountType: "PERCENT" | "FLAT";
+  welcomeDiscountValue: number;
 }
 
 export function computeDiscount(
@@ -36,65 +40,100 @@ export function computeDiscount(
   options: {
     isFirstTimeUser: boolean;
     hasActiveDuo: boolean;
-    promoPercent?: number;
+    promo?: { type: "PERCENT" | "FLAT"; value: number } | null;
     gym: GymDiscountConfig;
   }
 ): { finalPrice: number; breakdown: DiscountBreakdown } {
-  const { isFirstTimeUser, hasActiveDuo, promoPercent = 0, gym } = options;
+  const { isFirstTimeUser, hasActiveDuo, promo, gym } = options;
   const normalizedBasePrice = Number.isFinite(basePrice)
     ? Math.max(0, Math.round(basePrice))
     : 0;
   const clampPercent = (value: number) => Math.min(100, Math.max(0, value));
-  let welcomePercent = 0;
-  let quarterlyPercent = 0;
-  let yearlyPercent = 0;
-  let partnerPercent = 0;
+  const applyDiscount = (type: "PERCENT" | "FLAT", value: number) => {
+    if (type === "PERCENT") {
+      return Math.round((normalizedBasePrice * clampPercent(value)) / 100);
+    }
+    return Math.max(0, Math.round(value));
+  };
 
-  if (isFirstTimeUser && gym.welcomeDiscountPercent > 0) {
-    welcomePercent = clampPercent(gym.welcomeDiscountPercent);
-  }
-  if (planType === "QUARTERLY" && (gym.quarterlyDiscountPercent ?? 0) > 0) {
-    quarterlyPercent = clampPercent(gym.quarterlyDiscountPercent ?? 0);
-  }
-  if (planType === "YEARLY" && gym.yearlyDiscountPercent > 0) {
-    yearlyPercent = clampPercent(gym.yearlyDiscountPercent);
-  }
-  if (hasActiveDuo && gym.partnerDiscountPercent > 0) {
-    partnerPercent = clampPercent(gym.partnerDiscountPercent);
+  const hasPromo = !!promo && promo.value > 0;
+  const allowPlanDiscount = planType === "QUARTERLY" || planType === "YEARLY";
+  const allowPartnerDiscount = hasActiveDuo && allowPlanDiscount && !hasPromo;
+  const allowWelcome = isFirstTimeUser && !hasPromo && !hasActiveDuo;
+
+  const quarterlyEligible = planType === "QUARTERLY" && (gym.quarterlyDiscountValue ?? 0) > 0;
+  const yearlyEligible = planType === "YEARLY" && (gym.yearlyDiscountValue ?? 0) > 0;
+
+  const quarterlyType = quarterlyEligible ? (gym.quarterlyDiscountType ?? "PERCENT") : "NONE";
+  const quarterlyValue = quarterlyEligible ? (gym.quarterlyDiscountValue ?? 0) : 0;
+  const yearlyType = yearlyEligible ? gym.yearlyDiscountType : "NONE";
+  const yearlyValue = yearlyEligible ? gym.yearlyDiscountValue : 0;
+  const welcomeType = allowWelcome ? gym.welcomeDiscountType : "NONE";
+  const welcomeValue = allowWelcome ? gym.welcomeDiscountValue : 0;
+
+  const quarterlyAmount = quarterlyEligible
+    ? applyDiscount(quarterlyType === "NONE" ? "PERCENT" : quarterlyType, quarterlyValue)
+    : 0;
+  const yearlyAmount = yearlyEligible
+    ? applyDiscount(yearlyType === "NONE" ? "PERCENT" : yearlyType, yearlyValue)
+    : 0;
+  const planDiscountAmount = allowPlanDiscount
+    ? quarterlyEligible
+      ? quarterlyAmount
+      : yearlyEligible
+        ? yearlyAmount
+        : 0
+    : 0;
+
+  const partnerAmount = allowPartnerDiscount
+    ? Math.round((normalizedBasePrice * clampPercent(gym.partnerDiscountPercent)) / 100)
+    : 0;
+  const promoAmount = hasPromo ? applyDiscount(promo!.type, promo!.value) : 0;
+  const welcomeAmount = allowWelcome
+    ? applyDiscount(welcomeType === "NONE" ? "PERCENT" : welcomeType, welcomeValue)
+    : 0;
+
+  // Stacking rules:
+  // - Welcome cannot stack with any other discount.
+  // - Promo can stack with yearly/quarterly only.
+  // - Duo can stack with yearly/quarterly only, and cannot stack with promo or welcome.
+  let totalDiscountAmount = 0;
+  if (welcomeAmount > 0) {
+    totalDiscountAmount = welcomeAmount;
+  } else if (hasPromo && allowPlanDiscount) {
+    totalDiscountAmount = planDiscountAmount + promoAmount;
+  } else if (hasPromo) {
+    totalDiscountAmount = promoAmount;
+  } else if (allowPartnerDiscount && allowPlanDiscount) {
+    totalDiscountAmount = planDiscountAmount + partnerAmount;
+  } else if (allowPlanDiscount) {
+    totalDiscountAmount = planDiscountAmount;
+  } else if (allowPartnerDiscount) {
+    totalDiscountAmount = partnerAmount;
   }
 
-  let totalPercent =
-    welcomePercent + quarterlyPercent + yearlyPercent + partnerPercent + clampPercent(promoPercent);
-  const cap = clampPercent(gym.maxDiscountCapPercent ?? 40);
-  const capped = totalPercent > cap;
-  if (capped) totalPercent = cap;
-
-  const totalDiscountAmount = Math.round((normalizedBasePrice * totalPercent) / 100);
+  if (totalDiscountAmount > normalizedBasePrice) totalDiscountAmount = normalizedBasePrice;
   const finalPrice = Math.max(0, normalizedBasePrice - totalDiscountAmount);
-
-  const welcomeAmount = Math.round((normalizedBasePrice * welcomePercent) / 100);
-  const quarterlyAmount = Math.round((normalizedBasePrice * quarterlyPercent) / 100);
-  const yearlyAmount = Math.round((normalizedBasePrice * yearlyPercent) / 100);
-  const partnerAmount = Math.round((normalizedBasePrice * partnerPercent) / 100);
-  const promoAmount = Math.round((normalizedBasePrice * clampPercent(promoPercent)) / 100);
 
   const breakdown: DiscountBreakdown = {
     basePrice: normalizedBasePrice,
     planType,
-    welcomeDiscountPercent: welcomePercent,
+    welcomeDiscountType: welcomeType,
+    welcomeDiscountValue: welcomeValue,
     welcomeAmount,
-    quarterlyDiscountPercent: quarterlyPercent,
+    quarterlyDiscountType: quarterlyType,
+    quarterlyDiscountValue: quarterlyValue,
     quarterlyAmount,
-    yearlyDiscountPercent: yearlyPercent,
+    yearlyDiscountType: yearlyType,
+    yearlyDiscountValue: yearlyValue,
     yearlyAmount,
-    partnerDiscountPercent: partnerPercent,
+    partnerDiscountPercent: partnerAmount > 0 ? gym.partnerDiscountPercent : 0,
     partnerAmount,
-    promoDiscountPercent: promoPercent,
+    promoDiscountType: hasPromo ? promo!.type : "NONE",
+    promoDiscountValue: hasPromo ? promo!.value : 0,
     promoAmount,
-    totalDiscountPercent: totalPercent,
     totalDiscountAmount,
     finalPrice,
-    capped,
   };
   return { finalPrice, breakdown };
 }

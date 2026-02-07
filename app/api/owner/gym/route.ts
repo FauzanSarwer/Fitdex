@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import { forwardGeocode } from "@/lib/location";
 import { requireOwner } from "@/lib/permissions";
 import { jsonError, safeJson } from "@/lib/api";
 import { logServerError } from "@/lib/logger";
@@ -47,10 +48,13 @@ export async function POST(req: Request) {
     quarterlyPrice?: number | null;
     yearlyPrice?: number;
     partnerDiscountPercent?: number;
-    quarterlyDiscountPercent?: number;
-    yearlyDiscountPercent?: number;
-    welcomeDiscountPercent?: number;
-    maxDiscountCapPercent?: number;
+    quarterlyDiscountType?: "PERCENT" | "FLAT";
+    quarterlyDiscountValue?: number;
+    yearlyDiscountType?: "PERCENT" | "FLAT";
+    yearlyDiscountValue?: number;
+    welcomeDiscountType?: "PERCENT" | "FLAT";
+    welcomeDiscountValue?: number;
+    coverImageUrl?: string | null;
   }>(req);
   if (!parsed.ok) {
     return jsonError("Invalid JSON body", 400);
@@ -68,25 +72,38 @@ export async function POST(req: Request) {
     quarterlyPrice,
     yearlyPrice,
     partnerDiscountPercent,
-    quarterlyDiscountPercent,
-    yearlyDiscountPercent,
-    welcomeDiscountPercent,
-    maxDiscountCapPercent,
+    quarterlyDiscountType,
+    quarterlyDiscountValue,
+    yearlyDiscountType,
+    yearlyDiscountValue,
+    welcomeDiscountType,
+    welcomeDiscountValue,
+    coverImageUrl,
   } = parsed.data;
-  if (!name || !address || latitude == null || longitude == null || monthlyPrice == null || yearlyPrice == null) {
+  if (!name || !address || monthlyPrice == null || yearlyPrice == null || !coverImageUrl) {
     return jsonError(
-      "name, address, latitude, longitude, monthlyPrice, yearlyPrice required",
+      "name, address, coverImageUrl, monthlyPrice, yearlyPrice required",
       400
     );
   }
   try {
+    let lat = latitude;
+    let lng = longitude;
+    if (lat == null || lng == null) {
+      const geo = await forwardGeocode(address.trim());
+      if (!geo) {
+        return jsonError("Unable to resolve location from address", 400);
+      }
+      lat = geo.latitude;
+      lng = geo.longitude;
+    }
     const gym = await prisma.gym.create({
       data: {
         ownerId: uid,
         name: name.trim(),
         address: address.trim(),
-        latitude: Number(latitude),
-        longitude: Number(longitude),
+        latitude: Number(lat),
+        longitude: Number(lng),
         openTime: openTime ?? null,
         closeTime: closeTime ?? null,
         openDays: openDays ?? null,
@@ -95,10 +112,13 @@ export async function POST(req: Request) {
         quarterlyPrice: quarterlyPrice != null ? Number(quarterlyPrice) : null,
         yearlyPrice: Number(yearlyPrice),
         partnerDiscountPercent: Number(partnerDiscountPercent ?? 10),
-        quarterlyDiscountPercent: Number(quarterlyDiscountPercent ?? 10),
-        yearlyDiscountPercent: Number(yearlyDiscountPercent ?? 15),
-        welcomeDiscountPercent: Number(welcomeDiscountPercent ?? 10),
-        maxDiscountCapPercent: Number(maxDiscountCapPercent ?? 40),
+        quarterlyDiscountType: quarterlyDiscountType ?? "PERCENT",
+        quarterlyDiscountValue: Number(quarterlyDiscountValue ?? 10),
+        yearlyDiscountType: yearlyDiscountType ?? "PERCENT",
+        yearlyDiscountValue: Number(yearlyDiscountValue ?? 15),
+        welcomeDiscountType: welcomeDiscountType ?? "PERCENT",
+        welcomeDiscountValue: Number(welcomeDiscountValue ?? 10),
+        coverImageUrl: coverImageUrl?.trim() || null,
       },
     });
     return NextResponse.json({ gym });
@@ -128,10 +148,13 @@ export async function PATCH(req: Request) {
     quarterlyPrice?: number | null;
     yearlyPrice?: number;
     partnerDiscountPercent?: number;
-    quarterlyDiscountPercent?: number;
-    yearlyDiscountPercent?: number;
-    welcomeDiscountPercent?: number;
-    maxDiscountCapPercent?: number;
+    quarterlyDiscountType?: "PERCENT" | "FLAT";
+    quarterlyDiscountValue?: number;
+    yearlyDiscountType?: "PERCENT" | "FLAT";
+    yearlyDiscountValue?: number;
+    welcomeDiscountType?: "PERCENT" | "FLAT";
+    welcomeDiscountValue?: number;
+    coverImageUrl?: string | null;
   }>(req);
   if (!parsed.ok) {
     return jsonError("Invalid JSON body", 400);
@@ -149,7 +172,14 @@ export async function PATCH(req: Request) {
     }
     const update: Record<string, unknown> = {};
     if (data.name != null) update.name = data.name.trim();
-    if (data.address != null) update.address = data.address.trim();
+    if (data.address != null) {
+      update.address = data.address.trim();
+      const geo = await forwardGeocode(data.address.trim());
+      if (geo) {
+        update.latitude = geo.latitude;
+        update.longitude = geo.longitude;
+      }
+    }
     if (data.latitude != null) update.latitude = data.latitude;
     if (data.longitude != null) update.longitude = data.longitude;
     if (data.openTime !== undefined) update.openTime = data.openTime;
@@ -160,10 +190,13 @@ export async function PATCH(req: Request) {
     if (data.quarterlyPrice !== undefined) update.quarterlyPrice = data.quarterlyPrice;
     if (data.yearlyPrice != null) update.yearlyPrice = data.yearlyPrice;
     if (data.partnerDiscountPercent != null) update.partnerDiscountPercent = data.partnerDiscountPercent;
-    if (data.quarterlyDiscountPercent != null) update.quarterlyDiscountPercent = data.quarterlyDiscountPercent;
-    if (data.yearlyDiscountPercent != null) update.yearlyDiscountPercent = data.yearlyDiscountPercent;
-    if (data.welcomeDiscountPercent != null) update.welcomeDiscountPercent = data.welcomeDiscountPercent;
-    if (data.maxDiscountCapPercent != null) update.maxDiscountCapPercent = data.maxDiscountCapPercent;
+    if (data.quarterlyDiscountType != null) update.quarterlyDiscountType = data.quarterlyDiscountType;
+    if (data.quarterlyDiscountValue != null) update.quarterlyDiscountValue = data.quarterlyDiscountValue;
+    if (data.yearlyDiscountType != null) update.yearlyDiscountType = data.yearlyDiscountType;
+    if (data.yearlyDiscountValue != null) update.yearlyDiscountValue = data.yearlyDiscountValue;
+    if (data.welcomeDiscountType != null) update.welcomeDiscountType = data.welcomeDiscountType;
+    if (data.welcomeDiscountValue != null) update.welcomeDiscountValue = data.welcomeDiscountValue;
+    if (data.coverImageUrl !== undefined) update.coverImageUrl = data.coverImageUrl;
     const gym = await prisma.gym.update({
       where: { id: gymId },
       data: update,

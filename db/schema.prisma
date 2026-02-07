@@ -36,6 +36,7 @@ model User {
   verifiedPurchases VerifiedBadgePurchase[]
   notifications Notification[]
   passwordResetTokens PasswordResetToken[]
+  gymPageViews GymPageView[]
 }
 
 model PasswordResetToken {
@@ -109,10 +110,12 @@ model Gym {
   quarterlyPrice         Int?     // in paise, null = computed as monthlyPrice * 3
   yearlyPrice            Int      // in paise
   partnerDiscountPercent Int      @default(10)
-  quarterlyDiscountPercent Int    @default(10)
-  yearlyDiscountPercent  Int      @default(15)
-  welcomeDiscountPercent Int      @default(10)
-  maxDiscountCapPercent  Int      @default(40)
+  quarterlyDiscountType  String   @default("PERCENT") // PERCENT | FLAT
+  quarterlyDiscountValue Int      @default(10)        // percent or paise (if FLAT)
+  yearlyDiscountType     String   @default("PERCENT") // PERCENT | FLAT
+  yearlyDiscountValue    Int      @default(15)        // percent or paise (if FLAT)
+  welcomeDiscountType    String   @default("PERCENT") // PERCENT | FLAT
+  welcomeDiscountValue   Int      @default(10)        // percent or paise (if FLAT)
   coverImageUrl          String?  // optional gym photo
   featuredUntil          DateTime?
   verifiedUntil          DateTime?
@@ -129,6 +132,7 @@ model Gym {
   featuredPurchases FeaturedListingPurchase[]
   verifiedPurchases VerifiedBadgePurchase[]
   transactions Transaction[]
+  pageViews   GymPageView[]
 }
 
 model Notification {
@@ -194,7 +198,8 @@ model DiscountCode {
   id             String   @id @default(cuid())
   gymId          String
   code           String
-  discountPercent Int
+  discountType   String   @default("PERCENT") // PERCENT | FLAT
+  discountValue  Int
   maxUses        Int      @default(100)
   usedCount      Int      @default(0)
   validFrom      DateTime @default(now())
@@ -221,6 +226,18 @@ model Membership {
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
   gym  Gym  @relation(fields: [gymId], references: [id], onDelete: Cascade)
   transactions Transaction[]
+}
+
+model GymPageView {
+  id        String   @id @default(cuid())
+  gymId     String
+  userId    String?
+  createdAt DateTime @default(now())
+
+  gym  Gym  @relation(fields: [gymId], references: [id], onDelete: Cascade)
+  user User? @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([gymId, createdAt])
 }
 
 model Duo {
