@@ -23,6 +23,8 @@ export function Header() {
   const [sendingVerification, setSendingVerification] = useState(false);
   const [verificationSent, setVerificationSent] = useState(false);
 
+  const displayName = session?.user?.name ?? session?.user?.email?.split("@")[0] ?? "Account";
+
   return (
     <motion.header
       initial={{ y: -20, opacity: 0 }}
@@ -59,7 +61,7 @@ export function Header() {
           <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-br from-primary to-accent shadow-glow-sm">
             <Dumbbell className="h-5 w-5 text-white" />
           </div>
-          <span className="text-xl font-bold tracking-tight">FITDEX</span>
+          <span className="text-xl font-bold tracking-tight">Fitdex</span>
         </Link>
         <nav className="hidden md:flex items-center gap-4">
           <Link
@@ -75,6 +77,32 @@ export function Header() {
           >
             Pricing
           </Link>
+          <Link
+            href="/owners"
+            className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors"
+          >
+            Owners
+          </Link>
+          <Link
+            href="/privacy"
+            className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors"
+          >
+            Privacy
+          </Link>
+          <Link
+            href="/terms"
+            className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors"
+          >
+            Terms
+          </Link>
+          {status === "authenticated" && (
+            <Link
+              href="/dashboard"
+              className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors"
+            >
+              Dashboard
+            </Link>
+          )}
           {showOwnerExplore && (
             <Link
               href="/dashboard/owner/explore"
@@ -94,6 +122,9 @@ export function Header() {
             <div className="h-9 w-12 rounded-lg bg-white/10 animate-pulse" />
           ) : session ? (
             <>
+              <span className="hidden md:inline text-sm font-medium text-muted-foreground">
+                {displayName}
+              </span>
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                   <Button variant="ghost" size="icon" className="rounded-full">

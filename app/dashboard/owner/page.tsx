@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { useSession } from "next-auth/react";
 import Link from "next/link";
 import { motion } from "framer-motion";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -26,6 +27,7 @@ type Transaction = {
 };
 
 export default function OwnerDashboardPage() {
+  const { data: session } = useSession();
   const { toast } = useToast();
   const MAX_UPLOAD_BYTES = 500 * 1024;
   const [gyms, setGyms] = useState<any[]>([]);
@@ -157,6 +159,8 @@ export default function OwnerDashboardPage() {
     setSubmittingGst(false);
   };
 
+  const displayName = session?.user?.name ?? session?.user?.email?.split("@")[0] ?? "there";
+
   return (
     <div className="p-6 space-y-6">
       <motion.div
@@ -165,8 +169,8 @@ export default function OwnerDashboardPage() {
         className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between"
       >
         <div>
-          <h1 className="text-2xl font-bold">Owner dashboard</h1>
-          <p className="text-muted-foreground text-sm">Read-only view of verification and payouts.</p>
+          <h1 className="text-2xl font-bold">Hi, {displayName}</h1>
+          <p className="text-muted-foreground text-sm">Owner dashboard overview.</p>
         </div>
       </motion.div>
 

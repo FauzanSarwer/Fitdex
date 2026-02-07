@@ -33,7 +33,14 @@ interface GymData {
   openTime?: string | null;
   closeTime?: string | null;
   openDays?: string | null;
-  owner: { id: string; name: string | null };
+  owner: {
+    id: string;
+    name: string | null;
+    logoUrl?: string | null;
+    supportEmail?: string | null;
+    supportPhone?: string | null;
+    supportWhatsapp?: string | null;
+  };
   dayPassPrice?: number | null;
   monthlyPrice: number;
   quarterlyPrice: number;
@@ -241,8 +248,8 @@ export default function GymProfilePage() {
                   <MapPin className="h-4 w-4" />
                   {gym.address}
                 </p>
-                <p className={`text-xs mt-2 ${getGymOpenStatus(gym).isOpen ? "text-emerald-400" : "text-muted-foreground"}`}>
-                  {getGymOpenStatus(gym).label}
+                <p className={`text-xs mt-2 ${getGymOpenStatus({ ...gym, useIst: true }).isOpen ? "text-emerald-400" : "text-muted-foreground"}`}>
+                  {getGymOpenStatus({ ...gym, useIst: true }).label}
                 </p>
               </div>
               <div className="flex flex-col sm:flex-row gap-3">
@@ -382,6 +389,49 @@ export default function GymProfilePage() {
             <div>Quarterly discount: up to {formatDiscount(gym.quarterlyDiscountType, gym.quarterlyDiscountValue)}</div>
           </CardContent>
         </Card>
+
+        {(gym.owner?.supportEmail || gym.owner?.supportPhone || gym.owner?.supportWhatsapp || gym.owner?.logoUrl) && (
+          <Card className="glass-card">
+            <CardHeader>
+              <CardTitle>Support & contact</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-3 text-sm text-muted-foreground">
+              {gym.owner?.logoUrl && (
+                <div className="flex items-center gap-3">
+                  <img
+                    src={gym.owner.logoUrl}
+                    alt={gym.owner?.name ?? "Gym"}
+                    className="h-10 w-10 rounded-full object-cover"
+                  />
+                  <span className="text-sm">{gym.owner?.name ?? "Gym"}</span>
+                </div>
+              )}
+              {gym.owner?.supportEmail && (
+                <p>
+                  Email: <a className="text-primary hover:underline" href={`mailto:${gym.owner.supportEmail}`}>{gym.owner.supportEmail}</a>
+                </p>
+              )}
+              {gym.owner?.supportPhone && (
+                <p>
+                  Phone: <a className="text-primary hover:underline" href={`tel:${gym.owner.supportPhone}`}>{gym.owner.supportPhone}</a>
+                </p>
+              )}
+              {gym.owner?.supportWhatsapp && (
+                <p>
+                  WhatsApp:{" "}
+                  <a
+                    className="text-primary hover:underline"
+                    href={`https://wa.me/${gym.owner.supportWhatsapp.replace(/\D/g, "")}`}
+                    target="_blank"
+                    rel="noreferrer"
+                  >
+                    {gym.owner.supportWhatsapp}
+                  </a>
+                </p>
+              )}
+            </CardContent>
+          </Card>
+        )}
 
         {(gym.instagramUrl || gym.facebookUrl || gym.youtubeUrl) && (
           <Card className="glass-card">

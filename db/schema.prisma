@@ -21,6 +21,14 @@ model User {
   state         String?
   phoneNumber   String?
   billingEmail  String?
+  billingAddress String?
+  businessName   String?
+  businessType   String?
+  supportEmail   String?
+  supportPhone   String?
+  supportWhatsapp String?
+  logoUrl        String?
+  twoFactorEnabled Boolean @default(false)
   timezone      String?
   notifyMemberships Boolean @default(true)
   notifyPromos  Boolean  @default(true)

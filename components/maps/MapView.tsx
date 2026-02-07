@@ -56,10 +56,10 @@ export function MapView({ latitude, longitude, gyms = [], className, zoom = 13 }
     // Create map
     const map = L.map(containerRef.current).setView([latitude, longitude], zoom);
 
-    // Add OpenStreetMap tiles
-    L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+    // Add dark tiles
+    L.tileLayer("https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png", {
       maxZoom: 19,
-      attribution: '© OpenStreetMap contributors',
+      attribution: '© OpenStreetMap contributors © CARTO',
     }).addTo(map);
 
     markersRef.current = L.layerGroup().addTo(map);

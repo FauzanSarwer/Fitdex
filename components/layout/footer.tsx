@@ -14,7 +14,7 @@ export function Footer() {
 
   return (
     <footer className="mt-auto border-t border-white/10 bg-white/5 backdrop-blur">
-      <div className="container mx-auto px-4 py-12">
+      <div className="container mx-auto px-4 py-6">
         <motion.div
           initial={{ opacity: 0, y: 10 }}
           whileInView={{ opacity: 1, y: 0 }}
@@ -26,7 +26,7 @@ export function Footer() {
               <Dumbbell className="h-5 w-5 text-white" />
             </div>
             <div>
-              <div className="text-lg font-semibold">FITDEX</div>
+              <div className="text-lg font-semibold">Fitdex</div>
               <div className="text-sm text-muted-foreground">District of Gyms</div>
             </div>
           </div>
@@ -37,6 +37,12 @@ export function Footer() {
             </Link>
             <Link href="/pricing" className="text-muted-foreground hover:text-foreground transition-colors">
               Pricing
+            </Link>
+            <Link href="/privacy" className="text-muted-foreground hover:text-foreground transition-colors">
+              Privacy
+            </Link>
+            <Link href="/terms" className="text-muted-foreground hover:text-foreground transition-colors">
+              Terms
             </Link>
             {showOwnerExplore && (
               <Link href="/dashboard/owner/explore" className="text-muted-foreground hover:text-foreground transition-colors">

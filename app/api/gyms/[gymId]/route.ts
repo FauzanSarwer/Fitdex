@@ -12,7 +12,16 @@ export async function GET(
     const gym = await prisma.gym.findUnique({
       where: { id: gymId },
       include: {
-        owner: { select: { id: true, name: true } },
+        owner: {
+          select: {
+            id: true,
+            name: true,
+            logoUrl: true,
+            supportEmail: true,
+            supportPhone: true,
+            supportWhatsapp: true,
+          },
+        },
       },
     });
     if (!gym) {

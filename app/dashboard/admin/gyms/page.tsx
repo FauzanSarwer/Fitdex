@@ -3,7 +3,9 @@ import { redirect } from "next/navigation";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { requireAdmin } from "@/lib/permissions";
+import Link from "next/link";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { buildGymSlug } from "@/lib/utils";
 
 export const dynamic = "force-dynamic";
 
@@ -46,8 +48,13 @@ export default async function AdminGymsPage() {
               {gyms.map((gym) => (
                 <tr key={gym.id} className="border-t border-white/10">
                   <td className="py-2">
-                    <div className="font-medium">{gym.name}</div>
-                    <div className="text-xs text-muted-foreground">{gym.address}</div>
+                    <Link
+                      href={`/explore/${buildGymSlug(gym.name, gym.id)}`}
+                      className="block rounded-md p-1 -ml-1 hover:bg-white/5"
+                    >
+                      <div className="font-medium text-primary hover:underline">{gym.name}</div>
+                      <div className="text-xs text-muted-foreground">{gym.address}</div>
+                    </Link>
                   </td>
                   <td className="py-2">
                     <div>{gym.owner?.name ?? "—"}</div>

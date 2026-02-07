@@ -40,12 +40,36 @@ interface Gym {
   partnerDiscountPercent: number;
   distance?: number;
   createdAt?: string | Date;
+  coverImageUrl?: string | null;
   featuredUntil?: string | Date | null;
   verifiedUntil?: string | Date | null;
 }
 
 type SortOption = "price_asc" | "price_desc" | "distance" | "newest";
-type SearchScope = "all" | "name" | "address";
+
+function GymImageCarousel({ images, name }: { images: string[]; name: string }) {
+  const [index, setIndex] = useState(0);
+  if (images.length === 0) return null;
+  const active = images[index] ?? images[0];
+  return (
+    <div className="relative h-full w-full">
+      <img src={active} alt={name} className="h-full w-full object-cover" />
+      {images.length > 1 && (
+        <div className="absolute bottom-2 left-1/2 -translate-x-1/2 flex items-center gap-1">
+          {images.map((_, i) => (
+            <button
+              key={i}
+              type="button"
+              onClick={() => setIndex(i)}
+              className={`h-1.5 w-1.5 rounded-full ${i === index ? "bg-white" : "bg-white/50"}`}
+              aria-label={`Show image ${i + 1}`}
+            />
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
 
 export default function ExplorePage() {
   const [view, setView] = useState<ViewMode>("list");
@@ -54,58 +78,67 @@ export default function ExplorePage() {
   const [error, setError] = useState<string | null>(null);
   const [userLat, setUserLat] = useState<number | null>(null);
   const [userLng, setUserLng] = useState<number | null>(null);
+  const [locationGate, setLocationGate] = useState(true);
+  const [locationLoading, setLocationLoading] = useState(false);
+  const [locationError, setLocationError] = useState<string | null>(null);
   const [query, setQuery] = useState("");
   const [maxPrice, setMaxPrice] = useState<string>("");
   const [maxDistance, setMaxDistance] = useState<string>("");
   const [sortBy, setSortBy] = useState<SortOption>("distance");
-  const [searchScope, setSearchScope] = useState<SearchScope>("all");
   const [onlyFeatured, setOnlyFeatured] = useState(false);
   const [onlyVerified, setOnlyVerified] = useState(false);
   const { status } = useSession();
   const [savedIds, setSavedIds] = useState<Set<string>>(new Set());
 
-  useEffect(() => {
-    let cancelled = false;
+  const loadGyms = async (url: string) => {
     setError(null);
     setLoading(true);
-    const loadGyms = async (url: string) => {
-      try {
-        const result = await fetchJson<{ gyms?: Gym[]; error?: string }>(url, { retries: 2 });
-        if (!result.ok) {
-          if (!cancelled) setError(result.error ?? "Could not load gyms. Please try again.");
-          return;
-        }
-        if (!cancelled) setGyms(result.data?.gyms ?? []);
-      } catch {
-        if (!cancelled) setError("Could not load gyms. Please try again.");
-      } finally {
-        if (!cancelled) setLoading(false);
+    try {
+      const result = await fetchJson<{ gyms?: Gym[]; error?: string }>(url, { retries: 2 });
+      if (!result.ok) {
+        setError(result.error ?? "Could not load gyms. Please try again.");
+        return;
       }
-    };
-    if (!navigator.geolocation) {
-      loadGyms("/api/gyms");
-      return () => {
-        cancelled = true;
-      };
+      setGyms(result.data?.gyms ?? []);
+    } catch {
+      setError("Could not load gyms. Please try again.");
+    } finally {
+      setLoading(false);
     }
+  };
+
+  const requestLocation = () => {
+    if (!navigator.geolocation) {
+      setLocationError("Location is not supported on this device.");
+      setLocationGate(false);
+      loadGyms("/api/gyms");
+      return;
+    }
+    setLocationLoading(true);
     navigator.geolocation.getCurrentPosition(
       (pos) => {
-        if (cancelled) return;
         const lat = pos.coords.latitude;
         const lng = pos.coords.longitude;
         setUserLat(lat);
         setUserLng(lng);
+        setLocationGate(false);
+        setLocationLoading(false);
         loadGyms(`/api/gyms?lat=${lat}&lng=${lng}`);
       },
       () => {
-        if (cancelled) return;
+        setLocationError("Location access denied. Showing gyms without distance sorting.");
+        setLocationGate(false);
+        setLocationLoading(false);
         loadGyms("/api/gyms");
       }
     );
-    return () => {
-      cancelled = true;
-    };
-  }, []);
+  };
+
+  useEffect(() => {
+    if (!locationGate && gyms.length === 0 && !loading) {
+      loadGyms("/api/gyms");
+    }
+  }, [locationGate]);
 
   useEffect(() => {
     if (status !== "authenticated") return;
@@ -151,19 +184,43 @@ export default function ExplorePage() {
     }
   }
 
+  const normalize = (value: string) => value.toLowerCase().replace(/[^a-z0-9]/g, "");
+  const levenshtein = (a: string, b: string) => {
+    const m = a.length;
+    const n = b.length;
+    if (!m) return n;
+    if (!n) return m;
+    const dp = Array.from({ length: m + 1 }, () => new Array(n + 1).fill(0));
+    for (let i = 0; i <= m; i += 1) dp[i][0] = i;
+    for (let j = 0; j <= n; j += 1) dp[0][j] = j;
+    for (let i = 1; i <= m; i += 1) {
+      for (let j = 1; j <= n; j += 1) {
+        const cost = a[i - 1] === b[j - 1] ? 0 : 1;
+        dp[i][j] = Math.min(
+          dp[i - 1][j] + 1,
+          dp[i][j - 1] + 1,
+          dp[i - 1][j - 1] + cost
+        );
+      }
+    }
+    return dp[m][n];
+  };
+  const fuzzyMatch = (name: string, q: string) => {
+    const n = normalize(name);
+    const query = normalize(q);
+    if (!query) return true;
+    if (n.includes(query)) return true;
+    if (query.length < 3) return false;
+    const distance = levenshtein(n, query);
+    const threshold = Math.max(2, Math.floor(query.length * 0.3));
+    return distance <= threshold;
+  };
+
   const filteredGyms = useMemo(() => {
     let list = [...gyms];
     const q = query.trim().toLowerCase();
     if (q) {
-      list = list.filter(
-        (g) => {
-          const inName = g.name.toLowerCase().includes(q);
-          const inAddress = g.address.toLowerCase().includes(q);
-          if (searchScope === "name") return inName;
-          if (searchScope === "address") return inAddress;
-          return inName || inAddress;
-        }
-      );
+      list = list.filter((g) => fuzzyMatch(g.name, q));
     }
     const priceCap = Number(maxPrice);
     if (Number.isFinite(priceCap) && priceCap > 0) {
@@ -202,7 +259,7 @@ export default function ExplorePage() {
         list.sort((a, b) => (a.distance ?? Infinity) - (b.distance ?? Infinity));
     }
     return list;
-  }, [gyms, maxDistance, maxPrice, query, sortBy, searchScope, onlyFeatured, onlyVerified]);
+  }, [gyms, maxDistance, maxPrice, query, sortBy, onlyFeatured, onlyVerified]);
 
   const activeFilters = useMemo(() => {
     const filters: { label: string; onClear: () => void }[] = [];
@@ -224,12 +281,6 @@ export default function ExplorePage() {
       };
       filters.push({ label: labels[sortBy], onClear: () => setSortBy("distance") });
     }
-    if (searchScope !== "all") {
-      filters.push({
-        label: `Search: ${searchScope === "name" ? "Name" : "Address"}`,
-        onClear: () => setSearchScope("all"),
-      });
-    }
     if (onlyFeatured) {
       filters.push({ label: "Featured only", onClear: () => setOnlyFeatured(false) });
     }
@@ -237,7 +288,7 @@ export default function ExplorePage() {
       filters.push({ label: "Verified only", onClear: () => setOnlyVerified(false) });
     }
     return filters;
-  }, [maxDistance, maxPrice, query, sortBy, searchScope, onlyFeatured, onlyVerified]);
+  }, [maxDistance, maxPrice, query, sortBy, onlyFeatured, onlyVerified]);
 
   if (error) {
     return (
@@ -257,7 +308,33 @@ export default function ExplorePage() {
 
   return (
     <div className="container mx-auto px-4 py-8">
-      <div className="flex flex-col gap-4 mb-6">
+      {locationGate && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
+          <div className="glass-card border border-white/10 p-6 rounded-2xl max-w-md w-full text-center space-y-4">
+            <h2 className="text-xl font-semibold">Allow location access?</h2>
+            <p className="text-sm text-muted-foreground">
+              We use your location to sort gyms by distance. You can continue without it.
+            </p>
+            {locationError && <p className="text-xs text-amber-400">{locationError}</p>}
+            <div className="flex flex-col sm:flex-row gap-3 justify-center">
+              <Button onClick={requestLocation} disabled={locationLoading}>
+                {locationLoading ? "Requesting…" : "Use my location"}
+              </Button>
+              <Button
+                variant="outline"
+                onClick={() => {
+                  setLocationGate(false);
+                  loadGyms("/api/gyms");
+                }}
+              >
+                Continue without location
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+      <div className={locationGate ? "pointer-events-none blur-sm" : ""}>
+        <div className="flex flex-col gap-4 mb-6">
         <div className="flex items-center justify-between">
           <h1 className="text-2xl font-bold flex items-center gap-2 bg-clip-text text-transparent bg-gradient-to-r from-white to-white/70">
             <MapPin className="h-6 w-6 text-primary" />
@@ -307,7 +384,6 @@ export default function ExplorePage() {
                   setMaxPrice("");
                   setMaxDistance("");
                   setSortBy("distance");
-                  setSearchScope("all");
                   setOnlyFeatured(false);
                   setOnlyVerified(false);
                 }}
@@ -322,7 +398,7 @@ export default function ExplorePage() {
           <div className="relative w-full md:max-w-lg">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
             <Input
-              placeholder="Search gyms, neighborhoods, or landmarks"
+              placeholder="Search gyms by name"
               value={query}
               onChange={(e) => setQuery(e.target.value)}
               className="pl-9"
@@ -373,18 +449,6 @@ export default function ExplorePage() {
                     />
                   </div>
                   <div className="space-y-2">
-                    <p className="text-sm font-semibold">Search options</p>
-                    <DropdownMenuRadioGroup
-                      value={searchScope}
-                      onValueChange={(v) => setSearchScope(v as SearchScope)}
-                      className="space-y-1"
-                    >
-                      <DropdownMenuRadioItem value="all">Search name + address</DropdownMenuRadioItem>
-                      <DropdownMenuRadioItem value="name">Search by name only</DropdownMenuRadioItem>
-                      <DropdownMenuRadioItem value="address">Search by address only</DropdownMenuRadioItem>
-                    </DropdownMenuRadioGroup>
-                  </div>
-                  <div className="space-y-2">
                     <p className="text-sm font-semibold">Badges</p>
                     <button
                       type="button"
@@ -413,7 +477,7 @@ export default function ExplorePage() {
                       onClick={() => {
                         setMaxPrice("");
                         setMaxDistance("");
-                        setSearchScope("all");
+                        // name-only search
                         setOnlyFeatured(false);
                         setOnlyVerified(false);
                       }}
@@ -468,9 +532,10 @@ export default function ExplorePage() {
           <p className="text-muted-foreground">No gyms found. Try adjusting filters.</p>
         </Card>
       ) : (
-        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+        <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
           {filteredGyms.map((gym, i) => {
             const isFeatured = gym.featuredUntil && new Date(gym.featuredUntil).getTime() > Date.now();
+            const images = gym.coverImageUrl ? [gym.coverImageUrl] : [];
             return (
             <motion.div
               key={gym.id}
@@ -480,10 +545,17 @@ export default function ExplorePage() {
             >
               <Card
                 className={cn(
-                  "glass-card overflow-hidden hover:border-primary/30 transition-all duration-300 hover:-translate-y-1",
+                    "glass-card overflow-hidden hover:border-primary/30 transition-all duration-300 hover:-translate-y-1 min-h-[320px]",
                   isFeatured && "border-primary/40 shadow-[0_0_24px_rgba(99,102,241,0.25)]"
                 )}
               >
+                  <div className="relative h-44 w-full">
+                    {images.length > 0 ? (
+                      <GymImageCarousel images={images} name={gym.name} />
+                    ) : (
+                      <div className="h-full w-full bg-gradient-to-br from-primary/20 via-primary/5 to-accent/20" />
+                    )}
+                  </div>
                 <CardHeader className="pb-2">
                   <div className="flex items-center justify-between">
                     <h3 className="font-semibold text-lg">{gym.name}</h3>
@@ -521,8 +593,8 @@ export default function ExplorePage() {
                     <MapPin className="h-3 w-3" />
                     {gym.address}
                   </p>
-                  <p className={`text-xs mt-1 ${getGymOpenStatus(gym).isOpen ? "text-emerald-400" : "text-muted-foreground"}`}>
-                    {getGymOpenStatus(gym).label}
+                  <p className={`text-xs mt-1 ${getGymOpenStatus({ ...gym, useIst: true }).isOpen ? "text-emerald-400" : "text-muted-foreground"}`}>
+                    {getGymOpenStatus({ ...gym, useIst: true }).label}
                   </p>
                 </CardHeader>
                 <CardContent className="flex items-center justify-between">
@@ -549,6 +621,7 @@ export default function ExplorePage() {
           })}
         </div>
       )}
+      </div>
     </div>
   );
 }

@@ -23,7 +23,7 @@ const USER_LINKS = [
   { href: "/dashboard/user", label: "Overview", icon: LayoutDashboard },
   { href: "/dashboard/user/membership", label: "Membership", icon: CreditCard },
   { href: "/dashboard/user/duo", label: "Duo", icon: Users },
-  { href: "/dashboard/user/payments", label: "Payments", icon: CreditCard },
+  { href: "/dashboard/user/payments", label: "Transactions", icon: CreditCard },
   { href: "/dashboard/user/settings", label: "Settings", icon: Settings },
 ];
 
@@ -83,15 +83,27 @@ export function DashboardNav({
             <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-br from-primary to-accent shadow-glow-sm">
               <Dumbbell className="h-5 w-5 text-white" />
             </div>
-            <span className="text-lg font-bold">FITDEX</span>
+            <span className="text-lg font-bold">Fitdex</span>
           </Link>
           {role === "ADMIN" && (
-            <div className="ml-auto">
+            <div className="ml-auto flex items-center gap-2">
               <Link
                 href="/dashboard/admin"
                 className="rounded-full bg-primary/20 px-4 py-2 text-xs font-semibold text-primary hover:bg-primary/30"
               >
                 Admin panel
+              </Link>
+              <Link
+                href="/dashboard/owner"
+                className="rounded-full bg-white/10 px-3 py-2 text-xs font-semibold text-foreground hover:bg-white/20"
+              >
+                Owner dashboard
+              </Link>
+              <Link
+                href="/dashboard/user"
+                className="rounded-full bg-white/10 px-3 py-2 text-xs font-semibold text-foreground hover:bg-white/20"
+              >
+                User dashboard
               </Link>
             </div>
           )}

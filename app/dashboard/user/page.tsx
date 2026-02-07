@@ -138,6 +138,8 @@ function UserDashboardContent() {
     );
   }
 
+  const displayName = session?.user?.name ?? session?.user?.email?.split("@")[0] ?? "there";
+
   return (
     <div className="p-6 space-y-6">
       <motion.div
@@ -147,7 +149,7 @@ function UserDashboardContent() {
       >
         <div>
           <h1 className="text-2xl font-bold">
-            Hi, {session?.user?.name ?? "Member"}
+            Hi, {displayName}
           </h1>
           <p className="text-muted-foreground text-sm flex items-center gap-1 mt-1">
             {location && <MapPin className="h-4 w-4" />}

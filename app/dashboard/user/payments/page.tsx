@@ -69,14 +69,14 @@ export default function PaymentsPage() {
       >
         <h1 className="text-2xl font-bold flex items-center gap-2">
           <CreditCard className="h-6 w-6" />
-          Payment history
+          Transactions
         </h1>
         <p className="text-muted-foreground text-sm">All your transactions.</p>
       </motion.div>
 
       {payments.length === 0 ? (
         <Card className="glass-card p-12 text-center">
-          <p className="text-muted-foreground">No payments yet.</p>
+          <p className="text-muted-foreground">No transactions yet.</p>
         </Card>
       ) : (
         <div className="space-y-3">

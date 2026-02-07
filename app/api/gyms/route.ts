@@ -44,6 +44,7 @@ export async function GET(req: Request) {
       latitude: g.latitude,
       longitude: g.longitude,
       verificationStatus: g.verificationStatus,
+      coverImageUrl: g.coverImageUrl,
       openTime: g.openTime,
       closeTime: g.closeTime,
       openDays: g.openDays,

@@ -25,6 +25,12 @@ export default function OwnerVerificationPage() {
     gstCity: "",
     gstCertificateUrl: "",
   });
+  const [bankGym, setBankGym] = useState<any | null>(null);
+  const [bankForm, setBankForm] = useState({
+    accountNumber: "",
+    ifsc: "",
+    accountHolderName: "",
+  });
   const [uploading, setUploading] = useState(false);
   const [submitting, setSubmitting] = useState(false);
 
@@ -105,6 +111,50 @@ export default function OwnerVerificationPage() {
     setSubmitting(false);
   };
 
+  const openBankDialog = (gym: any) => {
+    setBankGym(gym);
+    setBankForm({
+      accountNumber: "",
+      ifsc: "",
+      accountHolderName: "",
+    });
+  };
+
+  const submitBank = async () => {
+    if (!bankGym?.id) return;
+    if (!bankForm.accountNumber.trim() || !bankForm.ifsc.trim()) {
+      toast({ title: "Missing info", description: "Account number and IFSC are required.", variant: "destructive" });
+      return;
+    }
+    setSubmitting(true);
+    try {
+      const result = await fetchJson<{ ok?: boolean; error?: string; verificationStatus?: string }>(
+        "/api/owner/gym/verification/bank",
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            gymId: bankGym.id,
+            accountNumber: bankForm.accountNumber.trim(),
+            ifsc: bankForm.ifsc.trim().toUpperCase(),
+            accountHolderName: bankForm.accountHolderName.trim() || undefined,
+          }),
+          retries: 1,
+        }
+      );
+      if (!result.ok) {
+        toast({ title: "Verification failed", description: result.error ?? "Please try again.", variant: "destructive" });
+        setSubmitting(false);
+        return;
+      }
+      toast({ title: "Bank details submitted", description: "Bank verification submitted." });
+      setBankGym(null);
+    } catch {
+      toast({ title: "Verification failed", variant: "destructive" });
+    }
+    setSubmitting(false);
+  };
+
   if (loading) {
     return (
       <div className="p-6 space-y-4">
@@ -173,121 +223,152 @@ export default function OwnerVerificationPage() {
                   <p className="text-sm text-muted-foreground">
                     {isVerified
                       ? "Verification is complete. This gym can accept members."
-                      : "Upload GST certificate and business details for review."}
+                      : "Upload GST certificate and bank details for review."}
                   </p>
                   {!isVerified && (
-                    <Dialog open={gstGym?.id === gym.id} onOpenChange={(open) => !open && setGstGym(null)}>
-                      <DialogTrigger asChild>
-                        <Button onClick={() => openGstDialog(gym)}>
-                          <UploadCloud className="mr-2 h-4 w-4" />
-                          Submit GST certificate
-                        </Button>
-                      </DialogTrigger>
-                      <DialogContent className="max-w-lg">
-                        <DialogHeader>
-                          <DialogTitle>Submit GST verification</DialogTitle>
-                        </DialogHeader>
-                        <div className="space-y-4">
-                          <div className="space-y-2">
-                            <Label>GST number</Label>
-                            <Input
-                              value={gstForm.gstNumber}
-                              onChange={(e) => setGstForm((p) => ({ ...p, gstNumber: e.target.value }))}
-                            />
-                          </div>
-                          <div className="space-y-2">
-                            <Label>Legal business name (optional)</Label>
-                            <Input
-                              value={gstForm.gstLegalName}
-                              onChange={(e) => setGstForm((p) => ({ ...p, gstLegalName: e.target.value }))}
-                            />
-                          </div>
-                          <div className="space-y-2">
-                            <Label>City (optional)</Label>
-                            <Input
-                              value={gstForm.gstCity}
-                              onChange={(e) => setGstForm((p) => ({ ...p, gstCity: e.target.value }))}
-                            />
-                          </div>
-                          <div className="space-y-2">
-                            <Label>GST certificate (image only, max 500KB)</Label>
-                            <Input
-                              type="file"
-                              accept="image/*"
-                              onChange={async (e) => {
-                                const file = e.target.files?.[0];
-                                if (!file) return;
-                                if (!file.type.startsWith("image/")) {
-                                  toast({ title: "Invalid file", description: "Only image files are allowed.", variant: "destructive" });
-                                  return;
-                                }
-                                if (file.size > MAX_UPLOAD_BYTES) {
-                                  toast({ title: "File too large", description: "Image must be 500KB or less.", variant: "destructive" });
-                                  return;
-                                }
-                                setUploading(true);
-                                try {
-                                  const sigResult = await fetchJson<{
-                                    signature?: string;
-                                    timestamp?: number;
-                                    cloudName?: string;
-                                    apiKey?: string;
-                                    folder?: string;
-                                    error?: string;
-                                  }>("/api/uploads/signature", { retries: 1 });
-                                  if (!sigResult.ok || !sigResult.data?.signature || !sigResult.data.cloudName) {
-                                    toast({ title: "Upload failed", description: sigResult.error ?? "Missing upload config", variant: "destructive" });
-                                    setUploading(false);
-                                    return;
-                                  }
-                                  if (!sigResult.data.apiKey || !sigResult.data.timestamp) {
-                                    toast({ title: "Upload failed", description: "Upload configuration incomplete.", variant: "destructive" });
-                                    setUploading(false);
-                                    return;
-                                  }
-                                  const formData = new FormData();
-                                  formData.append("file", file);
-                                  formData.append("api_key", sigResult.data.apiKey ?? "");
-                                  formData.append("timestamp", String(sigResult.data.timestamp));
-                                  formData.append("signature", sigResult.data.signature);
-                                  if (sigResult.data.folder) formData.append("folder", sigResult.data.folder);
-                                  const uploadRes = await fetch(
-                                    `https://api.cloudinary.com/v1_1/${sigResult.data.cloudName}/image/upload`,
-                                    { method: "POST", body: formData }
-                                  );
-                                  const uploadJson = await uploadRes.json();
-                                  if (!uploadRes.ok || !uploadJson.secure_url) {
-                                    toast({ title: "Upload failed", description: "Could not upload image", variant: "destructive" });
-                                    setUploading(false);
-                                    return;
-                                  }
-                                  setGstForm((p) => ({ ...p, gstCertificateUrl: uploadJson.secure_url }));
-                                } catch {
-                                  toast({ title: "Upload failed", variant: "destructive" });
-                                }
-                                setUploading(false);
-                              }}
-                            />
-                            {gstForm.gstCertificateUrl && (
-                              <img
-                                src={gstForm.gstCertificateUrl}
-                                alt="GST certificate"
-                                className="h-28 w-full rounded-lg object-cover"
+                    <div className="flex flex-wrap gap-2">
+                      <Dialog open={gstGym?.id === gym.id} onOpenChange={(open) => !open && setGstGym(null)}>
+                        <DialogTrigger asChild>
+                          <Button onClick={() => openGstDialog(gym)}>
+                            <UploadCloud className="mr-2 h-4 w-4" />
+                            Submit GST certificate
+                          </Button>
+                        </DialogTrigger>
+                        <DialogContent className="max-w-lg">
+                          <DialogHeader>
+                            <DialogTitle>Submit GST verification</DialogTitle>
+                          </DialogHeader>
+                          <div className="space-y-4">
+                            <div className="space-y-2">
+                              <Label>GST number</Label>
+                              <Input
+                                value={gstForm.gstNumber}
+                                onChange={(e) => setGstForm((p) => ({ ...p, gstNumber: e.target.value }))}
                               />
-                            )}
-                            {uploading && <p className="text-xs text-muted-foreground">Uploading…</p>}
+                            </div>
+                            <div className="space-y-2">
+                              <Label>Legal business name (optional)</Label>
+                              <Input
+                                value={gstForm.gstLegalName}
+                                onChange={(e) => setGstForm((p) => ({ ...p, gstLegalName: e.target.value }))}
+                              />
+                            </div>
+                            <div className="space-y-2">
+                              <Label>City (optional)</Label>
+                              <Input
+                                value={gstForm.gstCity}
+                                onChange={(e) => setGstForm((p) => ({ ...p, gstCity: e.target.value }))}
+                              />
+                            </div>
+                            <div className="space-y-2">
+                              <Label>GST certificate (image only, max 500KB)</Label>
+                              <Input
+                                type="file"
+                                accept="image/*"
+                                onChange={async (e) => {
+                                  const file = e.target.files?.[0];
+                                  if (!file) return;
+                                  if (!file.type.startsWith("image/")) {
+                                    toast({ title: "Invalid file", description: "Only image files are allowed.", variant: "destructive" });
+                                    return;
+                                  }
+                                  if (file.size > MAX_UPLOAD_BYTES) {
+                                    toast({ title: "File too large", description: "Image must be 500KB or less.", variant: "destructive" });
+                                    return;
+                                  }
+                                  setUploading(true);
+                                  try {
+                                    const sigResult = await fetchJson<{
+                                      signature?: string;
+                                      timestamp?: number;
+                                      cloudName?: string;
+                                      apiKey?: string;
+                                      folder?: string;
+                                      error?: string;
+                                    }>("/api/uploads/signature", { retries: 1 });
+                                    if (!sigResult.ok || !sigResult.data?.signature || !sigResult.data.cloudName) {
+                                      toast({ title: "Upload failed", description: sigResult.error ?? "Missing upload config", variant: "destructive" });
+                                      setUploading(false);
+                                      return;
+                                    }
+                                    if (!sigResult.data.apiKey || !sigResult.data.timestamp) {
+                                      toast({ title: "Upload failed", description: "Upload configuration incomplete.", variant: "destructive" });
+                                      setUploading(false);
+                                      return;
+                                    }
+                                    const formData = new FormData();
+                                    formData.append("file", file);
+                                    formData.append("api_key", sigResult.data.apiKey ?? "");
+                                    formData.append("timestamp", String(sigResult.data.timestamp));
+                                    formData.append("signature", sigResult.data.signature);
+                                    if (sigResult.data.folder) formData.append("folder", sigResult.data.folder);
+                                    const uploadRes = await fetch(
+                                      `https://api.cloudinary.com/v1_1/${sigResult.data.cloudName}/image/upload`,
+                                      { method: "POST", body: formData }
+                                    );
+                                    const uploadJson = await uploadRes.json();
+                                    if (!uploadRes.ok || !uploadJson.secure_url) {
+                                      toast({ title: "Upload failed", description: "Could not upload image", variant: "destructive" });
+                                      setUploading(false);
+                                      return;
+                                    }
+                                    setGstForm((p) => ({ ...p, gstCertificateUrl: uploadJson.secure_url }));
+                                  } catch {
+                                    toast({ title: "Upload failed", variant: "destructive" });
+                                  }
+                                  setUploading(false);
+                                }}
+                              />
+                              {gstForm.gstCertificateUrl && (
+                                <img src={gstForm.gstCertificateUrl} alt="GST" className="h-24 rounded-xl object-cover" />
+                              )}
+                            </div>
+                            <Button onClick={submitGst} disabled={submitting || uploading}>
+                              {submitting ? "Submitting..." : "Submit for verification"}
+                            </Button>
                           </div>
-                        </div>
-                        <div className="mt-4 flex justify-end gap-2">
-                          <Button variant="outline" onClick={() => setGstGym(null)}>
-                            Cancel
+                        </DialogContent>
+                      </Dialog>
+
+                      <Dialog open={bankGym?.id === gym.id} onOpenChange={(open) => !open && setBankGym(null)}>
+                        <DialogTrigger asChild>
+                          <Button variant="outline" onClick={() => openBankDialog(gym)}>
+                            Add bank account
                           </Button>
-                          <Button onClick={submitGst} disabled={submitting || uploading}>
-                            {submitting || uploading ? "Submitting…" : "Submit verification"}
-                          </Button>
-                        </div>
-                      </DialogContent>
-                    </Dialog>
+                        </DialogTrigger>
+                        <DialogContent className="max-w-lg">
+                          <DialogHeader>
+                            <DialogTitle>Bank account details</DialogTitle>
+                          </DialogHeader>
+                          <div className="space-y-4">
+                            <div className="space-y-2">
+                              <Label>Account holder name (optional)</Label>
+                              <Input
+                                value={bankForm.accountHolderName}
+                                onChange={(e) => setBankForm((p) => ({ ...p, accountHolderName: e.target.value }))}
+                              />
+                            </div>
+                            <div className="space-y-2">
+                              <Label>Account number</Label>
+                              <Input
+                                value={bankForm.accountNumber}
+                                onChange={(e) => setBankForm((p) => ({ ...p, accountNumber: e.target.value }))}
+                              />
+                            </div>
+                            <div className="space-y-2">
+                              <Label>IFSC code</Label>
+                              <Input
+                                value={bankForm.ifsc}
+                                onChange={(e) => setBankForm((p) => ({ ...p, ifsc: e.target.value }))}
+                              />
+                            </div>
+                            <Button onClick={submitBank} disabled={submitting}>
+                              {submitting ? "Submitting..." : "Submit bank details"}
+                            </Button>
+                          </div>
+                        </DialogContent>
+                      </Dialog>
+                    </div>
                   )}
                 </CardContent>
               </Card>

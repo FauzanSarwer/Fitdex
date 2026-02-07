@@ -365,8 +365,8 @@ export default function OwnerGymProfilePage() {
                   <MapPin className="h-4 w-4" />
                   {gym.address}
                 </p>
-                <p className={`text-xs mt-2 ${getGymOpenStatus(gym).isOpen ? "text-emerald-400" : "text-muted-foreground"}`}>
-                  {getGymOpenStatus(gym).label}
+                <p className={`text-xs mt-2 ${getGymOpenStatus({ ...gym, useIst: true }).isOpen ? "text-emerald-400" : "text-muted-foreground"}`}>
+                  {getGymOpenStatus({ ...gym, useIst: true }).label}
                 </p>
               </div>
               <div className="flex flex-col sm:flex-row gap-3">

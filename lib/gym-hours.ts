@@ -30,8 +30,13 @@ export function getGymOpenStatus(params: {
   closeTime?: string | null;
   openDays?: string | null;
   now?: Date;
+  useIst?: boolean;
 }): OpenStatus {
-  const now = params.now ?? new Date();
+  const now =
+    params.now ??
+    (params.useIst
+      ? new Date(new Date().toLocaleString("en-US", { timeZone: "Asia/Kolkata" }))
+      : new Date());
   const openTimeMinutes = parseTimeToMinutes(params.openTime);
   const closeTimeMinutes = parseTimeToMinutes(params.closeTime);
   const days = params.openDays
