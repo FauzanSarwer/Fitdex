@@ -88,7 +88,7 @@ export const authOptions: NextAuthOptions = {
     async jwt({ token, user, trigger, session }) {
       if (user) {
         token.id = user.id;
-        token.role = (user as { role?: string }).role;
+        token.role = (user as { role?: "USER" | "OWNER" | "ADMIN" }).role;
       }
       if (trigger === "update" && session) {
         token.name = session.name;
@@ -99,7 +99,7 @@ export const authOptions: NextAuthOptions = {
           where: { id: token.sub },
           select: { role: true },
         });
-        if (u) token.role = u.role;
+        if (u?.role) token.role = u.role as "USER" | "OWNER" | "ADMIN";
       }
       return token;
     },

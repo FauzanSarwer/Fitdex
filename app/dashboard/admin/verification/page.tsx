@@ -6,6 +6,8 @@ import { prisma } from "@/lib/prisma";
 import { requireAdmin } from "@/lib/permissions";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 
+export const dynamic = "force-dynamic";
+
 export default async function AdminVerificationQueuePage() {
   const session = await getServerSession(authOptions);
   if (!requireAdmin(session)) {

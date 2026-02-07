@@ -26,13 +26,16 @@
 
 @layer base {
   * {
-    @apply border-border;
+    border-color: hsl(var(--border));
   }
   html {
     scroll-behavior: smooth;
   }
   body {
-    @apply bg-background text-foreground antialiased;
+    background-color: hsl(var(--background));
+    color: hsl(var(--foreground));
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
   }
   a:focus-visible,
   button:focus-visible {
@@ -43,11 +46,18 @@
 
 /* Glassmorphism */
 .glass {
-  @apply bg-white/5 backdrop-blur-xl border border-white/10 shadow-glow-sm;
+  background-color: rgba(255, 255, 255, 0.05);
+  backdrop-filter: blur(24px);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  box-shadow: 0 0 20px -5px hsl(var(--glow));
 }
 
 .glass-card {
-  @apply bg-white/[0.06] backdrop-blur-2xl border border-white/10 rounded-2xl shadow-glow-sm;
+  background-color: rgba(255, 255, 255, 0.06);
+  backdrop-filter: blur(40px);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 1rem;
+  box-shadow: 0 0 20px -5px hsl(var(--glow));
 }
 
 /* Glow */
@@ -60,8 +70,9 @@
   height: 6px;
 }
 .scrollbar-thin::-webkit-scrollbar-track {
-  @apply bg-transparent;
+  background-color: transparent;
 }
 .scrollbar-thin::-webkit-scrollbar-thumb {
-  @apply bg-white/20 rounded-full;
+  background-color: rgba(255, 255, 255, 0.2);
+  border-radius: 9999px;
 }

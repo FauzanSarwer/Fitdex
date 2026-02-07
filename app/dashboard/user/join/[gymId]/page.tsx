@@ -23,6 +23,7 @@ import type { PlanType } from "@/lib/discounts";
 import { useToast } from "@/hooks/use-toast";
 import { Skeleton } from "@/components/ui/skeleton";
 import { fetchJson } from "@/lib/client-fetch";
+import { isPaymentsEnabled, openRazorpayCheckout } from "@/lib/razorpay-checkout";
 
 declare global {
   interface Window {
@@ -74,6 +75,7 @@ function JoinContent() {
   const [hasDuo, setHasDuo] = useState(false);
   const [inviteCreated, setInviteCreated] = useState<{ code: string } | null>(null);
   const [creatingInvite, setCreatingInvite] = useState(false);
+  const paymentsEnabled = isPaymentsEnabled();
 
   useEffect(() => {
     let active = true;

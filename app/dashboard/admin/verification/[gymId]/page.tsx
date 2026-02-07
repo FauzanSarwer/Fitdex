@@ -7,6 +7,8 @@ import { requireAdmin } from "@/lib/permissions";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { VerificationActions } from "./verification-actions";
 
+export const dynamic = "force-dynamic";
+
 export default async function AdminVerificationDetailPage({
   params,
 }: {

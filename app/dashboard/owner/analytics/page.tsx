@@ -342,7 +342,7 @@ export default function OwnerAnalyticsPage() {
                       <YAxis stroke="rgba(255,255,255,0.5)" fontSize={12} tickFormatter={(v) => `₹${v}`} />
                       <Tooltip
                         contentStyle={{ background: "hsl(var(--card))", border: "1px solid rgba(255,255,255,0.1)" }}
-                        formatter={(value: number) => [`₹${value}`, "Revenue"]}
+                        formatter={(value) => [`₹${value ?? 0}`, "Revenue"]}
                       />
                       <Area type="monotone" dataKey="revenue" stroke="hsl(var(--primary))" fill="url(#revenueGradient)" />
                     </AreaChart>
