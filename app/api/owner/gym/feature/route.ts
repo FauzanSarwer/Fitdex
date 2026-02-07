@@ -10,6 +10,9 @@ import { logServerError } from "@/lib/logger";
 const FEATURE_PRICE_PAISE = 9900; // ₹99
 
 export async function POST(req: Request) {
+  if (process.env.PAYMENTS_ENABLED !== "true") {
+    return jsonError("PAYMENTS_DISABLED", 503);
+  }
   const session = await getServerSession(authOptions);
   if (!requireOwner(session)) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });

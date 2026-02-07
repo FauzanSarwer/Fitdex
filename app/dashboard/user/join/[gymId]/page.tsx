@@ -203,6 +203,10 @@ function JoinContent() {
 
   async function openRazorpay(membershipId: string, amountPaise: number): Promise<boolean> {
     try {
+      if (!paymentsEnabled) {
+        toast({ title: "Payments not available yet", description: "Please try again later." });
+        return false;
+      }
       const orderResult = await fetchJson<{ orderId?: string; amount?: number; currency?: string; error?: string }>("/api/razorpay/order", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -217,51 +221,38 @@ function JoinContent() {
         });
         return false;
       }
-      const key = process.env.NEXT_PUBLIC_RAZORPAY_KEY_ID;
-      if (!key || key === "XXXXX") {
-        toast({ title: "Payments unavailable", description: "Missing Razorpay key", variant: "destructive" });
+      const checkout = await openRazorpayCheckout({
+        orderId: orderResult.data.orderId,
+        amount: orderResult.data?.amount ?? amountPaise,
+        currency: orderResult.data?.currency ?? "INR",
+        name: "GYMDUO",
+        onSuccess: async (res) => {
+          const verifyResult = await fetchJson<{ error?: string }>("/api/razorpay/verify", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              razorpay_order_id: res.razorpay_order_id,
+              razorpay_payment_id: res.razorpay_payment_id,
+              razorpay_signature: res.razorpay_signature,
+              membershipId,
+            }),
+            retries: 1,
+          });
+          if (verifyResult.ok) {
+            toast({ title: "Payment received", description: "Activation will complete after confirmation." });
+          } else {
+            toast({ title: "Verification failed", description: verifyResult.error ?? "Payment failed", variant: "destructive" });
+          }
+        },
+      });
+      if (!checkout.ok) {
+        if (checkout.error && checkout.error !== "DISMISSED") {
+          const message = checkout.error === "PAYMENTS_DISABLED" ? "Payments not available yet" : checkout.error;
+          toast({ title: "Payments unavailable", description: message, variant: "destructive" });
+        }
         return false;
       }
-      if (typeof window.Razorpay === "undefined") {
-        const script = document.createElement("script");
-        script.src = "https://checkout.razorpay.com/v1/checkout.js";
-        script.async = true;
-        document.body.appendChild(script);
-        await new Promise((r) => (script.onload = r));
-      }
-      return await new Promise<boolean>((resolve) => {
-        const rzp = new window.Razorpay!({
-          key,
-          amount: orderResult.data?.amount ?? amountPaise,
-          currency: orderResult.data?.currency ?? "INR",
-          name: "GYMDUO",
-          order_id: orderResult.data.orderId,
-          handler: async (res) => {
-            const verifyResult = await fetchJson<{ error?: string }>("/api/razorpay/verify", {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({
-                razorpay_order_id: res.razorpay_order_id,
-                razorpay_payment_id: res.razorpay_payment_id,
-                razorpay_signature: res.razorpay_signature,
-                membershipId,
-              }),
-              retries: 1,
-            });
-            if (verifyResult.ok) {
-              toast({ title: "Payment received", description: "Activation will complete after confirmation." });
-              resolve(true);
-            } else {
-              toast({ title: "Verification failed", description: verifyResult.error ?? "Payment failed", variant: "destructive" });
-              resolve(false);
-            }
-          },
-          modal: {
-            ondismiss: () => resolve(false),
-          },
-        });
-        rzp.open();
-      });
+      return true;
     } catch {
       toast({ title: "Payment failed", variant: "destructive" });
       return false;
@@ -533,10 +524,12 @@ function JoinContent() {
               className="w-full h-12 text-base"
               size="lg"
               onClick={handleCheckout}
-              disabled={checkingOut}
+              disabled={checkingOut || !paymentsEnabled}
             >
               {checkingOut ? (
                 <Loader2 className="h-5 w-5 animate-spin" />
+              ) : !paymentsEnabled ? (
+                "Payments not available yet"
               ) : (
                 <>
                   Proceed to checkout
@@ -545,7 +538,7 @@ function JoinContent() {
               )}
             </Button>
             <p className="text-center text-xs text-muted-foreground mt-3">
-              You’ll complete payment on the next screen
+              {paymentsEnabled ? "You’ll complete payment on the next screen" : "Payments are not available yet."}
             </p>
           </CardContent>
         </Card>

@@ -11,20 +11,7 @@ import { useToast } from "@/hooks/use-toast";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Loader2 } from "lucide-react";
 import { fetchJson } from "@/lib/client-fetch";
-
-declare global {
-  interface Window {
-    Razorpay?: new (options: {
-      key: string;
-      amount: number;
-      currency: string;
-      name: string;
-      order_id: string;
-      handler: (res: { razorpay_payment_id: string; razorpay_order_id: string; razorpay_signature: string }) => void;
-      modal?: { ondismiss?: () => void };
-    }) => { open: () => void };
-  }
-}
+import { isPaymentsEnabled, openRazorpayCheckout } from "@/lib/razorpay-checkout";
 
 function MembershipContent() {
   const searchParams = useSearchParams();
@@ -35,6 +22,7 @@ function MembershipContent() {
   const [error, setError] = useState<string | null>(null);
   const [creating, setCreating] = useState(false);
   const [paying, setPaying] = useState<string | null>(null);
+  const paymentsEnabled = isPaymentsEnabled();
 
   useEffect(() => {
     let active = true;
@@ -91,6 +79,10 @@ function MembershipContent() {
   }
 
   async function openRazorpay(membershipId: string, amountPaise: number) {
+    if (!paymentsEnabled) {
+      toast({ title: "Payments not available yet", description: "Please try again later." });
+      return;
+    }
     setPaying(membershipId);
     try {
       const orderResult = await fetchJson<{ orderId?: string; amount?: number; currency?: string; error?: string }>("/api/razorpay/order", {
@@ -104,26 +96,12 @@ function MembershipContent() {
         setPaying(null);
         return;
       }
-      const key = process.env.NEXT_PUBLIC_RAZORPAY_KEY_ID;
-      if (!key || key === "XXXXX") {
-        toast({ title: "Payments unavailable", description: "Missing Razorpay key", variant: "destructive" });
-        setPaying(null);
-        return;
-      }
-      if (typeof window.Razorpay === "undefined") {
-        const script = document.createElement("script");
-        script.src = "https://checkout.razorpay.com/v1/checkout.js";
-        script.async = true;
-        document.body.appendChild(script);
-        await new Promise((r) => script.onload = r);
-      }
-      const rzp = new window.Razorpay!({
-        key,
+      const checkout = await openRazorpayCheckout({
+        orderId: orderResult.data.orderId,
         amount: orderResult.data?.amount ?? 0,
         currency: orderResult.data?.currency ?? "INR",
         name: "GYMDUO",
-        order_id: orderResult.data.orderId,
-        handler: async (res) => {
+        onSuccess: async (res) => {
           const verifyResult = await fetchJson<{ error?: string }>("/api/razorpay/verify", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
@@ -140,17 +118,18 @@ function MembershipContent() {
           } else {
             toast({ title: "Verification failed", description: verifyResult.error ?? "Payment failed", variant: "destructive" });
           }
-          setPaying(null);
         },
-        modal: {
-          ondismiss: () => setPaying(null),
-        },
+        onDismiss: () => setPaying(null),
       });
-      rzp.open();
+      if (!checkout.ok && checkout.error && checkout.error !== "DISMISSED") {
+        const message = checkout.error === "PAYMENTS_DISABLED" ? "Payments not available yet" : checkout.error;
+        toast({ title: "Payments unavailable", description: message, variant: "destructive" });
+      }
     } catch {
       setPaying(null);
       toast({ title: "Payment failed", variant: "destructive" });
     }
+    setPaying(null);
   }
 
   async function cancelMembership(membershipId: string) {
@@ -248,10 +227,16 @@ function MembershipContent() {
                     </div>
                     <Button
                       size="sm"
-                      disabled={paying === m.id}
+                      disabled={!paymentsEnabled || paying === m.id}
                       onClick={() => openRazorpay(m.id, m.finalPrice)}
                     >
-                      {paying === m.id ? <Loader2 className="h-4 w-4 animate-spin" /> : "Pay now"}
+                      {paying === m.id ? (
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                      ) : paymentsEnabled ? (
+                        "Pay now"
+                      ) : (
+                        "Payments not available yet"
+                      )}
                     </Button>
                   </div>
                 ))}

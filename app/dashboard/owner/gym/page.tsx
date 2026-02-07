@@ -11,23 +11,7 @@ import { useToast } from "@/hooks/use-toast";
 import { Skeleton } from "@/components/ui/skeleton";
 import { MapPin, Loader2, Sparkles, ShieldCheck } from "lucide-react";
 import { fetchJson } from "@/lib/client-fetch";
-
-declare global {
-  interface Window {
-    Razorpay?: new (options: {
-      key: string;
-      amount: number;
-      currency: string;
-      name: string;
-      order_id: string;
-      handler: (res: {
-        razorpay_payment_id: string;
-        razorpay_order_id: string;
-        razorpay_signature: string;
-      }) => void;
-    }) => { open: () => void };
-  }
-}
+import { isPaymentsEnabled, openRazorpayCheckout } from "@/lib/razorpay-checkout";
 
 export default function OwnerGymPage() {
   const { toast } = useToast();
@@ -50,6 +34,7 @@ export default function OwnerGymPage() {
   const [saving, setSaving] = useState(false);
   const [featuring, setFeaturing] = useState<string | null>(null);
   const [verifying, setVerifying] = useState<string | null>(null);
+  const paymentsEnabled = isPaymentsEnabled();
 
   useEffect(() => {
     let active = true;
@@ -335,8 +320,12 @@ export default function OwnerGymPage() {
                   <Button
                     size="sm"
                     variant="secondary"
-                    disabled={featuring === g.id}
+                    disabled={!paymentsEnabled || featuring === g.id}
                     onClick={async () => {
+                      if (!paymentsEnabled) {
+                        toast({ title: "Payments not available yet", description: "Please try again later." });
+                        return;
+                      }
                       setFeaturing(g.id);
                       try {
                         const result = await fetchJson<{
@@ -359,26 +348,12 @@ export default function OwnerGymPage() {
                           setFeaturing(null);
                           return;
                         }
-                        const key = process.env.NEXT_PUBLIC_RAZORPAY_KEY_ID;
-                        if (!key || key === "XXXXX") {
-                          toast({ title: "Payments unavailable", description: "Missing Razorpay key", variant: "destructive" });
-                          setFeaturing(null);
-                          return;
-                        }
-                        if (typeof window.Razorpay === "undefined") {
-                          const script = document.createElement("script");
-                          script.src = "https://checkout.razorpay.com/v1/checkout.js";
-                          script.async = true;
-                          document.body.appendChild(script);
-                          await new Promise((r) => (script.onload = r));
-                        }
-                        const rzp = new window.Razorpay!({
-                          key,
+                        const checkout = await openRazorpayCheckout({
+                          orderId: result.data?.orderId ?? "",
                           amount: result.data?.amount ?? 0,
                           currency: result.data?.currency ?? "INR",
                           name: "GYMDUO",
-                          order_id: result.data?.orderId ?? "",
-                          handler: async (res) => {
+                          onSuccess: async (res) => {
                             const verifyResult = await fetchJson<{
                               featuredUntil?: string;
                               error?: string;
@@ -411,20 +386,33 @@ export default function OwnerGymPage() {
                             }
                           },
                         });
-                        rzp.open();
+                        if (!checkout.ok && checkout.error && checkout.error !== "DISMISSED") {
+                          const message = checkout.error === "PAYMENTS_DISABLED" ? "Payments not available yet" : checkout.error;
+                          toast({ title: "Payments unavailable", description: message, variant: "destructive" });
+                        }
                       } catch {
                         toast({ title: "Error", variant: "destructive" });
                       }
                       setFeaturing(null);
                     }}
                   >
-                    {featuring === g.id ? <Loader2 className="h-4 w-4 animate-spin" /> : "Feature ₹99 / 3 days"}
+                    {featuring === g.id ? (
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                    ) : paymentsEnabled ? (
+                      "Feature ₹99 / 3 days"
+                    ) : (
+                      "Payments not available yet"
+                    )}
                   </Button>
                   <Button
                     size="sm"
                     variant="outline"
-                    disabled={verifying === g.id}
+                    disabled={!paymentsEnabled || verifying === g.id}
                     onClick={async () => {
+                      if (!paymentsEnabled) {
+                        toast({ title: "Payments not available yet", description: "Please try again later." });
+                        return;
+                      }
                       setVerifying(g.id);
                       try {
                         const result = await fetchJson<{
@@ -447,26 +435,12 @@ export default function OwnerGymPage() {
                           setVerifying(null);
                           return;
                         }
-                        const key = process.env.NEXT_PUBLIC_RAZORPAY_KEY_ID;
-                        if (!key || key === "XXXXX") {
-                          toast({ title: "Payments unavailable", description: "Missing Razorpay key", variant: "destructive" });
-                          setVerifying(null);
-                          return;
-                        }
-                        if (typeof window.Razorpay === "undefined") {
-                          const script = document.createElement("script");
-                          script.src = "https://checkout.razorpay.com/v1/checkout.js";
-                          script.async = true;
-                          document.body.appendChild(script);
-                          await new Promise((r) => (script.onload = r));
-                        }
-                        const rzp = new window.Razorpay!({
-                          key,
+                        const checkout = await openRazorpayCheckout({
+                          orderId: result.data?.orderId ?? "",
                           amount: result.data?.amount ?? 0,
                           currency: result.data?.currency ?? "INR",
                           name: "GYMDUO",
-                          order_id: result.data?.orderId ?? "",
-                          handler: async (res) => {
+                          onSuccess: async (res) => {
                             const verifyResult = await fetchJson<{
                               verifiedUntil?: string;
                               error?: string;
@@ -499,14 +473,23 @@ export default function OwnerGymPage() {
                             }
                           },
                         });
-                        rzp.open();
+                        if (!checkout.ok && checkout.error && checkout.error !== "DISMISSED") {
+                          const message = checkout.error === "PAYMENTS_DISABLED" ? "Payments not available yet" : checkout.error;
+                          toast({ title: "Payments unavailable", description: message, variant: "destructive" });
+                        }
                       } catch {
                         toast({ title: "Error", variant: "destructive" });
                       }
                       setVerifying(null);
                     }}
                   >
-                    {verifying === g.id ? <Loader2 className="h-4 w-4 animate-spin" /> : "Verify ₹99 / month"}
+                    {verifying === g.id ? (
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                    ) : paymentsEnabled ? (
+                      "Verify ₹99 / month"
+                    ) : (
+                      "Payments not available yet"
+                    )}
                   </Button>
                 </div>
               </div>

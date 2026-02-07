@@ -8,6 +8,9 @@ import { jsonError, safeJson } from "@/lib/api";
 import { logServerError } from "@/lib/logger";
 
 export async function POST(req: Request) {
+  if (process.env.PAYMENTS_ENABLED !== "true") {
+    return jsonError("PAYMENTS_DISABLED", 503);
+  }
   const session = await getServerSession(authOptions);
   if (!requireUser(session)) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
