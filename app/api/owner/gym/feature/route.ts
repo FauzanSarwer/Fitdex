@@ -3,7 +3,7 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { requireOwner } from "@/lib/permissions";
-import { createRazorpayOrder } from "@/lib/razorpay";
+import { createRazorpayOrder, PaymentConfigError } from "@/lib/razorpay";
 import { jsonError, safeJson } from "@/lib/api";
 import { logServerError } from "@/lib/logger";
 
@@ -51,6 +51,9 @@ export async function POST(req: Request) {
       gymId,
     });
   } catch (e) {
+    if (e instanceof PaymentConfigError) {
+      return jsonError("Payments unavailable", 503);
+    }
     logServerError(e as Error, { route: "/api/owner/gym/feature", userId: uid });
     return jsonError("Failed to create order", 500);
   }

@@ -3,7 +3,7 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { requireOwner } from "@/lib/permissions";
-import { verifyRazorpayPaymentSignature } from "@/lib/razorpay";
+import { PaymentConfigError, verifyRazorpayPaymentSignature } from "@/lib/razorpay";
 import { jsonError, safeJson } from "@/lib/api";
 import { logServerError } from "@/lib/logger";
 
@@ -65,6 +65,9 @@ export async function POST(req: Request) {
       verifiedUntil: updated.verifiedUntil,
     });
   } catch (error) {
+    if (error instanceof PaymentConfigError) {
+      return jsonError("Payments unavailable", 503);
+    }
     logServerError(error as Error, { route: "/api/owner/gym/verify/verify", userId: uid });
     return jsonError("Failed to verify purchase", 500);
   }

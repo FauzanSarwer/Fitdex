@@ -3,7 +3,7 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { requireUser } from "@/lib/permissions";
-import { verifyRazorpayPaymentSignature } from "@/lib/razorpay";
+import { PaymentConfigError, verifyRazorpayPaymentSignature } from "@/lib/razorpay";
 import { jsonError, safeJson } from "@/lib/api";
 import { logServerError } from "@/lib/logger";
 
@@ -29,15 +29,15 @@ export async function POST(req: Request) {
   if (!razorpay_order_id || !razorpay_payment_id || !razorpay_signature || !membershipId) {
     return jsonError("Missing payment details", 400);
   }
-  const valid = verifyRazorpayPaymentSignature(
-    razorpay_order_id,
-    razorpay_payment_id,
-    razorpay_signature
-  );
-  if (!valid) {
-    return jsonError("Invalid payment signature", 400);
-  }
   try {
+    const valid = verifyRazorpayPaymentSignature(
+      razorpay_order_id,
+      razorpay_payment_id,
+      razorpay_signature
+    );
+    if (!valid) {
+      return jsonError("Invalid payment signature", 400);
+    }
     const payment = await prisma.payment.findFirst({
       where: {
         razorpayOrderId: razorpay_order_id,
@@ -100,6 +100,9 @@ export async function POST(req: Request) {
     }
     return NextResponse.json({ success: true });
   } catch (error) {
+    if (error instanceof PaymentConfigError) {
+      return jsonError("Payments unavailable", 503);
+    }
     logServerError(error as Error, { route: "/api/razorpay/verify", userId: uid });
     return jsonError("Payment verification failed", 500);
   }

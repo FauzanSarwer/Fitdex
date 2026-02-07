@@ -1,9 +1,16 @@
 import { getOptionalEnv } from "./env";
 
+export class PaymentConfigError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "PaymentConfigError";
+  }
+}
+
 function requireEnv(name: string) {
   const value = getOptionalEnv(name);
   if (!value) {
-    throw new Error(`Missing required environment variable: ${name}`);
+    throw new PaymentConfigError("Payments unavailable: missing configuration");
   }
   return value;
 }
@@ -63,7 +70,13 @@ export function verifyRazorpayWebhookSignature(
   signature: string
 ): boolean {
   const crypto = require("crypto");
-  const secret = requireEnv("RAZORPAY_WEBHOOK_SECRET");
+  let secret = "";
+  try {
+    secret = requireEnv("RAZORPAY_WEBHOOK_SECRET");
+  } catch (e) {
+    if (e instanceof PaymentConfigError) return false;
+    throw e;
+  }
   const expected = crypto
     .createHmac("sha256", secret)
     .update(body)
