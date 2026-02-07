@@ -4,6 +4,8 @@ import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { requireOwner } from "@/lib/permissions";
 import { createRazorpayOrder } from "@/lib/razorpay";
+import { jsonError, safeJson } from "@/lib/api";
+import { logServerError } from "@/lib/logger";
 
 const FEATURE_PRICE_PAISE = 9900; // ₹99
 
@@ -13,17 +15,20 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
   const uid = (session!.user as { id: string }).id;
-  const body = await req.json();
-  const { gymId } = body as { gymId: string };
+  const parsed = await safeJson<{ gymId?: string }>(req);
+  if (!parsed.ok) {
+    return jsonError("Invalid JSON body", 400);
+  }
+  const gymId = parsed.data.gymId?.trim();
   if (!gymId) {
-    return NextResponse.json({ error: "gymId required" }, { status: 400 });
+    return jsonError("gymId required", 400);
   }
-  const gym = await prisma.gym.findFirst({ where: { id: gymId, ownerId: uid } });
-  if (!gym) {
-    return NextResponse.json({ error: "Gym not found" }, { status: 404 });
-  }
-  const receipt = `feature_${gymId}_${Date.now()}`;
   try {
+    const gym = await prisma.gym.findFirst({ where: { id: gymId, ownerId: uid } });
+    if (!gym) {
+      return jsonError("Gym not found", 404);
+    }
+    const receipt = `feature_${gymId}_${Date.now()}`;
     const order = await createRazorpayOrder(FEATURE_PRICE_PAISE, receipt, {
       gymId,
       ownerId: uid,
@@ -46,7 +51,7 @@ export async function POST(req: Request) {
       gymId,
     });
   } catch (e) {
-    console.error(e);
-    return NextResponse.json({ error: "Failed to create order" }, { status: 500 });
+    logServerError(e as Error, { route: "/api/owner/gym/feature", userId: uid });
+    return jsonError("Failed to create order", 500);
   }
 }

@@ -2,6 +2,8 @@ import { NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import { jsonError, safeJson } from "@/lib/api";
+import { logServerError } from "@/lib/logger";
 
 const ALLOWED_ROLES = new Set(["USER", "OWNER"]);
 
@@ -12,8 +14,11 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const body = await req.json().catch(() => ({}));
-    const requested = typeof body?.role === "string" ? body.role.toUpperCase() : "USER";
+    const parsed = await safeJson<{ role?: string }>(req);
+    if (!parsed.ok) {
+      return jsonError("Invalid JSON body", 400);
+    }
+    const requested = typeof parsed.data?.role === "string" ? parsed.data.role.toUpperCase() : "USER";
     const normalized = ALLOWED_ROLES.has(requested) ? requested : "USER";
 
     const user = await prisma.user.findUnique({
@@ -43,9 +48,7 @@ export async function POST(req: Request) {
 
     return NextResponse.json({ role: nextRole }, { status: 200 });
   } catch (error: any) {
-    return NextResponse.json(
-      { error: error?.message ?? "Failed to update role" },
-      { status: 500 }
-    );
+    logServerError(error as Error, { route: "/api/auth/role" });
+    return jsonError(error?.message ?? "Failed to update role", 500);
   }
 }

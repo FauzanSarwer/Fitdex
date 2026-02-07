@@ -3,18 +3,19 @@ import { PrismaAdapter } from "@auth/prisma-adapter";
 import CredentialsProvider from "next-auth/providers/credentials";
 import GoogleProvider from "next-auth/providers/google";
 import { prisma } from "./prisma";
+import { getOptionalEnv, getRequiredEnv } from "./env";
 import bcrypt from "bcryptjs";
 
-const googleClientId = process.env.GOOGLE_CLIENT_ID;
-const googleClientSecret = process.env.GOOGLE_CLIENT_SECRET;
-const passwordPepper = process.env.PASSWORD_PEPPER ?? "";
-const googleEnabled =
-  !!googleClientId &&
-  !!googleClientSecret &&
-  googleClientId !== "XXXXX" &&
-  googleClientSecret !== "XXXXX";
+const googleClientId = getOptionalEnv("GOOGLE_CLIENT_ID");
+const googleClientSecret = getOptionalEnv("GOOGLE_CLIENT_SECRET");
+const passwordPepper = getRequiredEnv("PASSWORD_PEPPER", {
+  allowEmptyInDev: true,
+});
+const nextAuthSecret = getRequiredEnv("NEXTAUTH_SECRET", { allowEmptyInDev: true });
+const googleEnabled = !!googleClientId && !!googleClientSecret;
 
 export const authOptions: NextAuthOptions = {
+  secret: nextAuthSecret,
   adapter: PrismaAdapter(prisma) as NextAuthOptions["adapter"],
   session: { strategy: "jwt", maxAge: 30 * 24 * 60 * 60 },
   pages: { signIn: "/auth/login" },

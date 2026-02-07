@@ -10,6 +10,7 @@ import { formatPrice } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Loader2 } from "lucide-react";
+import { fetchJson } from "@/lib/client-fetch";
 
 declare global {
   interface Window {
@@ -30,14 +31,25 @@ function MembershipContent() {
   const { toast } = useToast();
   const [memberships, setMemberships] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [creating, setCreating] = useState(false);
   const [paying, setPaying] = useState<string | null>(null);
 
   useEffect(() => {
-    fetch("/api/memberships")
-      .then((r) => r.json())
-      .then((d) => {
-        setMemberships(d.memberships ?? []);
+    fetchJson<{ memberships?: any[]; error?: string }>("/api/memberships", { retries: 1 })
+      .then((result) => {
+        if (!result.ok) {
+          toast({ title: "Error", description: result.error ?? "Failed to load memberships", variant: "destructive" });
+          setError(result.error ?? "Failed to load memberships");
+          setLoading(false);
+          return;
+        }
+        setMemberships(result.data?.memberships ?? []);
+        setLoading(false);
+      })
+      .catch(() => {
+        toast({ title: "Error", description: "Failed to load memberships", variant: "destructive" });
+        setError("Failed to load memberships");
         setLoading(false);
       });
   }, []);
@@ -48,20 +60,23 @@ function MembershipContent() {
   async function createMembership(gymId: string, planType: "MONTHLY" | "YEARLY") {
     setCreating(true);
     try {
-      const res = await fetch("/api/memberships", {
+      const result = await fetchJson<{ membership?: any; finalPricePaise?: number; error?: string }>("/api/memberships", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ gymId, planType }),
+        retries: 1,
       });
-      const data = await res.json();
-      if (!res.ok) {
-        toast({ title: "Error", description: data.error ?? "Failed to create membership", variant: "destructive" });
+      if (!result.ok) {
+        toast({ title: "Error", description: result.error ?? "Failed to create membership", variant: "destructive" });
         setCreating(false);
         return;
       }
-      setMemberships((prev) => [data.membership, ...prev]);
+      const membership = result.data?.membership;
+      setMemberships((prev) => (membership ? [membership, ...prev] : prev));
       toast({ title: "Membership created", description: "Proceed to payment." });
-      await openRazorpay(data.membership.id, data.finalPricePaise);
+      if (membership) {
+        await openRazorpay(membership.id, result.data?.finalPricePaise ?? 0);
+      }
     } catch {
       toast({ title: "Error", description: "Something went wrong", variant: "destructive" });
     }
@@ -71,18 +86,23 @@ function MembershipContent() {
   async function openRazorpay(membershipId: string, amountPaise: number) {
     setPaying(membershipId);
     try {
-      const orderRes = await fetch("/api/razorpay/order", {
+      const orderResult = await fetchJson<{ orderId?: string; amount?: number; currency?: string; error?: string }>("/api/razorpay/order", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ membershipId }),
+        retries: 1,
       });
-      const orderData = await orderRes.json();
-      if (!orderRes.ok) {
-        toast({ title: "Error", description: orderData.error ?? "Failed to create order", variant: "destructive" });
+      if (!orderResult.ok || !orderResult.data?.orderId) {
+        toast({ title: "Error", description: orderResult.error ?? "Failed to create order", variant: "destructive" });
         setPaying(null);
         return;
       }
-      const key = process.env.NEXT_PUBLIC_RAZORPAY_KEY_ID ?? "XXXXX";
+      const key = process.env.NEXT_PUBLIC_RAZORPAY_KEY_ID;
+      if (!key || key === "XXXXX") {
+        toast({ title: "Payments unavailable", description: "Missing Razorpay key", variant: "destructive" });
+        setPaying(null);
+        return;
+      }
       if (typeof window.Razorpay === "undefined") {
         const script = document.createElement("script");
         script.src = "https://checkout.razorpay.com/v1/checkout.js";
@@ -92,12 +112,12 @@ function MembershipContent() {
       }
       const rzp = new window.Razorpay!({
         key,
-        amount: orderData.amount,
-        currency: orderData.currency ?? "INR",
+        amount: orderResult.data?.amount ?? 0,
+        currency: orderResult.data?.currency ?? "INR",
         name: "GYMDUO",
-        order_id: orderData.orderId,
+        order_id: orderResult.data.orderId,
         handler: async (res) => {
-          const verifyRes = await fetch("/api/razorpay/verify", {
+          const verifyResult = await fetchJson<{ error?: string }>("/api/razorpay/verify", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
@@ -106,8 +126,9 @@ function MembershipContent() {
               razorpay_signature: res.razorpay_signature,
               membershipId,
             }),
+            retries: 1,
           });
-          if (verifyRes.ok) {
+          if (verifyResult.ok) {
             toast({ title: "Payment successful", description: "Membership activated." });
             setMemberships((prev) =>
               prev.map((m) =>
@@ -115,7 +136,7 @@ function MembershipContent() {
               )
             );
           } else {
-            toast({ title: "Verification failed", variant: "destructive" });
+            toast({ title: "Verification failed", description: verifyResult.error ?? "Payment failed", variant: "destructive" });
           }
           setPaying(null);
         },
@@ -128,18 +149,19 @@ function MembershipContent() {
   }
 
   async function cancelMembership(membershipId: string) {
-    const res = await fetch("/api/memberships/cancel", {
+    const result = await fetchJson<{ error?: string }>("/api/memberships/cancel", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ membershipId }),
+      retries: 1,
     });
-    if (res.ok) {
+    if (result.ok) {
       toast({ title: "Membership cancelled" });
       setMemberships((prev) =>
         prev.map((m) => (m.id === membershipId ? { ...m, active: false } : m))
       );
     } else {
-      toast({ title: "Failed to cancel", variant: "destructive" });
+      toast({ title: "Failed to cancel", description: result.error ?? "Unable to cancel membership", variant: "destructive" });
     }
   }
 
@@ -147,6 +169,22 @@ function MembershipContent() {
     return (
       <div className="p-6">
         <Skeleton className="h-40 rounded-2xl" />
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="p-6">
+        <Card className="glass-card p-10 text-center">
+          <CardHeader>
+            <CardTitle>Could not load memberships</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            <p className="text-sm text-muted-foreground">{error}</p>
+            <Button onClick={() => window.location.reload()}>Retry</Button>
+          </CardContent>
+        </Card>
       </div>
     );
   }

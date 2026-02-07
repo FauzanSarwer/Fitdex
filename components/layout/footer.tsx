@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 
 export function Footer() {
   return (
-    <footer className="mt-16 border-t border-white/10 bg-white/5">
+    <footer className="mt-auto border-t border-white/10 bg-white/5 backdrop-blur">
       <div className="container mx-auto px-4 py-12">
         <motion.div
           initial={{ opacity: 0, y: 10 }}

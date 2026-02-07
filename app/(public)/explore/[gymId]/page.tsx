@@ -18,6 +18,7 @@ import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { formatPrice } from "@/lib/utils";
 import { getGymOpenStatus } from "@/lib/gym-hours";
+import { fetchJson } from "@/lib/client-fetch";
 
 interface GymData {
   id: string;
@@ -30,6 +31,7 @@ interface GymData {
   closeTime?: string | null;
   openDays?: string | null;
   owner: { id: string; name: string | null };
+  dayPassPrice?: number | null;
   monthlyPrice: number;
   quarterlyPrice: number;
   yearlyPrice: number;
@@ -51,24 +53,33 @@ export default function GymProfilePage() {
   const [gym, setGym] = useState<GymData | null>(null);
   const [loading, setLoading] = useState(true);
   const [saved, setSaved] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     if (!gymId) return;
-    fetch(`/api/gyms/${gymId}`)
-      .then((r) => r.json())
-      .then((d) => {
-        if (d.gym) setGym(d.gym);
+    fetchJson<{ gym?: GymData; error?: string }>(`/api/gyms/${gymId}`, { retries: 1 })
+      .then((result) => {
+        if (!result.ok) {
+          setError(result.error ?? "Gym not found");
+          setLoading(false);
+          return;
+        }
+        if (result.data?.gym) setGym(result.data.gym);
+        if (!result.data?.gym) setError("Gym not found");
         setLoading(false);
       })
-      .catch(() => setLoading(false));
+      .catch(() => {
+        setError("Failed to load gym details");
+        setLoading(false);
+      });
   }, [gymId]);
 
   useEffect(() => {
     if (status !== "authenticated") return;
-    fetch("/api/saved-gyms")
-      .then((r) => r.json())
-      .then((d) => {
-        const ids = new Set((d.saved ?? []).map((s: any) => s.gymId));
+    fetchJson<{ saved?: Array<{ gymId: string }> }>("/api/saved-gyms", { retries: 1 })
+      .then((result) => {
+        if (!result.ok) return;
+        const ids = new Set((result.data?.saved ?? []).map((s) => s.gymId));
         setSaved(ids.has(gymId));
       })
       .catch(() => {});
@@ -76,21 +87,33 @@ export default function GymProfilePage() {
 
   async function toggleSave() {
     if (status !== "authenticated") return;
-    setSaved((p) => !p);
-    if (saved) {
-      await fetch(`/api/saved-gyms?gymId=${gymId}`, { method: "DELETE" });
-    } else {
-      await fetch("/api/saved-gyms", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ gymId }),
-      });
+    const next = !saved;
+    setSaved(next);
+    const result = next
+      ? await fetchJson("/api/saved-gyms", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ gymId }),
+          retries: 1,
+        })
+      : await fetchJson(`/api/saved-gyms?gymId=${gymId}`, { method: "DELETE", retries: 1 });
+    if (!result.ok) {
+      setSaved(!next);
     }
   }
 
   const pricing = useMemo(() => {
     if (!gym) return [];
     return [
+      ...(gym.dayPassPrice && gym.dayPassPrice > 0
+        ? [
+            {
+              label: "Day pass",
+              price: gym.dayPassPrice,
+              note: "One-day access",
+            },
+          ]
+        : []),
       {
         label: "Monthly",
         price: gym.monthlyPrice,
@@ -109,11 +132,27 @@ export default function GymProfilePage() {
     ];
   }, [gym]);
 
-  if (loading || !gym) {
+  if (loading) {
     return (
       <div className="container mx-auto px-4 py-10">
         <Skeleton className="h-72 rounded-3xl mb-6" />
         <Skeleton className="h-40 rounded-3xl" />
+      </div>
+    );
+  }
+
+  if (error || !gym) {
+    return (
+      <div className="container mx-auto px-4 py-10">
+        <Card className="glass-card p-10 text-center">
+          <CardHeader>
+            <CardTitle>Unable to load gym</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            <p className="text-sm text-muted-foreground">{error ?? "Please try again."}</p>
+            <Button onClick={() => window.location.reload()}>Retry</Button>
+          </CardContent>
+        </Card>
       </div>
     );
   }

@@ -10,6 +10,7 @@ import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import { Skeleton } from "@/components/ui/skeleton";
 import { MapPin, Loader2, Sparkles, ShieldCheck } from "lucide-react";
+import { fetchJson } from "@/lib/client-fetch";
 
 declare global {
   interface Window {
@@ -41,6 +42,7 @@ export default function OwnerGymPage() {
     openTime: "",
     closeTime: "",
     openDays: ["MON", "TUE", "WED", "THU", "FRI", "SAT"] as string[],
+    dayPassPrice: "",
     monthlyPrice: "",
     quarterlyPrice: "",
     yearlyPrice: "",
@@ -53,20 +55,20 @@ export default function OwnerGymPage() {
     let active = true;
     setLoading(true);
     setError(null);
-    fetch("/api/owner/gym")
-      .then(async (r) => {
-        const payload = await r.json().catch(() => ({}));
-        if (!r.ok) throw new Error(payload?.error ?? "Failed to load gyms");
-        return payload;
-      })
-      .then((d) => {
+    fetchJson<{ gyms?: any[]; error?: string }>("/api/owner/gym", { retries: 1 })
+      .then((result) => {
         if (!active) return;
-        setGyms(d.gyms ?? []);
+        if (!result.ok) {
+          setGyms([]);
+          setError(result.error ?? "Failed to load gyms");
+          return;
+        }
+        setGyms(result.data?.gyms ?? []);
       })
-      .catch((e: any) => {
+      .catch(() => {
         if (!active) return;
         setGyms([]);
-        setError(e?.message ?? "Failed to load gyms");
+        setError("Failed to load gyms");
       })
       .finally(() => {
         if (active) setLoading(false);
@@ -81,7 +83,7 @@ export default function OwnerGymPage() {
     e.preventDefault();
     setSaving(true);
     try {
-      const res = await fetch("/api/owner/gym", {
+      const result = await fetchJson<{ gym?: any; error?: string }>("/api/owner/gym", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -92,19 +94,23 @@ export default function OwnerGymPage() {
           openTime: form.openTime || null,
           closeTime: form.closeTime || null,
           openDays: form.openDays.length > 0 ? form.openDays.join(",") : null,
+          dayPassPrice: form.dayPassPrice ? Math.round(parseFloat(form.dayPassPrice) * 100) : null,
           monthlyPrice: Math.round(parseFloat(form.monthlyPrice) * 100) || 29900,
           quarterlyPrice: form.quarterlyPrice ? Math.round(parseFloat(form.quarterlyPrice) * 100) : null,
           yearlyPrice: Math.round(parseFloat(form.yearlyPrice) * 100) || 299000,
         }),
+        retries: 1,
       });
-      const data = await res.json();
-      if (!res.ok) {
-        toast({ title: "Error", description: data.error ?? "Failed", variant: "destructive" });
+      if (!result.ok) {
+        toast({ title: "Error", description: result.error ?? "Failed", variant: "destructive" });
         setSaving(false);
         return;
       }
-      toast({ title: "Gym added", description: data.gym?.name });
-      setGyms((prev) => [data.gym, ...prev]);
+      const createdGym = result.data?.gym;
+      toast({ title: "Gym added", description: createdGym?.name });
+      if (createdGym) {
+        setGyms((prev) => [createdGym, ...prev]);
+      }
       setForm({
         name: "",
         address: "",
@@ -113,6 +119,7 @@ export default function OwnerGymPage() {
         openTime: "",
         closeTime: "",
         openDays: ["MON", "TUE", "WED", "THU", "FRI", "SAT"],
+        dayPassPrice: "",
         monthlyPrice: "",
         quarterlyPrice: "",
         yearlyPrice: "",
@@ -249,6 +256,17 @@ export default function OwnerGymPage() {
                 </div>
               </div>
               <div className="space-y-2">
+                <Label>Day pass price (₹) — optional</Label>
+                <Input
+                  type="number"
+                  min="0"
+                  step="1"
+                  value={form.dayPassPrice}
+                  onChange={(e) => setForm((p) => ({ ...p, dayPassPrice: e.target.value }))}
+                  placeholder="99"
+                />
+              </div>
+              <div className="space-y-2">
                 <Label>Monthly price (₹)</Label>
                 <Input
                   type="number"
@@ -321,18 +339,32 @@ export default function OwnerGymPage() {
                     onClick={async () => {
                       setFeaturing(g.id);
                       try {
-                        const res = await fetch("/api/owner/gym/feature", {
+                        const result = await fetchJson<{
+                          amount: number;
+                          currency?: string;
+                          orderId: string;
+                          error?: string;
+                        }>("/api/owner/gym/feature", {
                           method: "POST",
                           headers: { "Content-Type": "application/json" },
                           body: JSON.stringify({ gymId: g.id }),
+                          retries: 1,
                         });
-                        const data = await res.json();
-                        if (!res.ok) {
-                          toast({ title: "Error", description: data.error ?? "Failed to start payment", variant: "destructive" });
+                        if (!result.ok) {
+                          toast({
+                            title: "Error",
+                            description: result.error ?? "Failed to start payment",
+                            variant: "destructive",
+                          });
                           setFeaturing(null);
                           return;
                         }
-                        const key = process.env.NEXT_PUBLIC_RAZORPAY_KEY_ID ?? "XXXXX";
+                        const key = process.env.NEXT_PUBLIC_RAZORPAY_KEY_ID;
+                        if (!key || key === "XXXXX") {
+                          toast({ title: "Payments unavailable", description: "Missing Razorpay key", variant: "destructive" });
+                          setFeaturing(null);
+                          return;
+                        }
                         if (typeof window.Razorpay === "undefined") {
                           const script = document.createElement("script");
                           script.src = "https://checkout.razorpay.com/v1/checkout.js";
@@ -342,12 +374,15 @@ export default function OwnerGymPage() {
                         }
                         const rzp = new window.Razorpay!({
                           key,
-                          amount: data.amount,
-                          currency: data.currency ?? "INR",
+                          amount: result.data?.amount ?? 0,
+                          currency: result.data?.currency ?? "INR",
                           name: "GYMDUO",
-                          order_id: data.orderId,
+                          order_id: result.data?.orderId ?? "",
                           handler: async (res) => {
-                            const verifyRes = await fetch("/api/owner/gym/feature/verify", {
+                            const verifyResult = await fetchJson<{
+                              featuredUntil?: string;
+                              error?: string;
+                            }>("/api/owner/gym/feature/verify", {
                               method: "POST",
                               headers: { "Content-Type": "application/json" },
                               body: JSON.stringify({
@@ -356,17 +391,23 @@ export default function OwnerGymPage() {
                                 paymentId: res.razorpay_payment_id,
                                 signature: res.razorpay_signature,
                               }),
+                              retries: 1,
                             });
-                            const verifyData = await verifyRes.json();
-                            if (verifyRes.ok) {
+                            if (verifyResult.ok) {
                               toast({ title: "Featured activated", description: "Your gym is now featured for 3 days." });
                               setGyms((prev) =>
                                 prev.map((gym) =>
-                                  gym.id === g.id ? { ...gym, featuredUntil: verifyData.featuredUntil } : gym
+                                  gym.id === g.id
+                                    ? { ...gym, featuredUntil: verifyResult.data?.featuredUntil }
+                                    : gym
                                 )
                               );
                             } else {
-                              toast({ title: "Verification failed", description: verifyData.error ?? "Payment failed", variant: "destructive" });
+                              toast({
+                                title: "Verification failed",
+                                description: verifyResult.error ?? "Payment failed",
+                                variant: "destructive",
+                              });
                             }
                           },
                         });
@@ -386,18 +427,32 @@ export default function OwnerGymPage() {
                     onClick={async () => {
                       setVerifying(g.id);
                       try {
-                        const res = await fetch("/api/owner/gym/verify", {
+                        const result = await fetchJson<{
+                          amount: number;
+                          currency?: string;
+                          orderId: string;
+                          error?: string;
+                        }>("/api/owner/gym/verify", {
                           method: "POST",
                           headers: { "Content-Type": "application/json" },
                           body: JSON.stringify({ gymId: g.id }),
+                          retries: 1,
                         });
-                        const data = await res.json();
-                        if (!res.ok) {
-                          toast({ title: "Error", description: data.error ?? "Failed to start payment", variant: "destructive" });
+                        if (!result.ok) {
+                          toast({
+                            title: "Error",
+                            description: result.error ?? "Failed to start payment",
+                            variant: "destructive",
+                          });
                           setVerifying(null);
                           return;
                         }
-                        const key = process.env.NEXT_PUBLIC_RAZORPAY_KEY_ID ?? "XXXXX";
+                        const key = process.env.NEXT_PUBLIC_RAZORPAY_KEY_ID;
+                        if (!key || key === "XXXXX") {
+                          toast({ title: "Payments unavailable", description: "Missing Razorpay key", variant: "destructive" });
+                          setVerifying(null);
+                          return;
+                        }
                         if (typeof window.Razorpay === "undefined") {
                           const script = document.createElement("script");
                           script.src = "https://checkout.razorpay.com/v1/checkout.js";
@@ -407,12 +462,15 @@ export default function OwnerGymPage() {
                         }
                         const rzp = new window.Razorpay!({
                           key,
-                          amount: data.amount,
-                          currency: data.currency ?? "INR",
+                          amount: result.data?.amount ?? 0,
+                          currency: result.data?.currency ?? "INR",
                           name: "GYMDUO",
-                          order_id: data.orderId,
+                          order_id: result.data?.orderId ?? "",
                           handler: async (res) => {
-                            const verifyRes = await fetch("/api/owner/gym/verify/verify", {
+                            const verifyResult = await fetchJson<{
+                              verifiedUntil?: string;
+                              error?: string;
+                            }>("/api/owner/gym/verify/verify", {
                               method: "POST",
                               headers: { "Content-Type": "application/json" },
                               body: JSON.stringify({
@@ -421,17 +479,23 @@ export default function OwnerGymPage() {
                                 paymentId: res.razorpay_payment_id,
                                 signature: res.razorpay_signature,
                               }),
+                              retries: 1,
                             });
-                            const verifyData = await verifyRes.json();
-                            if (verifyRes.ok) {
+                            if (verifyResult.ok) {
                               toast({ title: "Verified badge activated", description: "Your gym is verified for 30 days." });
                               setGyms((prev) =>
                                 prev.map((gym) =>
-                                  gym.id === g.id ? { ...gym, verifiedUntil: verifyData.verifiedUntil } : gym
+                                  gym.id === g.id
+                                    ? { ...gym, verifiedUntil: verifyResult.data?.verifiedUntil }
+                                    : gym
                                 )
                               );
                             } else {
-                              toast({ title: "Verification failed", description: verifyData.error ?? "Payment failed", variant: "destructive" });
+                              toast({
+                                title: "Verification failed",
+                                description: verifyResult.error ?? "Payment failed",
+                                variant: "destructive",
+                              });
                             }
                           },
                         });

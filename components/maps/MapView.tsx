@@ -14,6 +14,7 @@ interface MapViewProps {
 export function MapView({ latitude, longitude, gyms = [], className, zoom = 13 }: MapViewProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<any>(null);
+  const markersRef = useRef<any>(null);
 
   useEffect(() => {
     // Load Leaflet CSS and JS
@@ -37,6 +38,13 @@ export function MapView({ latitude, longitude, gyms = [], className, zoom = 13 }
     script.async = true;
     script.onload = initMap;
     document.head.appendChild(script);
+    return () => {
+      if (mapRef.current) {
+        mapRef.current.remove();
+        mapRef.current = null;
+        markersRef.current = null;
+      }
+    };
   }, []);
 
   const initMap = () => {
@@ -54,6 +62,18 @@ export function MapView({ latitude, longitude, gyms = [], className, zoom = 13 }
       attribution: '© OpenStreetMap contributors',
     }).addTo(map);
 
+    markersRef.current = L.layerGroup().addTo(map);
+    updateMarkers();
+
+    mapRef.current = map;
+  };
+
+  const updateMarkers = () => {
+    if (!mapRef.current || !markersRef.current) return;
+    const L = (window as any).L;
+    if (!L) return;
+    markersRef.current.clearLayers();
+
     // Add user marker
     L.marker([latitude, longitude], {
       title: "You",
@@ -66,7 +86,7 @@ export function MapView({ latitude, longitude, gyms = [], className, zoom = 13 }
         shadowSize: [41, 41],
       }),
     })
-      .addTo(map)
+      .addTo(markersRef.current)
       .bindPopup("Your location");
 
     // Add gym markers
@@ -82,21 +102,20 @@ export function MapView({ latitude, longitude, gyms = [], className, zoom = 13 }
           shadowSize: [41, 41],
         }),
       })
-        .addTo(map)
+        .addTo(markersRef.current)
         .bindPopup(gym.name);
     });
-
-    mapRef.current = map;
   };
 
   useEffect(() => {
     if (!mapRef.current) return;
     const L = (window as any).L;
     if (!L) return;
-    
+
     // Update map view when coordinates change
     mapRef.current.setView([latitude, longitude], zoom);
-  }, [latitude, longitude, zoom]);
+    updateMarkers();
+  }, [latitude, longitude, zoom, gyms]);
 
   return (
     <div

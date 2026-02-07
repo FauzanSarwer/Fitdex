@@ -1,5 +1,7 @@
-const RAZORPAY_KEY_ID = process.env.RAZORPAY_KEY_ID ?? "XXXXX";
-const RAZORPAY_KEY_SECRET = process.env.RAZORPAY_KEY_SECRET ?? "XXXXX";
+import { getRequiredEnv } from "./env";
+
+const RAZORPAY_KEY_ID = getRequiredEnv("RAZORPAY_KEY_ID", { allowEmptyInDev: true });
+const RAZORPAY_KEY_SECRET = getRequiredEnv("RAZORPAY_KEY_SECRET", { allowEmptyInDev: true });
 
 export function getRazorpayKeyId() {
   return RAZORPAY_KEY_ID;
@@ -45,7 +47,7 @@ export function verifyRazorpayPaymentSignature(
     .createHmac("sha256", RAZORPAY_KEY_SECRET)
     .update(body)
     .digest("hex");
-  return expected === signature;
+  return timingSafeEqualHex(expected, signature);
 }
 
 export function verifyRazorpayWebhookSignature(
@@ -53,10 +55,18 @@ export function verifyRazorpayWebhookSignature(
   signature: string
 ): boolean {
   const crypto = require("crypto");
-  const secret = process.env.RAZORPAY_WEBHOOK_SECRET ?? "XXXXX";
+  const secret = getRequiredEnv("RAZORPAY_WEBHOOK_SECRET", { allowEmptyInDev: true });
   const expected = crypto
     .createHmac("sha256", secret)
     .update(body)
     .digest("hex");
-  return expected === signature;
+  return timingSafeEqualHex(expected, signature);
+}
+
+function timingSafeEqualHex(expected: string, actual: string): boolean {
+  const crypto = require("crypto");
+  const expectedBuf = Buffer.from(expected, "hex");
+  const actualBuf = Buffer.from(actual, "hex");
+  if (expectedBuf.length !== actualBuf.length) return false;
+  return crypto.timingSafeEqual(expectedBuf, actualBuf);
 }

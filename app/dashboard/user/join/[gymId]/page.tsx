@@ -19,6 +19,7 @@ import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { formatPrice } from "@/lib/utils";
+import type { PlanType } from "@/lib/discounts";
 import { useToast } from "@/hooks/use-toast";
 import { Skeleton } from "@/components/ui/skeleton";
 
@@ -39,14 +40,13 @@ declare global {
   }
 }
 
-type PlanType = "MONTHLY" | "QUARTERLY" | "YEARLY";
-
 interface GymData {
   id: string;
   name: string;
   address: string;
   coverImageUrl: string | null;
   owner: { id: string; name: string | null };
+  dayPassPrice?: number | null;
   monthlyPrice: number;
   quarterlyPrice: number;
   yearlyPrice: number;
@@ -188,7 +188,7 @@ function JoinContent() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ membershipId }),
       });
-      const orderData = await orderRes.json();
+      const orderData = await orderRes.json().catch(() => ({}));
       if (!orderRes.ok) {
         toast({
           title: "Error",
@@ -197,7 +197,11 @@ function JoinContent() {
         });
         return;
       }
-      const key = process.env.NEXT_PUBLIC_RAZORPAY_KEY_ID ?? "XXXXX";
+      const key = process.env.NEXT_PUBLIC_RAZORPAY_KEY_ID;
+      if (!key || key === "XXXXX") {
+        toast({ title: "Payments unavailable", description: "Missing Razorpay key", variant: "destructive" });
+        return;
+      }
       if (typeof window.Razorpay === "undefined") {
         const script = document.createElement("script");
         script.src = "https://checkout.razorpay.com/v1/checkout.js";
@@ -231,6 +235,17 @@ function JoinContent() {
   }
 
   const plans = [
+    ...(gym.dayPassPrice && gym.dayPassPrice > 0
+      ? [
+          {
+            type: "DAY_PASS" as PlanType,
+            label: "Day pass",
+            price: gym.dayPassPrice,
+            savePercent: null,
+            desc: "One-day access",
+          },
+        ]
+      : []),
     {
       type: "MONTHLY" as PlanType,
       label: "Monthly",
@@ -335,7 +350,7 @@ function JoinContent() {
                 </div>
                 <div className="text-right">
                   <span className="font-bold">{formatPrice(p.price)}</span>
-                  {p.type !== "MONTHLY" && (
+                  {(p.type === "QUARTERLY" || p.type === "YEARLY") && (
                     <p className="text-xs text-muted-foreground">
                       {formatPrice(Math.round(p.price / (p.type === "QUARTERLY" ? 3 : 12)))}/mo
                     </p>

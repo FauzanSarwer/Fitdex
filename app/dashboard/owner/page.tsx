@@ -7,22 +7,29 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button";
 import { MapPin, Users, BarChart3, Loader2 } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
+import { fetchJson } from "@/lib/client-fetch";
 
 export default function OwnerDashboardPage() {
   const [gyms, setGyms] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     let active = true;
-    fetch("/api/owner/gym")
-      .then((r) => r.json())
-      .then((d) => {
+    fetchJson<{ gyms?: any[]; error?: string }>("/api/owner/gym", { retries: 1 })
+      .then((result) => {
         if (!active) return;
-        setGyms(d.gyms ?? []);
+        if (!result.ok) {
+          setError(result.error ?? "Failed to load gyms");
+          setGyms([]);
+          return;
+        }
+        setGyms(result.data?.gyms ?? []);
       })
       .catch(() => {
         if (!active) return;
         setGyms([]);
+        setError("Failed to load gyms");
       })
       .finally(() => {
         if (active) setLoading(false);
@@ -38,6 +45,22 @@ export default function OwnerDashboardPage() {
       <div className="p-6 space-y-6">
         <Skeleton className="h-12 w-64" />
         <Skeleton className="h-40 rounded-2xl" />
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="p-6">
+        <Card className="glass-card p-10 text-center">
+          <CardHeader>
+            <CardTitle>Could not load dashboard</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            <p className="text-sm text-muted-foreground">{error}</p>
+            <Button onClick={() => window.location.reload()}>Retry</Button>
+          </CardContent>
+        </Card>
       </div>
     );
   }

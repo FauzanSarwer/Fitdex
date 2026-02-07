@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { getServerSession } from "next-auth";
-import { authOptions } from "@/lib/auth";
+import { jsonError } from "@/lib/api";
+import { logServerError } from "@/lib/logger";
 
 export async function GET(
   _req: Request,
@@ -30,8 +30,9 @@ export async function GET(
       monthly > 0
         ? Math.round(100 - (quarterly / 3 / monthly) * 100)
         : 0;
-    return NextResponse.json({
-      gym: {
+    return NextResponse.json(
+      {
+        gym: {
         id: gym.id,
         name: gym.name,
         address: gym.address,
@@ -41,6 +42,7 @@ export async function GET(
         openTime: gym.openTime,
         closeTime: gym.closeTime,
         openDays: gym.openDays,
+        dayPassPrice: gym.dayPassPrice,
         owner: gym.owner,
         monthlyPrice: monthly,
         quarterlyPrice: quarterly,
@@ -55,12 +57,11 @@ export async function GET(
         yearlySavePercent,
         quarterlySavePercent,
       },
-    });
-  } catch (e) {
-    console.error(e);
-    return NextResponse.json(
-      { error: "Failed to fetch gym" },
-      { status: 500 }
+      },
+      { headers: { "Cache-Control": "public, max-age=60, stale-while-revalidate=120" } }
     );
+  } catch (e) {
+    logServerError(e as Error, { route: "/api/gyms/[gymId]" });
+    return jsonError("Failed to fetch gym", 500);
   }
 }

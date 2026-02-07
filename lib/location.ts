@@ -44,11 +44,19 @@ export async function reverseGeocode(
   try {
     // Use OpenStreetMap's Nominatim API (free, no API key required)
     const url = `https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}`;
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 5000);
     const res = await fetch(url, {
       headers: {
-        'Accept': 'application/json',
+        Accept: "application/json",
+        "User-Agent": process.env.NOMINATIM_USER_AGENT ?? "GymDuo/1.0",
       },
+      signal: controller.signal,
     });
+    clearTimeout(timeout);
+    if (!res.ok) {
+      return null;
+    }
     const data = await res.json();
     
     if (!data.address) return null;

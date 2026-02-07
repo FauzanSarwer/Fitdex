@@ -14,6 +14,11 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en" className="dark">
+      <head>
+        <link rel="preconnect" href="https://checkout.razorpay.com" />
+        <link rel="preconnect" href="https://cdnjs.cloudflare.com" />
+        <link rel="preconnect" href="https://tile.openstreetmap.org" />
+      </head>
       <body className="font-sans min-h-screen bg-background antialiased">
         <Providers>{children}</Providers>
       </body>

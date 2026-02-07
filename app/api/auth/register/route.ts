@@ -1,40 +1,37 @@
 import { NextResponse } from "next/server";
 import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
+import { getRequiredEnv } from "@/lib/env";
 import bcrypt from "bcryptjs";
+import { jsonError, safeJson } from "@/lib/api";
+import { logServerError } from "@/lib/logger";
 
-const passwordPepper = process.env.PASSWORD_PEPPER ?? "";
+const passwordPepper = getRequiredEnv("PASSWORD_PEPPER", { allowEmptyInDev: true });
 
 export async function POST(req: Request) {
   try {
-    if (!process.env.DATABASE_URL) {
-      return NextResponse.json(
-        { error: "Database not configured" },
-        { status: 500 }
-      );
-    }
-    const body = await req.json();
-    const { email, password, name, role } = body as {
-      email: string;
-      password: string;
+    const parsed = await safeJson<{
+      email?: string;
+      password?: string;
       name?: string;
       role?: string;
-    };
+    }>(req);
+    if (!parsed.ok) {
+      return jsonError("Invalid JSON body", 400);
+    }
+    const { email, password, name, role } = parsed.data;
     if (!email || !password) {
-      return NextResponse.json(
-        { error: "Email and password required" },
-        { status: 400 }
-      );
+      return jsonError("Email and password required", 400);
+    }
+    if (password.length < 8) {
+      return jsonError("Password must be at least 8 characters", 400);
     }
     const validRole = ["USER", "OWNER"].includes(role ?? "USER") ? (role ?? "USER") : "USER";
     const existing = await prisma.user.findUnique({
       where: { email: email.toLowerCase().trim() },
     });
     if (existing) {
-      return NextResponse.json(
-        { error: "Email already registered" },
-        { status: 400 }
-      );
+      return jsonError("Email already registered", 400);
     }
     const hashed = await bcrypt.hash(`${password}${passwordPepper}`, 12);
     const user = await prisma.user.create({
@@ -52,24 +49,15 @@ export async function POST(req: Request) {
       role: user.role,
     });
   } catch (e) {
-    console.error(e);
+    logServerError(e as Error, { route: "/api/auth/register" });
     if (e instanceof Prisma.PrismaClientKnownRequestError) {
       if (e.code === "P2002") {
-        return NextResponse.json(
-          { error: "Email already registered" },
-          { status: 409 }
-        );
+        return jsonError("Email already registered", 409);
       }
     }
     if (e instanceof Prisma.PrismaClientInitializationError) {
-      return NextResponse.json(
-        { error: "Database unavailable. Check DATABASE_URL or run migrations." },
-        { status: 500 }
-      );
+      return jsonError("Database unavailable. Check DATABASE_URL or run migrations.", 500);
     }
-    return NextResponse.json(
-      { error: "Registration failed" },
-      { status: 500 }
-    );
+    return jsonError("Registration failed", 500);
   }
 }

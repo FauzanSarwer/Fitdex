@@ -6,5 +6,6 @@ export function cn(...inputs: ClassValue[]) {
 }
 
 export function formatPrice(paise: number): string {
-  return `₹${(paise / 100).toLocaleString("en-IN")}`;
+  const safe = Number.isFinite(paise) ? paise : 0;
+  return `₹${(safe / 100).toLocaleString("en-IN")}`;
 }

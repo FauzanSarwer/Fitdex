@@ -11,6 +11,7 @@ import { Button } from "@/components/ui/button";
 import { MapView } from "@/components/maps/MapView";
 import { formatPrice } from "@/lib/utils";
 import { Skeleton } from "@/components/ui/skeleton";
+import { fetchJson } from "@/lib/client-fetch";
 
 interface Membership {
   id: string;
@@ -40,6 +41,7 @@ function UserDashboardContent() {
   const [location, setLocation] = useState<{ latitude: number; longitude: number } | null>(null);
   const [savedGyms, setSavedGyms] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     let active = true;
@@ -52,28 +54,34 @@ function UserDashboardContent() {
     const load = async () => {
       try {
         const results = await Promise.allSettled([
-          fetch("/api/memberships").then((r) => r.json()),
-          fetch("/api/duos").then((r) => r.json()),
-          fetch("/api/location").then((r) => r.json()),
-          fetch("/api/saved-gyms").then((r) => r.json()).catch(() => ({ saved: [] })),
+          fetchJson<{ memberships?: Membership[] }>("/api/memberships", { retries: 1 }),
+          fetchJson<{ duos?: Duo[] }>("/api/duos", { retries: 1 }),
+          fetchJson<{ location?: { latitude?: number; longitude?: number } }>("/api/location", { retries: 1 }),
+          fetchJson<{ saved?: any[] }>("/api/saved-gyms", { retries: 1 }),
         ]);
 
         if (!active) return;
 
-        const mem = results[0].status === "fulfilled" ? results[0].value : {};
-        const d = results[1].status === "fulfilled" ? results[1].value : {};
-        const loc = results[2].status === "fulfilled" ? results[2].value : {};
-        const saved = results[3].status === "fulfilled" ? results[3].value : { saved: [] };
+        const mem = results[0].status === "fulfilled" ? results[0].value : null;
+        const d = results[1].status === "fulfilled" ? results[1].value : null;
+        const loc = results[2].status === "fulfilled" ? results[2].value : null;
+        const saved = results[3].status === "fulfilled" ? results[3].value : null;
 
-        setMemberships(mem.memberships ?? []);
-        setDuos(d.duos ?? []);
-        if (loc.location?.latitude != null && loc.location?.longitude != null) {
+        if (!mem?.ok || !d?.ok || !loc?.ok) {
+          setError("Failed to load your dashboard");
+        }
+
+        setMemberships(mem?.data?.memberships ?? []);
+        setDuos(d?.data?.duos ?? []);
+        if (loc?.data?.location?.latitude != null && loc.data.location?.longitude != null) {
           setLocation({
-            latitude: loc.location.latitude,
-            longitude: loc.location.longitude,
+            latitude: loc.data.location.latitude,
+            longitude: loc.data.location.longitude,
           });
         }
-        setSavedGyms(saved.saved ?? []);
+        setSavedGyms(saved?.data?.saved ?? []);
+      } catch {
+        if (active) setError("Failed to load your dashboard");
       } finally {
         if (active) setLoading(false);
       }
@@ -108,6 +116,22 @@ function UserDashboardContent() {
       <div className="p-6 space-y-6">
         <Skeleton className="h-32 w-full rounded-2xl" />
         <Skeleton className="h-48 w-full rounded-2xl" />
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="p-6">
+        <Card className="glass-card p-10 text-center">
+          <CardHeader>
+            <CardTitle>Could not load dashboard</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            <p className="text-sm text-muted-foreground">{error}</p>
+            <Button onClick={() => window.location.reload()}>Retry</Button>
+          </CardContent>
+        </Card>
       </div>
     );
   }

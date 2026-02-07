@@ -17,8 +17,8 @@ export function trackEvent(payload: AnalyticsPayload) {
   const url = "/api/analytics";
 
   if (navigator.sendBeacon) {
-    navigator.sendBeacon(url, body);
-    return;
+    const ok = navigator.sendBeacon(url, body);
+    if (ok) return;
   }
 
   fetch(url, {

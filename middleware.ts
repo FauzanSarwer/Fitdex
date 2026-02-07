@@ -9,6 +9,13 @@ type RateLimitEntry = {
 const RATE_LIMIT_WINDOW_MS = 60_000;
 const RATE_LIMIT_MAX = 120;
 
+const securityHeaders: Record<string, string> = {
+  "X-Content-Type-Options": "nosniff",
+  "X-Frame-Options": "DENY",
+  "Referrer-Policy": "strict-origin-when-cross-origin",
+  "Permissions-Policy": "geolocation=(self), camera=(), microphone=()",
+};
+
 const authMiddleware = withAuth({
   callbacks: {
     authorized: ({ token }) => !!token,
@@ -63,16 +70,27 @@ function applyRateLimit(req: NextRequest) {
   return null;
 }
 
+function applySecurityHeaders(response: NextResponse) {
+  Object.entries(securityHeaders).forEach(([key, value]) => {
+    response.headers.set(key, value);
+  });
+  if (process.env.NODE_ENV === "production") {
+    response.headers.set("Strict-Transport-Security", "max-age=31536000; includeSubDomains");
+  }
+  return response;
+}
+
 export default function middleware(req: NextRequest, event: NextFetchEvent) {
   if (req.nextUrl.pathname.startsWith("/api")) {
     const rateLimitResponse = applyRateLimit(req);
     if (rateLimitResponse) {
-      return rateLimitResponse;
+      return applySecurityHeaders(rateLimitResponse);
     }
-    return NextResponse.next();
+    return applySecurityHeaders(NextResponse.next());
   }
 
-  return authMiddleware(req as NextRequestWithAuth, event);
+  const response = authMiddleware(req as NextRequestWithAuth, event) as NextResponse;
+  return applySecurityHeaders(response);
 }
 
 export const config = {

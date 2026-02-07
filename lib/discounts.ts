@@ -1,4 +1,4 @@
-export type PlanType = "MONTHLY" | "QUARTERLY" | "YEARLY";
+export type PlanType = "DAY_PASS" | "MONTHLY" | "QUARTERLY" | "YEARLY";
 
 export interface DiscountBreakdown {
   basePrice: number;
@@ -41,41 +41,45 @@ export function computeDiscount(
   }
 ): { finalPrice: number; breakdown: DiscountBreakdown } {
   const { isFirstTimeUser, hasActiveDuo, promoPercent = 0, gym } = options;
+  const normalizedBasePrice = Number.isFinite(basePrice)
+    ? Math.max(0, Math.round(basePrice))
+    : 0;
+  const clampPercent = (value: number) => Math.min(100, Math.max(0, value));
   let welcomePercent = 0;
   let quarterlyPercent = 0;
   let yearlyPercent = 0;
   let partnerPercent = 0;
 
   if (isFirstTimeUser && gym.welcomeDiscountPercent > 0) {
-    welcomePercent = gym.welcomeDiscountPercent;
+    welcomePercent = clampPercent(gym.welcomeDiscountPercent);
   }
   if (planType === "QUARTERLY" && (gym.quarterlyDiscountPercent ?? 0) > 0) {
-    quarterlyPercent = gym.quarterlyDiscountPercent ?? 0;
+    quarterlyPercent = clampPercent(gym.quarterlyDiscountPercent ?? 0);
   }
   if (planType === "YEARLY" && gym.yearlyDiscountPercent > 0) {
-    yearlyPercent = gym.yearlyDiscountPercent;
+    yearlyPercent = clampPercent(gym.yearlyDiscountPercent);
   }
   if (hasActiveDuo && gym.partnerDiscountPercent > 0) {
-    partnerPercent = gym.partnerDiscountPercent;
+    partnerPercent = clampPercent(gym.partnerDiscountPercent);
   }
 
   let totalPercent =
-    welcomePercent + quarterlyPercent + yearlyPercent + partnerPercent + promoPercent;
-  const cap = gym.maxDiscountCapPercent ?? 40;
+    welcomePercent + quarterlyPercent + yearlyPercent + partnerPercent + clampPercent(promoPercent);
+  const cap = clampPercent(gym.maxDiscountCapPercent ?? 40);
   const capped = totalPercent > cap;
   if (capped) totalPercent = cap;
 
-  const totalDiscountAmount = Math.round((basePrice * totalPercent) / 100);
-  const finalPrice = basePrice - totalDiscountAmount;
+  const totalDiscountAmount = Math.round((normalizedBasePrice * totalPercent) / 100);
+  const finalPrice = Math.max(0, normalizedBasePrice - totalDiscountAmount);
 
-  const welcomeAmount = Math.round((basePrice * welcomePercent) / 100);
-  const quarterlyAmount = Math.round((basePrice * quarterlyPercent) / 100);
-  const yearlyAmount = Math.round((basePrice * yearlyPercent) / 100);
-  const partnerAmount = Math.round((basePrice * partnerPercent) / 100);
-  const promoAmount = Math.round((basePrice * promoPercent) / 100);
+  const welcomeAmount = Math.round((normalizedBasePrice * welcomePercent) / 100);
+  const quarterlyAmount = Math.round((normalizedBasePrice * quarterlyPercent) / 100);
+  const yearlyAmount = Math.round((normalizedBasePrice * yearlyPercent) / 100);
+  const partnerAmount = Math.round((normalizedBasePrice * partnerPercent) / 100);
+  const promoAmount = Math.round((normalizedBasePrice * clampPercent(promoPercent)) / 100);
 
   const breakdown: DiscountBreakdown = {
-    basePrice,
+    basePrice: normalizedBasePrice,
     planType,
     welcomeDiscountPercent: welcomePercent,
     welcomeAmount,

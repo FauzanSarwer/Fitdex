@@ -8,6 +8,7 @@ import { ArrowRight, Users, Sparkles } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
+import { fetchJson } from "@/lib/client-fetch";
 
 interface InviteData {
   code: string;
@@ -22,16 +23,25 @@ export default function InvitePage() {
   const code = (params.code as string) ?? "";
   const [data, setData] = useState<InviteData | null>(null);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     if (!code) return;
-    fetch(`/api/invites/resolve?code=${encodeURIComponent(code)}`)
-      .then((r) => r.json())
-      .then((d) => {
-        if (d?.gymId) setData(d);
+    fetchJson<InviteData & { error?: string }>(`/api/invites/resolve?code=${encodeURIComponent(code)}`, { retries: 1 })
+      .then((result) => {
+        if (!result.ok) {
+          setError(result.error ?? "Invalid invite");
+          setLoading(false);
+          return;
+        }
+        if (result.data?.gymId) setData(result.data as InviteData);
+        if (!result.data?.gymId) setError("Invalid invite");
         setLoading(false);
       })
-      .catch(() => setLoading(false));
+      .catch(() => {
+        setError("Failed to load invite");
+        setLoading(false);
+      });
   }, [code]);
 
   if (loading) {
@@ -47,7 +57,7 @@ export default function InvitePage() {
       <div className="container mx-auto px-4 py-12">
         <Card className="glass-card p-10 text-center">
           <CardTitle>Invalid invite</CardTitle>
-          <p className="text-muted-foreground mt-2">This invite link is no longer valid.</p>
+          <p className="text-muted-foreground mt-2">{error ?? "This invite link is no longer valid."}</p>
           <Button asChild className="mt-6">
             <Link href="/explore">Explore gyms</Link>
           </Button>

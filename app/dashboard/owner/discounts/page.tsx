@@ -16,12 +16,14 @@ import {
 import { useToast } from "@/hooks/use-toast";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Percent, Loader2 } from "lucide-react";
+import { fetchJson } from "@/lib/client-fetch";
 
 export default function OwnerDiscountsPage() {
   const { toast } = useToast();
   const [gyms, setGyms] = useState<any[]>([]);
   const [selectedGymId, setSelectedGymId] = useState<string>("");
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [form, setForm] = useState({
     partnerDiscountPercent: "",
@@ -37,10 +39,14 @@ export default function OwnerDiscountsPage() {
   const [promoCodes, setPromoCodes] = useState<any[]>([]);
 
   useEffect(() => {
-    fetch("/api/owner/gym")
-      .then((r) => r.json())
-      .then((d) => {
-        const list = d.gyms ?? [];
+    fetchJson<{ gyms?: any[]; error?: string }>("/api/owner/gym", { retries: 1 })
+      .then((result) => {
+        if (!result.ok) {
+          setError(result.error ?? "Failed to load gyms");
+          setLoading(false);
+          return;
+        }
+        const list = result.data?.gyms ?? [];
         setGyms(list);
         if (list.length > 0) {
           setSelectedGymId(list[0].id);
@@ -53,6 +59,10 @@ export default function OwnerDiscountsPage() {
             maxDiscountCapPercent: String(g.maxDiscountCapPercent ?? 40),
           });
         }
+        setLoading(false);
+      })
+      .catch(() => {
+        setError("Failed to load gyms");
         setLoading(false);
       });
   }, []);
@@ -72,9 +82,19 @@ export default function OwnerDiscountsPage() {
 
   useEffect(() => {
     if (selectedGymId) {
-      fetch(`/api/owner/discount-codes?gymId=${selectedGymId}`)
-        .then((r) => r.json())
-        .then((d) => setPromoCodes(d.codes ?? []));
+      fetchJson<{ codes?: any[]; error?: string }>(`/api/owner/discount-codes?gymId=${selectedGymId}`, { retries: 1 })
+        .then((result) => {
+          if (!result.ok) {
+            setError(result.error ?? "Failed to load discount codes");
+            setPromoCodes([]);
+            return;
+          }
+          setPromoCodes(result.data?.codes ?? []);
+        })
+        .catch(() => {
+          setError("Failed to load discount codes");
+          setPromoCodes([]);
+        });
     }
   }, [selectedGymId]);
 
@@ -82,7 +102,7 @@ export default function OwnerDiscountsPage() {
     if (!selectedGymId || !promoCode.trim() || !promoPercent) return;
     setPromoSaving(true);
     try {
-      const res = await fetch("/api/owner/discount-codes", {
+      const result = await fetchJson<{ code?: any; error?: string }>("/api/owner/discount-codes", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -91,15 +111,18 @@ export default function OwnerDiscountsPage() {
           discountPercent: parseInt(promoPercent, 10) || 0,
           validUntil: promoValidUntil || undefined,
         }),
+        retries: 1,
       });
-      const data = await res.json();
-      if (!res.ok) {
-        toast({ title: "Error", description: data.error ?? "Failed", variant: "destructive" });
+      if (!result.ok) {
+        toast({ title: "Error", description: result.error ?? "Failed", variant: "destructive" });
         setPromoSaving(false);
         return;
       }
       toast({ title: "Promo code added" });
-      setPromoCodes((prev) => [data.code, ...prev]);
+      const createdCode = result.data?.code;
+      if (createdCode) {
+        setPromoCodes((prev) => [createdCode, ...prev]);
+      }
       setPromoCode("");
       setPromoPercent("");
       setPromoValidUntil("");
@@ -113,7 +136,7 @@ export default function OwnerDiscountsPage() {
     if (!selectedGymId) return;
     setSaving(true);
     try {
-      const res = await fetch("/api/owner/gym", {
+      const result = await fetchJson<{ gym?: any; error?: string }>("/api/owner/gym", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -124,16 +147,16 @@ export default function OwnerDiscountsPage() {
           welcomeDiscountPercent: parseInt(form.welcomeDiscountPercent, 10) || 0,
           maxDiscountCapPercent: parseInt(form.maxDiscountCapPercent, 10) || 40,
         }),
+        retries: 1,
       });
-      const data = await res.json();
-      if (!res.ok) {
-        toast({ title: "Error", description: data.error ?? "Failed", variant: "destructive" });
+      if (!result.ok) {
+        toast({ title: "Error", description: result.error ?? "Failed", variant: "destructive" });
         setSaving(false);
         return;
       }
       toast({ title: "Discounts updated" });
       setGyms((prev) =>
-        prev.map((g) => (g.id === selectedGymId ? { ...g, ...data.gym } : g))
+        prev.map((g) => (g.id === selectedGymId ? { ...g, ...(result.data?.gym ?? {}) } : g))
       );
     } catch {
       toast({ title: "Error", variant: "destructive" });
@@ -145,6 +168,22 @@ export default function OwnerDiscountsPage() {
     return (
       <div className="p-6">
         <Skeleton className="h-64 rounded-2xl" />
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="p-6">
+        <Card className="glass-card p-10 text-center">
+          <CardHeader>
+            <CardTitle>Could not load discounts</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            <p className="text-sm text-muted-foreground">{error}</p>
+            <Button onClick={() => window.location.reload()}>Retry</Button>
+          </CardContent>
+        </Card>
       </div>
     );
   }

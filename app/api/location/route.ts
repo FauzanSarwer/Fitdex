@@ -7,6 +7,8 @@ import {
   isCityServiceable,
   reverseGeocode,
 } from "@/lib/location";
+import { jsonError, safeJson } from "@/lib/api";
+import { logServerError } from "@/lib/logger";
 
 // Always force route to be dynamic
 export const dynamic = 'force-dynamic';
@@ -80,25 +82,22 @@ export async function POST(req: Request) {
     }
 
     // BODY parse
-    let body: any = {};
-    try {
-      body = await req.json();
-    } catch (e: any) {
-      return NextResponse.json(
-        {
-          error: "Invalid or malformed request body for location.",
-          details: e?.message ?? String(e),
-          canRetry: true,
-        },
-        { status: 400 }
-      );
+    const parsed = await safeJson<{
+      latitude?: number | string | null;
+      longitude?: number | string | null;
+      city?: string | null;
+    }>(req);
+    if (!parsed.ok) {
+      return jsonError("Invalid or malformed request body for location.", 400);
     }
+    const body = parsed.data ?? {};
 
     // Defensive merge
-    let { latitude, longitude, city: cityFromUser } = body || {};
+    let latitude = body.latitude;
+    let longitude = body.longitude;
+    let cityFromUser = typeof body.city === "string" ? body.city.trim() : undefined;
     latitude = typeof latitude === "string" ? parseFloat(latitude) : latitude;
     longitude = typeof longitude === "string" ? parseFloat(longitude) : longitude;
-    cityFromUser = typeof cityFromUser === "string" ? cityFromUser.trim() : undefined;
 
     // --- GEOLOCATION FLOW ---
     if (!isBadLatLng(latitude, longitude)) {
@@ -152,21 +151,15 @@ export async function POST(req: Request) {
           await prisma.user.update({
             where: { id: uid },
             data: {
-              latitude: latitude,
-              longitude: longitude,
+              latitude: Number.isFinite(latitude) ? (latitude as number) : null,
+              longitude: Number.isFinite(longitude) ? (longitude as number) : null,
               city,
               state,
             }
           });
         } catch (dbError: any) {
-          return NextResponse.json(
-            {
-              error: "Failed to save location to your profile.",
-              details: dbError?.message ?? String(dbError),
-              canRetry: true,
-            },
-            { status: 503 }
-          );
+          logServerError(dbError as Error, { route: "/api/location", userId: uid });
+          return jsonError("Failed to save location to your profile.", 503);
         }
       }
 
@@ -202,14 +195,8 @@ export async function POST(req: Request) {
             }
           });
         } catch (dbError: any) {
-          return NextResponse.json(
-            {
-              error: "Failed to save location to your profile.",
-              details: dbError?.message ?? String(dbError),
-              canRetry: true,
-            },
-            { status: 503 }
-          );
+          logServerError(dbError as Error, { route: "/api/location", userId: uid });
+          return jsonError("Failed to save location to your profile.", 503);
         }
       }
 
@@ -240,14 +227,8 @@ export async function POST(req: Request) {
     if (typeof console !== "undefined" && typeof console.error === "function") {
       console.error("ERR/location-POST", e && e.stack ? e.stack : e);
     }
-    return NextResponse.json(
-      {
-        error: "An unexpected error occurred while updating your location.",
-        details: e?.message ?? String(e),
-        canRetry: true,
-      },
-      { status: 500 }
-    );
+    logServerError(e as Error, { route: "/api/location" });
+    return jsonError("An unexpected error occurred while updating your location.", 500);
   }
 }
 
@@ -264,14 +245,8 @@ export async function GET(req: Request) {
         session = result as { user?: { id?: string } };
       }
     } catch (sessErr: any) {
-      return NextResponse.json(
-        {
-          error: "Error retrieving user authentication.",
-          details: sessErr?.message ?? String(sessErr),
-          canRetry: true
-        },
-        { status: 500 }
-      );
+      logServerError(sessErr as Error, { route: "/api/location" });
+      return jsonError("Error retrieving user authentication.", 500);
     }
     if (!session?.user || !session.user.id) {
       // Not logged in: Acceptable, prompt for manual
@@ -292,14 +267,8 @@ export async function GET(req: Request) {
         }
       });
     } catch (getUserError: any) {
-      return NextResponse.json(
-        {
-          error: "Failed to retrieve user location from the database. Please try again.",
-          details: getUserError?.message ?? String(getUserError),
-          canRetry: true
-        },
-        { status: 500 }
-      );
+      logServerError(getUserError as Error, { route: "/api/location", userId: uid });
+      return jsonError("Failed to retrieve user location from the database. Please try again.", 500);
     }
 
     // --- Decide if valid lat/lng is present ---
@@ -356,14 +325,7 @@ export async function GET(req: Request) {
     if (typeof console !== "undefined" && typeof console.error === "function") {
       console.error("ERR/location-GET", e && e.stack ? e.stack : e);
     }
-    return NextResponse.json(
-      {
-        error: "Failed to get location. Please check your network and try again.",
-        details: e?.message ?? String(e),
-        canRetry: true,
-        allowManualCityEntry: true
-      },
-      { status: 500 }
-    );
+    logServerError(e as Error, { route: "/api/location" });
+    return jsonError("Failed to get location. Please check your network and try again.", 500);
   }
 }

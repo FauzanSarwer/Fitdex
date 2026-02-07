@@ -9,12 +9,14 @@ import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Users, Mail } from "lucide-react";
+import { fetchJson } from "@/lib/client-fetch";
 
 export default function DuoPage() {
   const { toast } = useToast();
   const [duos, setDuos] = useState<any[]>([]);
   const [memberships, setMemberships] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [inviteEmail, setInviteEmail] = useState("");
   const [inviteGymId, setInviteGymId] = useState("");
   const [sending, setSending] = useState(false);
@@ -24,15 +26,21 @@ export default function DuoPage() {
 
   useEffect(() => {
     Promise.all([
-      fetch("/api/duos").then((r) => r.json()),
-      fetch("/api/memberships").then((r) => r.json()),
-    ]).then(([d, m]) => {
-      setDuos(d.duos ?? []);
-      setMemberships(m.memberships ?? []);
-      const active = (m.memberships ?? []).find((x: any) => x.active);
-      if (active) setInviteGymId(active.gymId);
-      setLoading(false);
-    });
+      fetchJson<{ duos?: any[] }>("/api/duos", { retries: 1 }),
+      fetchJson<{ memberships?: any[] }>("/api/memberships", { retries: 1 }),
+    ])
+      .then(([d, m]) => {
+        setDuos(d.ok ? d.data?.duos ?? [] : []);
+        setMemberships(m.ok ? m.data?.memberships ?? [] : []);
+        const active = (m.ok ? m.data?.memberships ?? [] : []).find((x: any) => x.active);
+        if (active) setInviteGymId(active.gymId);
+        setLoading(false);
+      })
+      .catch(() => {
+        toast({ title: "Error", description: "Failed to load duo data", variant: "destructive" });
+        setError("Failed to load duo data");
+        setLoading(false);
+      });
   }, []);
 
   const activeMembership = memberships.find((m) => m.active);
@@ -45,22 +53,22 @@ export default function DuoPage() {
     }
     setSending(true);
     try {
-      const res = await fetch("/api/duos", {
+      const result = await fetchJson<{ code?: string; email?: string; error?: string }>("/api/duos", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ gymId: inviteGymId, email: inviteEmail || undefined }),
+        retries: 1,
       });
-      const data = await res.json();
-      if (!res.ok) {
-        toast({ title: "Error", description: data.error ?? "Failed to send invite", variant: "destructive" });
+      if (!result.ok) {
+        toast({ title: "Error", description: result.error ?? "Failed to send invite", variant: "destructive" });
         setSending(false);
         return;
       }
-      if (data.code) {
-        setLastInviteCode(data.code);
-        toast({ title: "Invite created", description: `Share this code: ${data.code}` });
+      if (result.data?.code) {
+        setLastInviteCode(result.data.code);
+        toast({ title: "Invite created", description: `Share this code: ${result.data.code}` });
       } else {
-        toast({ title: "Invite sent", description: `Sent to ${data.email}` });
+        toast({ title: "Invite sent", description: `Sent to ${result.data?.email}` });
       }
       setInviteEmail("");
       setDuos((prev) => [...prev]); // refetch would be better
@@ -74,14 +82,14 @@ export default function DuoPage() {
     if (!acceptCode.trim()) return;
     setAccepting(true);
     try {
-      const res = await fetch("/api/duos/accept", {
+      const result = await fetchJson<{ error?: string }>("/api/duos/accept", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ code: acceptCode.trim().toUpperCase() }),
+        retries: 1,
       });
-      const data = await res.json();
-      if (!res.ok) {
-        toast({ title: "Error", description: data.error ?? "Invalid code", variant: "destructive" });
+      if (!result.ok) {
+        toast({ title: "Error", description: result.error ?? "Invalid code", variant: "destructive" });
         setAccepting(false);
         return;
       }
@@ -98,6 +106,22 @@ export default function DuoPage() {
     return (
       <div className="p-6">
         <Skeleton className="h-48 rounded-2xl" />
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="p-6">
+        <Card className="glass-card p-10 text-center">
+          <CardHeader>
+            <CardTitle>Could not load duo</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            <p className="text-sm text-muted-foreground">{error}</p>
+            <Button onClick={() => window.location.reload()}>Retry</Button>
+          </CardContent>
+        </Card>
       </div>
     );
   }
@@ -156,18 +180,17 @@ export default function DuoPage() {
               <Button
                 variant="outline"
                 onClick={() =>
-                  fetch("/api/duos", {
+                  fetchJson<{ code?: string }>("/api/duos", {
                     method: "POST",
                     headers: { "Content-Type": "application/json" },
                     body: JSON.stringify({ gymId: inviteGymId, joinTogether: true }),
+                    retries: 1,
+                  }).then((result) => {
+                    if (result.ok && result.data?.code) {
+                      setLastInviteCode(result.data.code);
+                      toast({ title: "Code", description: result.data.code });
+                    }
                   })
-                    .then((r) => r.json())
-                    .then((d) => {
-                      if (d.code) {
-                        setLastInviteCode(d.code);
-                        toast({ title: "Code", description: d.code });
-                      }
-                    })
                 }
               >
                 Generate code

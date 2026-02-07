@@ -82,6 +82,7 @@ model Gym {
   openTime               String?  // "HH:mm"
   closeTime              String?  // "HH:mm"
   openDays               String?  // "MON,TUE,WED,THU,FRI,SAT,SUN"
+  dayPassPrice           Int?     // in paise, optional
   monthlyPrice           Int      // in paise
   quarterlyPrice         Int?     // in paise, null = computed as monthlyPrice * 3
   yearlyPrice            Int      // in paise
@@ -186,7 +187,7 @@ model Membership {
   id           String   @id @default(cuid())
   userId       String
   gymId        String
-  planType     String   // MONTHLY | YEARLY
+  planType     String   // DAY_PASS | MONTHLY | QUARTERLY | YEARLY
   basePrice    Int      // in paise
   finalPrice   Int      // in paise
   discountBreakdown String? // JSON

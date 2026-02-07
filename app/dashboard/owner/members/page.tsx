@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
 import {
   Select,
   SelectContent,
@@ -12,35 +13,72 @@ import {
 } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Users } from "lucide-react";
+import { fetchJson } from "@/lib/client-fetch";
 
 export default function OwnerMembersPage() {
   const [gyms, setGyms] = useState<any[]>([]);
   const [selectedGymId, setSelectedGymId] = useState<string>("");
   const [members, setMembers] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    fetch("/api/owner/gym")
-      .then((r) => r.json())
-      .then((d) => {
-        const list = d.gyms ?? [];
+    fetchJson<{ gyms?: any[]; error?: string }>("/api/owner/gym", { retries: 1 })
+      .then((result) => {
+        if (!result.ok) {
+          setError(result.error ?? "Failed to load gyms");
+          setGyms([]);
+          setLoading(false);
+          return;
+        }
+        const list = result.data?.gyms ?? [];
         setGyms(list);
         if (list.length > 0 && !selectedGymId) setSelectedGymId(list[0].id);
+        setLoading(false);
+      })
+      .catch(() => {
+        setError("Failed to load gyms");
         setLoading(false);
       });
   }, []);
 
   useEffect(() => {
     if (!selectedGymId) return;
-    fetch(`/api/owner/members?gymId=${selectedGymId}`)
-      .then((r) => r.json())
-      .then((d) => setMembers(d.members ?? []));
+    fetchJson<{ members?: any[]; error?: string }>(`/api/owner/members?gymId=${selectedGymId}`, { retries: 1 })
+      .then((result) => {
+        if (!result.ok) {
+          setError(result.error ?? "Failed to load members");
+          setMembers([]);
+          return;
+        }
+        setMembers(result.data?.members ?? []);
+      })
+      .catch(() => {
+        setError("Failed to load members");
+        setMembers([]);
+      });
   }, [selectedGymId]);
 
   if (loading) {
     return (
       <div className="p-6">
         <Skeleton className="h-48 rounded-2xl" />
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="p-6">
+        <Card className="glass-card p-10 text-center">
+          <CardHeader>
+            <CardTitle>Could not load members</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            <p className="text-sm text-muted-foreground">{error}</p>
+            <Button onClick={() => window.location.reload()}>Retry</Button>
+          </CardContent>
+        </Card>
       </div>
     );
   }

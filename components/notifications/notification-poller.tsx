@@ -3,6 +3,7 @@
 import { useEffect, useRef } from "react";
 import { useSession } from "next-auth/react";
 import { useToast } from "@/hooks/use-toast";
+import { fetchJson } from "@/lib/client-fetch";
 
 type NotificationItem = {
   id: string;
@@ -28,10 +29,9 @@ export function NotificationPoller() {
       if (fetchingRef.current) return;
       fetchingRef.current = true;
       try {
-        const res = await fetch("/api/notifications");
-        const data = await res.json();
-        if (!res.ok) return;
-        const notifications: NotificationItem[] = data.notifications ?? [];
+        const result = await fetchJson<{ notifications?: NotificationItem[] }>("/api/notifications", { retries: 1 });
+        if (!result.ok) return;
+        const notifications: NotificationItem[] = result.data?.notifications ?? [];
         if (notifications.length === 0) return;
 
         notifications.forEach((note) => {
@@ -42,10 +42,11 @@ export function NotificationPoller() {
           }
         });
 
-        await fetch("/api/notifications/read", {
+        await fetchJson("/api/notifications/read", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ ids: notifications.map((n) => n.id) }),
+          retries: 1,
         });
       } catch {
         // ignore

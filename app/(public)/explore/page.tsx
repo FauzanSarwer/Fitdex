@@ -6,7 +6,7 @@ import { useSession } from "next-auth/react";
 import { motion } from "framer-motion";
 import { MapPin, List, LayoutGrid, Search, ArrowRight, Heart, SlidersHorizontal, ArrowDownUp } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import {
   DropdownMenu,
@@ -21,6 +21,7 @@ import { MapView } from "@/components/maps/MapView";
 import { formatPrice } from "@/lib/utils";
 import { Skeleton } from "@/components/ui/skeleton";
 import { getGymOpenStatus } from "@/lib/gym-hours";
+import { fetchJson } from "@/lib/client-fetch";
 
 type ViewMode = "map" | "list";
 
@@ -68,9 +69,12 @@ export default function ExplorePage() {
     setLoading(true);
     const loadGyms = async (url: string) => {
       try {
-        const res = await fetch(url);
-        const data = await res.json();
-        if (!cancelled) setGyms(data.gyms ?? []);
+        const result = await fetchJson<{ gyms?: Gym[]; error?: string }>(url, { retries: 2 });
+        if (!result.ok) {
+          if (!cancelled) setError(result.error ?? "Could not load gyms. Please try again.");
+          return;
+        }
+        if (!cancelled) setGyms(result.data?.gyms ?? []);
       } catch {
         if (!cancelled) setError("Could not load gyms. Please try again.");
       } finally {
@@ -100,12 +104,10 @@ export default function ExplorePage() {
 
   useEffect(() => {
     if (status !== "authenticated") return;
-    fetch("/api/saved-gyms")
-      .then((r) => r.json())
-      .then((d) => {
-        const ids = new Set<string>(
-          (d.saved ?? []).map((s: { gymId: string }) => s.gymId)
-        );
+    fetchJson<{ saved?: Array<{ gymId: string }> }>("/api/saved-gyms", { retries: 1 })
+      .then((result) => {
+        if (!result.ok) return;
+        const ids = new Set<string>((result.data?.saved ?? []).map((s) => s.gymId));
         setSavedIds(ids);
       })
       .catch(() => {});
@@ -120,13 +122,20 @@ export default function ExplorePage() {
       else next.add(gymId);
       return next;
     });
-    if (isSaved) {
-      await fetch(`/api/saved-gyms?gymId=${gymId}`, { method: "DELETE" });
-    } else {
-      await fetch("/api/saved-gyms", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ gymId }),
+    const result = isSaved
+      ? await fetchJson(`/api/saved-gyms?gymId=${gymId}`, { method: "DELETE", retries: 1 })
+      : await fetchJson("/api/saved-gyms", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ gymId }),
+          retries: 1,
+        });
+    if (!result.ok) {
+      setSavedIds((prev) => {
+        const next = new Set(prev);
+        if (isSaved) next.add(gymId);
+        else next.delete(gymId);
+        return next;
       });
     }
   }
@@ -218,6 +227,22 @@ export default function ExplorePage() {
     }
     return filters;
   }, [maxDistance, maxPrice, query, sortBy, searchScope, onlyFeatured, onlyVerified]);
+
+  if (error) {
+    return (
+      <div className="container mx-auto px-4 py-8">
+        <Card className="glass-card p-10 text-center">
+          <CardHeader>
+            <CardTitle>Could not load gyms</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            <p className="text-sm text-muted-foreground">{error}</p>
+            <Button onClick={() => window.location.reload()}>Retry</Button>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
 
   return (
     <div className="container mx-auto px-4 py-8">

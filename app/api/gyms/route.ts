@@ -2,6 +2,8 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
+import { jsonError, safeJson } from "@/lib/api";
+import { logServerError } from "@/lib/logger";
 
 function haversine(
   lat1: number,
@@ -42,6 +44,7 @@ export async function GET(req: Request) {
       openTime: g.openTime,
       closeTime: g.closeTime,
       openDays: g.openDays,
+      dayPassPrice: g.dayPassPrice,
       monthlyPrice: g.monthlyPrice,
       yearlyPrice: g.yearlyPrice,
       partnerDiscountPercent: g.partnerDiscountPercent,
@@ -71,13 +74,13 @@ export async function GET(req: Request) {
           });
       }
     }
-    return NextResponse.json({ gyms: list });
-  } catch (e) {
-    console.error(e);
     return NextResponse.json(
-      { error: "Failed to fetch gyms" },
-      { status: 500 }
+      { gyms: list },
+      { headers: { "Cache-Control": "public, max-age=30, stale-while-revalidate=60" } }
     );
+  } catch (e) {
+    logServerError(e as Error, { route: "/api/gyms" });
+    return jsonError("Failed to fetch gyms", 500);
   }
 }
 
@@ -87,25 +90,26 @@ export async function GET(req: Request) {
  * Returns: gym plan & joining details (to render structured joining page like the "district" app)
  */
 export async function POST(req: Request) {
+  let uid: string | undefined;
   try {
     const session = await getServerSession(authOptions);
     if (!session?.user) {
-      return NextResponse.json(
-        { error: "Unauthorized" },
-        { status: 401 }
-      );
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
-    const uid = (session.user as { id: string }).id;
-    const body = await req.json();
-
-    const { gymId, plan, partnerId, discountCodes } = body as {
-      gymId: string;
-      plan?: "monthly" | "yearly";
+    uid = (session.user as { id: string }).id;
+    const parsed = await safeJson<{
+      gymId?: string;
+      plan?: "day_pass" | "monthly" | "yearly";
       partnerId?: string;
       discountCodes?: string[];
-    };
+    }>(req);
+    if (!parsed.ok) {
+      return jsonError("Invalid JSON body", 400);
+    }
+    const { plan, partnerId, discountCodes } = parsed.data;
+    const gymId = parsed.data.gymId?.trim();
     if (!gymId) {
-      return NextResponse.json({ error: "Missing gymId" }, { status: 400 });
+      return jsonError("Missing gymId", 400);
     }
 
     // Fetch gym details
@@ -125,6 +129,12 @@ export async function POST(req: Request) {
 
     // Prepare available plans
     const plans = [
+      {
+        type: "day_pass",
+        price: gym.dayPassPrice ?? 0,
+        originalPrice: gym.dayPassPrice ?? 0,
+        available: typeof gym.dayPassPrice === "number" && gym.dayPassPrice > 0,
+      },
       {
         type: "monthly",
         price: gym.monthlyPrice,
@@ -250,12 +260,8 @@ export async function POST(req: Request) {
       // Optionally, send redirectUrl if you want to force redirect to a step-by-step UI
       // redirectUrl: `/gyms/${gym.id}/join?plan=${selectedPlan}` 
     });
-
   } catch (e) {
-    console.error(e);
-    return NextResponse.json(
-      { error: "Failed to join gym" },
-      { status: 500 }
-    );
+    logServerError(e as Error, { route: "/api/gyms", userId: uid });
+    return jsonError("Failed to fetch gym", 500);
   }
 }

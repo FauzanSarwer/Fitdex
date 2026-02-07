@@ -3,19 +3,30 @@
 import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
 import { formatPrice } from "@/lib/utils";
 import { Skeleton } from "@/components/ui/skeleton";
 import { CreditCard } from "lucide-react";
+import { fetchJson } from "@/lib/client-fetch";
 
 export default function PaymentsPage() {
   const [payments, setPayments] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    fetch("/api/payments")
-      .then((r) => r.json())
-      .then((d) => {
-        setPayments(d.payments ?? []);
+    fetchJson<{ payments?: any[]; error?: string }>("/api/payments", { retries: 1 })
+      .then((result) => {
+        if (!result.ok) {
+          setError(result.error ?? "Failed to load payments");
+          setLoading(false);
+          return;
+        }
+        setPayments(result.data?.payments ?? []);
+        setLoading(false);
+      })
+      .catch(() => {
+        setError("Failed to load payments");
         setLoading(false);
       });
   }, []);
@@ -24,6 +35,22 @@ export default function PaymentsPage() {
     return (
       <div className="p-6">
         <Skeleton className="h-64 rounded-2xl" />
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="p-6">
+        <Card className="glass-card p-10 text-center">
+          <CardHeader>
+            <CardTitle>Could not load payments</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            <p className="text-sm text-muted-foreground">{error}</p>
+            <Button onClick={() => window.location.reload()}>Retry</Button>
+          </CardContent>
+        </Card>
       </div>
     );
   }

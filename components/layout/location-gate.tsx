@@ -8,6 +8,7 @@ import { MapPin, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { fetchJson } from "@/lib/client-fetch";
 
 interface LocationState {
   status: "idle" | "requesting" | "ready" | "denied" | "not_serviceable";
@@ -40,12 +41,13 @@ export function LocationGate({ children }: { children: React.ReactNode }) {
         const lat = pos.coords.latitude;
         const lng = pos.coords.longitude;
         try {
-          const res = await fetch("/api/location", {
+          const result = await fetchJson<{ city?: string; serviceable?: boolean }>("/api/location", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ latitude: lat, longitude: lng }),
+            retries: 1,
           });
-          const data = await res.json();
+          const data = result.data ?? {};
           if (data.serviceable) {
             const loc = {
               status: "ready" as const,
@@ -124,9 +126,9 @@ export function LocationGate({ children }: { children: React.ReactNode }) {
 
     // If authenticated, try server first
     if (authStatus === "authenticated") {
-      fetch("/api/location")
-        .then((r) => r.json())
-        .then((data) => {
+      fetchJson<{ location?: { latitude?: number; longitude?: number; city?: string } }>("/api/location", { retries: 1 })
+        .then((result) => {
+          const data = result.data ?? {};
           if (data.location?.latitude != null && data.location?.longitude != null) {
             const loc = {
               status: "ready" as const,
