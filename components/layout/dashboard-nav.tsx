@@ -18,6 +18,7 @@ import {
   Bell,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { GlobalSearch } from "@/components/layout/global-search";
 
 const USER_LINKS = [
   { href: "/dashboard/user", label: "Overview", icon: LayoutDashboard },
@@ -63,9 +64,16 @@ export function DashboardNav({
   showVerification?: boolean;
 }) {
   const pathname = usePathname();
-  const links = role === "ADMIN"
+  const navRole = role === "ADMIN"
+    ? pathname?.startsWith("/dashboard/owner")
+      ? "OWNER"
+      : pathname?.startsWith("/dashboard/user")
+        ? "USER"
+        : "ADMIN"
+    : role;
+  const links = navRole === "ADMIN"
     ? ADMIN_LINKS
-    : isOwner
+    : navRole === "OWNER"
       ? [
           ...OWNER_LINKS.slice(0, 2),
           ...(showVerification
@@ -74,34 +82,55 @@ export function DashboardNav({
           ...OWNER_LINKS.slice(2),
         ]
       : USER_LINKS;
+  const adminActive = pathname?.startsWith("/dashboard/admin");
+  const ownerActive = pathname?.startsWith("/dashboard/owner");
+  const userActive = pathname?.startsWith("/dashboard/user");
 
   return (
     <>
       <header className="fixed top-0 left-0 right-0 z-40 glass border-b border-white/10 md:pl-56">
-        <div className="flex h-16 items-center px-4">
+        <div className="flex h-16 items-center gap-4 px-4">
           <Link href="/" className="flex items-center gap-2">
             <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-br from-primary to-accent shadow-glow-sm">
               <Dumbbell className="h-5 w-5 text-white" />
             </div>
             <span className="text-lg font-bold">Fitdex</span>
           </Link>
+          <div className="hidden md:flex flex-1 justify-center">
+            <GlobalSearch className="w-full max-w-md" />
+          </div>
           {role === "ADMIN" && (
             <div className="ml-auto flex items-center gap-2">
               <Link
                 href="/dashboard/admin"
-                className="rounded-full bg-primary/20 px-4 py-2 text-xs font-semibold text-primary hover:bg-primary/30"
+                className={cn(
+                  "rounded-full px-4 py-2 text-xs font-semibold transition-colors",
+                  adminActive
+                    ? "bg-primary/20 text-primary"
+                    : "bg-white/10 text-foreground hover:bg-white/20"
+                )}
               >
                 Admin panel
               </Link>
               <Link
                 href="/dashboard/owner"
-                className="rounded-full bg-white/10 px-3 py-2 text-xs font-semibold text-foreground hover:bg-white/20"
+                className={cn(
+                  "rounded-full px-3 py-2 text-xs font-semibold transition-colors",
+                  ownerActive
+                    ? "bg-primary/20 text-primary"
+                    : "bg-white/10 text-foreground hover:bg-white/20"
+                )}
               >
                 Owner dashboard
               </Link>
               <Link
                 href="/dashboard/user"
-                className="rounded-full bg-white/10 px-3 py-2 text-xs font-semibold text-foreground hover:bg-white/20"
+                className={cn(
+                  "rounded-full px-3 py-2 text-xs font-semibold transition-colors",
+                  userActive
+                    ? "bg-primary/20 text-primary"
+                    : "bg-white/10 text-foreground hover:bg-white/20"
+                )}
               >
                 User dashboard
               </Link>
@@ -111,9 +140,9 @@ export function DashboardNav({
       </header>
       <aside className="fixed left-0 top-0 z-50 hidden h-full w-56 flex-col border-r border-white/10 bg-background/95 backdrop-blur md:flex">
         <div className="flex h-16 items-center border-b border-white/10 px-4">
-          <Link href={role === "ADMIN" ? "/dashboard/admin" : isOwner ? "/dashboard/owner" : "/dashboard/user"} className="flex items-center gap-2">
+          <Link href={navRole === "ADMIN" ? "/dashboard/admin" : navRole === "OWNER" ? "/dashboard/owner" : "/dashboard/user"} className="flex items-center gap-2">
             <User className="h-5 w-5 text-primary" />
-            <span className="font-semibold">{role === "ADMIN" ? "Admin" : isOwner ? "Owner" : "Member"}</span>
+            <span className="font-semibold">{navRole === "ADMIN" ? "Admin" : navRole === "OWNER" ? "Owner" : "Member"}</span>
           </Link>
         </div>
         <nav className="flex-1 space-y-1 p-2">

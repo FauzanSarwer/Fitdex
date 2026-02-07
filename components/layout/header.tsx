@@ -16,6 +16,7 @@ import {
 
 export function Header() {
   const { data: session, status } = useSession();
+  const role = (session?.user as { role?: string })?.role;
   const owner = status === "authenticated" && isOwner(session);
   const showOwnerCta = status !== "loading" && !session;
   const showOwnerExplore = status === "authenticated" && owner;
@@ -135,9 +136,9 @@ export function Header() {
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end" className="w-48 glass border-white/10">
                   <DropdownMenuItem asChild>
-                    <Link href={owner ? "/dashboard/owner" : "/dashboard/user"}>
+                    <Link href={role === "ADMIN" ? "/dashboard/admin" : owner ? "/dashboard/owner" : "/dashboard/user"}>
                       <LayoutDashboard className="mr-2 h-4 w-4" />
-                      Dashboard
+                      {role === "ADMIN" ? "Admin dashboard" : "Dashboard"}
                     </Link>
                   </DropdownMenuItem>
                   <DropdownMenuItem onClick={() => signOut()}>

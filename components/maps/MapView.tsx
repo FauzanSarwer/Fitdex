@@ -9,9 +9,10 @@ interface MapViewProps {
   gyms?: Array<{ id: string; name: string; latitude: number; longitude: number; url?: string }>;
   className?: string;
   zoom?: number;
+  showUserMarker?: boolean;
 }
 
-export function MapView({ latitude, longitude, gyms = [], className, zoom = 13 }: MapViewProps) {
+export function MapView({ latitude, longitude, gyms = [], className, zoom = 13, showUserMarker = true }: MapViewProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<any>(null);
   const markersRef = useRef<any>(null);
@@ -74,20 +75,21 @@ export function MapView({ latitude, longitude, gyms = [], className, zoom = 13 }
     if (!L) return;
     markersRef.current.clearLayers();
 
-    // Add user marker
-    L.marker([latitude, longitude], {
-      title: "You",
-      icon: L.icon({
-        iconUrl: "https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-blue.png",
-        shadowUrl: "https://cdnjs.cloudflare.com/ajax/libs/leaflet/0.7.7/images/marker-shadow.png",
-        iconSize: [25, 41],
-        iconAnchor: [12, 41],
-        popupAnchor: [1, -34],
-        shadowSize: [41, 41],
-      }),
-    })
-      .addTo(markersRef.current)
-      .bindPopup("Your location");
+    if (showUserMarker) {
+      L.marker([latitude, longitude], {
+        title: "You",
+        icon: L.icon({
+          iconUrl: "https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-blue.png",
+          shadowUrl: "https://cdnjs.cloudflare.com/ajax/libs/leaflet/0.7.7/images/marker-shadow.png",
+          iconSize: [25, 41],
+          iconAnchor: [12, 41],
+          popupAnchor: [1, -34],
+          shadowSize: [41, 41],
+        }),
+      })
+        .addTo(markersRef.current)
+        .bindPopup("Your location");
+    }
 
     // Add gym markers
     gyms.forEach((gym) => {

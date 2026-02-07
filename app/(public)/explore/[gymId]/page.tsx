@@ -22,11 +22,13 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { buildGymSlug, formatPrice, parseGymIdFromSlug } from "@/lib/utils";
 import { getGymOpenStatus } from "@/lib/gym-hours";
 import { fetchJson } from "@/lib/client-fetch";
+import { MapView } from "@/components/maps/MapView";
 
 interface GymData {
   id: string;
   name: string;
   address: string;
+  latitude: number;
   longitude: number;
   verificationStatus: string;
   coverImageUrl: string | null;
@@ -207,6 +209,7 @@ export default function GymProfilePage() {
   }
 
   const isVerified = gym.verificationStatus === "VERIFIED";
+  const openDays = gym.openDays ? gym.openDays.split(",") : [];
 
   return (
     <div className="container mx-auto px-4 py-10">
@@ -389,6 +392,55 @@ export default function GymProfilePage() {
             <div>Quarterly discount: up to {formatDiscount(gym.quarterlyDiscountType, gym.quarterlyDiscountValue)}</div>
           </CardContent>
         </Card>
+
+        <div className="grid gap-4 lg:grid-cols-[1.4fr_1fr]">
+          <Card className="glass-card overflow-hidden">
+            <CardHeader>
+              <CardTitle>Location</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <MapView
+                latitude={gym.latitude}
+                longitude={gym.longitude}
+                gyms={[{ id: gym.id, name: gym.name, latitude: gym.latitude, longitude: gym.longitude }]}
+                className="h-64 w-full"
+                zoom={15}
+                showUserMarker={false}
+              />
+              <p className="mt-3 text-sm text-muted-foreground flex items-center gap-2">
+                <MapPin className="h-4 w-4" />
+                {gym.address}
+              </p>
+            </CardContent>
+          </Card>
+          <Card className="glass-card">
+            <CardHeader>
+              <CardTitle>Quick facts</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-3 text-sm text-muted-foreground">
+              <div className="flex items-center justify-between">
+                <span>Open days</span>
+                <span className="text-foreground">
+                  {openDays.length > 0 ? openDays.join(", ") : "Not listed"}
+                </span>
+              </div>
+              <div className="flex items-center justify-between">
+                <span>Hours</span>
+                <span className="text-foreground">
+                  {gym.openTime && gym.closeTime ? `${gym.openTime} - ${gym.closeTime}` : "Not listed"}
+                </span>
+              </div>
+              <div className="flex items-center justify-between">
+                <span>Starting price</span>
+                <span className="text-foreground">{formatPrice(gym.monthlyPrice)}/mo</span>
+              </div>
+              <div className="flex items-center justify-between">
+                <span>Duo savings</span>
+                <span className="text-foreground">Up to {gym.partnerDiscountPercent}%</span>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
 
         {(gym.owner?.supportEmail || gym.owner?.supportPhone || gym.owner?.supportWhatsapp || gym.owner?.logoUrl) && (
           <Card className="glass-card">

@@ -18,7 +18,7 @@ export function isUser(session: Session | null): boolean {
 
 export function requireUser(session: Session | null): boolean {
   const user = getSessionUser(session);
-  return !!user && user.role === "USER";
+  return !!user && (user.role === "USER" || user.role === "ADMIN");
 }
 
 export function requireOwner(session: Session | null): boolean {

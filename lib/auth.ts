@@ -12,6 +12,16 @@ import { sendVerificationEmail } from "@/lib/email";
 
 const googleClientId = getOptionalEnv("GOOGLE_CLIENT_ID");
 const googleClientSecret = getOptionalEnv("GOOGLE_CLIENT_SECRET");
+const adminEmails = (getOptionalEnv("ADMIN_EMAILS") ?? "")
+  .split(",")
+  .map((email) => email.trim().toLowerCase())
+  .filter(Boolean);
+
+function isAdminEmail(email?: string | null) {
+  if (!email) return false;
+  const normalized = email.trim().toLowerCase();
+  return adminEmails.includes(normalized);
+}
 const passwordPepper = getRequiredEnv("PASSWORD_PEPPER", {
   allowEmptyInDev: true,
 });
@@ -85,6 +95,18 @@ export const authOptions: NextAuthOptions = {
           token.emailVerified = !!u?.emailVerified;
         }
       }
+      const adminEmail = user?.email ?? token.email;
+      if (isAdminEmail(adminEmail)) {
+        if (token.role !== "ADMIN" && adminEmail) {
+          try {
+            await prisma.user.update({
+              where: { email: adminEmail.toLowerCase() },
+              data: { role: "ADMIN" },
+            });
+          } catch {}
+        }
+        token.role = "ADMIN";
+      }
       if (trigger === "update" && session) {
         token.name = session.name;
         if (session.role) token.role = session.role;
@@ -112,6 +134,14 @@ export const authOptions: NextAuthOptions = {
       return session;
     },
     async signIn({ user, account }) {
+      if (user?.email && isAdminEmail(user.email)) {
+        try {
+          await prisma.user.update({
+            where: { email: user.email.toLowerCase() },
+            data: { role: "ADMIN" },
+          });
+        } catch {}
+      }
       if (account?.provider === "google" && user.email) {
         const existing = await prisma.user.findUnique({
           where: { email: user.email },

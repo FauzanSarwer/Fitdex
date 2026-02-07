@@ -40,6 +40,28 @@ export default function OwnerGymPage() {
   const [verifying, setVerifying] = useState<string | null>(null);
   const paymentsEnabled = isPaymentsEnabled();
 
+  const primaryGym = gyms[0];
+  const onboardingSteps = [
+    {
+      label: "Create your first gym",
+      done: gyms.length > 0,
+    },
+    {
+      label: "Add pricing & hours",
+      done: !!primaryGym?.monthlyPrice && !!primaryGym?.openTime && !!primaryGym?.closeTime,
+    },
+    {
+      label: "Upload a cover photo",
+      done: !!primaryGym?.coverImageUrl,
+    },
+    {
+      label: "Submit verification",
+      done: !!primaryGym && primaryGym.verificationStatus !== "UNVERIFIED",
+    },
+  ];
+  const completedSteps = onboardingSteps.filter((s) => s.done).length;
+  const onboardingProgress = Math.round((completedSteps / onboardingSteps.length) * 100);
+
   useEffect(() => {
     let active = true;
     setLoading(true);
@@ -143,6 +165,39 @@ export default function OwnerGymPage() {
         </h1>
         <p className="text-muted-foreground text-sm">Add or manage your gym.</p>
       </motion.div>
+
+      <Card className="glass-card">
+        <CardHeader>
+          <CardTitle>Owner onboarding</CardTitle>
+          <CardDescription>Complete these steps to go live and start receiving leads.</CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="flex items-center justify-between text-sm">
+            <span className="text-muted-foreground">Progress</span>
+            <span className="font-semibold text-primary">{onboardingProgress}%</span>
+          </div>
+          <div className="h-2 rounded-full bg-white/10">
+            <div
+              className="h-2 rounded-full bg-gradient-to-r from-primary to-accent"
+              style={{ width: `${onboardingProgress}%` }}
+            />
+          </div>
+          <div className="grid gap-3 md:grid-cols-2">
+            {onboardingSteps.map((step) => (
+              <div
+                key={step.label}
+                className={`rounded-xl border px-4 py-3 text-sm ${
+                  step.done
+                    ? "border-emerald-500/40 bg-emerald-500/10 text-emerald-200"
+                    : "border-white/10 text-muted-foreground"
+                }`}
+              >
+                {step.done ? "✓" : "•"} {step.label}
+              </div>
+            ))}
+          </div>
+        </CardContent>
+      </Card>
 
       {error && (
         <Card className="glass-card">

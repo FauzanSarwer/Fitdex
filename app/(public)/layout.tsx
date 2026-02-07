@@ -11,7 +11,12 @@ export default function PublicLayout({
 }) {
   return (
     <LocationGate>
-      <div className="min-h-screen bg-background flex flex-col">
+      <div className="relative min-h-screen bg-background flex flex-col overflow-hidden">
+        <div className="pointer-events-none absolute inset-0 -z-10">
+          <div className="absolute -top-48 right-0 h-96 w-96 rounded-full bg-primary/20 blur-[140px]" />
+          <div className="absolute top-1/3 -left-24 h-[420px] w-[420px] rounded-full bg-accent/20 blur-[160px]" />
+          <div className="absolute inset-0 bg-[radial-gradient(circle_at_top,rgba(255,255,255,0.06),transparent_60%)]" />
+        </div>
         <Header />
         <main className="pt-16 flex-1">
           <Suspense

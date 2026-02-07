@@ -6,6 +6,7 @@ import { prisma } from "@/lib/prisma";
 import { requireAdmin } from "@/lib/permissions";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { formatPrice } from "@/lib/utils";
+import { RealtimeAdminMetrics } from "@/components/admin/realtime-metrics";
 
 export const dynamic = "force-dynamic";
 
@@ -64,6 +65,8 @@ export default async function AdminOverviewPage() {
           Real-time platform health, revenue, and operational visibility.
         </p>
       </div>
+
+      <RealtimeAdminMetrics />
 
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
         <Card className="glass-card">

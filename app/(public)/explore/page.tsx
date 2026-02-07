@@ -47,6 +47,15 @@ interface Gym {
 
 type SortOption = "price_asc" | "price_desc" | "distance" | "newest";
 
+const SERVICEABLE_CITIES = [
+  "Delhi",
+  "New Delhi",
+  "Gurugram",
+  "Noida",
+  "Ghaziabad",
+  "Faridabad",
+];
+
 function GymImageCarousel({ images, name }: { images: string[]; name: string }) {
   const [index, setIndex] = useState(0);
   if (images.length === 0) return null;
@@ -334,12 +343,39 @@ export default function ExplorePage() {
         </div>
       )}
       <div className={locationGate ? "pointer-events-none blur-sm" : ""}>
+        <motion.section
+          initial={{ opacity: 0, y: 12 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="mb-8 rounded-3xl border border-white/10 bg-white/5 p-6 md:p-8 shadow-glow-sm"
+        >
+          <div className="flex flex-col gap-6 md:flex-row md:items-end md:justify-between">
+            <div className="max-w-2xl space-y-3">
+              <p className="text-xs uppercase tracking-[0.3em] text-muted-foreground">Fitdex Explore</p>
+              <h1 className="text-2xl md:text-4xl font-semibold text-foreground">
+                Discover premium gyms near you, with transparent pricing and verified listings.
+              </h1>
+              <p className="text-sm text-muted-foreground">
+                Compare facilities, check timings, and reach out instantly. Sorted by distance when location is available.
+              </p>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              {SERVICEABLE_CITIES.map((city) => (
+                <span
+                  key={city}
+                  className="rounded-full border border-white/10 bg-white/5 px-3 py-1 text-xs text-muted-foreground"
+                >
+                  {city}
+                </span>
+              ))}
+            </div>
+          </div>
+        </motion.section>
         <div className="flex flex-col gap-4 mb-6">
         <div className="flex items-center justify-between">
-          <h1 className="text-2xl font-bold flex items-center gap-2 bg-clip-text text-transparent bg-gradient-to-r from-white to-white/70">
+          <h2 className="text-xl font-semibold flex items-center gap-2 text-foreground">
             <MapPin className="h-6 w-6 text-primary" />
-            Explore gyms
-          </h1>
+            Browse gyms
+          </h2>
           <div className="flex rounded-xl border border-white/10 overflow-hidden">
             <Button
               variant={view === "list" ? "secondary" : "ghost"}
