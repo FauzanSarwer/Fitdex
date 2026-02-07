@@ -33,41 +33,45 @@ function getClientIp(req: NextRequest) {
 }
 
 function applyRateLimit(req: NextRequest) {
-  const key = `${getClientIp(req)}:${req.nextUrl.pathname}`;
-  const now = Date.now();
-  const store = (globalThis as typeof globalThis & {
-    __gymduoRateLimit__?: Map<string, RateLimitEntry>;
-  });
-
-  if (!store.__gymduoRateLimit__) {
-    store.__gymduoRateLimit__ = new Map();
-  }
-
-  const bucket = store.__gymduoRateLimit__.get(key);
-  if (!bucket || now > bucket.reset) {
-    store.__gymduoRateLimit__.set(key, {
-      count: 1,
-      reset: now + RATE_LIMIT_WINDOW_MS,
+  try {
+    const key = `${getClientIp(req)}:${req.nextUrl.pathname}`;
+    const now = Date.now();
+    const store = (globalThis as typeof globalThis & {
+      __gymduoRateLimit__?: Map<string, RateLimitEntry>;
     });
+
+    if (!store.__gymduoRateLimit__) {
+      store.__gymduoRateLimit__ = new Map();
+    }
+
+    const bucket = store.__gymduoRateLimit__.get(key);
+    if (!bucket || now > bucket.reset) {
+      store.__gymduoRateLimit__.set(key, {
+        count: 1,
+        reset: now + RATE_LIMIT_WINDOW_MS,
+      });
+      return null;
+    }
+
+    if (bucket.count >= RATE_LIMIT_MAX) {
+      const retryAfter = Math.ceil((bucket.reset - now) / 1000);
+      return NextResponse.json(
+        { error: "Too many requests" },
+        {
+          status: 429,
+          headers: {
+            "Retry-After": retryAfter.toString(),
+          },
+        }
+      );
+    }
+
+    bucket.count += 1;
+    store.__gymduoRateLimit__.set(key, bucket);
+    return null;
+  } catch {
     return null;
   }
-
-  if (bucket.count >= RATE_LIMIT_MAX) {
-    const retryAfter = Math.ceil((bucket.reset - now) / 1000);
-    return NextResponse.json(
-      { error: "Too many requests" },
-      {
-        status: 429,
-        headers: {
-          "Retry-After": retryAfter.toString(),
-        },
-      }
-    );
-  }
-
-  bucket.count += 1;
-  store.__gymduoRateLimit__.set(key, bucket);
-  return null;
 }
 
 function applySecurityHeaders(response: NextResponse) {
@@ -81,16 +85,20 @@ function applySecurityHeaders(response: NextResponse) {
 }
 
 export default function middleware(req: NextRequest, event: NextFetchEvent) {
-  if (req.nextUrl.pathname.startsWith("/api")) {
-    const rateLimitResponse = applyRateLimit(req);
-    if (rateLimitResponse) {
-      return applySecurityHeaders(rateLimitResponse);
+  try {
+    if (req.nextUrl.pathname.startsWith("/api")) {
+      const rateLimitResponse = applyRateLimit(req);
+      if (rateLimitResponse) {
+        return applySecurityHeaders(rateLimitResponse);
+      }
+      return applySecurityHeaders(NextResponse.next());
     }
+
+    const response = authMiddleware(req as NextRequestWithAuth, event) as NextResponse;
+    return applySecurityHeaders(response);
+  } catch {
     return applySecurityHeaders(NextResponse.next());
   }
-
-  const response = authMiddleware(req as NextRequestWithAuth, event) as NextResponse;
-  return applySecurityHeaders(response);
 }
 
 export const config = {
