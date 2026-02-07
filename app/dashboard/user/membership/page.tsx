@@ -21,6 +21,7 @@ declare global {
       name: string;
       order_id: string;
       handler: (res: { razorpay_payment_id: string; razorpay_order_id: string; razorpay_signature: string }) => void;
+      modal?: { ondismiss?: () => void };
     }) => { open: () => void };
   }
 }
@@ -36,8 +37,10 @@ function MembershipContent() {
   const [paying, setPaying] = useState<string | null>(null);
 
   useEffect(() => {
+    let active = true;
     fetchJson<{ memberships?: any[]; error?: string }>("/api/memberships", { retries: 1 })
       .then((result) => {
+        if (!active) return;
         if (!result.ok) {
           toast({ title: "Error", description: result.error ?? "Failed to load memberships", variant: "destructive" });
           setError(result.error ?? "Failed to load memberships");
@@ -48,11 +51,15 @@ function MembershipContent() {
         setLoading(false);
       })
       .catch(() => {
+        if (!active) return;
         toast({ title: "Error", description: "Failed to load memberships", variant: "destructive" });
         setError("Failed to load memberships");
         setLoading(false);
       });
-  }, []);
+    return () => {
+      active = false;
+    };
+  }, [toast]);
 
   const activeMembership = memberships.find((m) => m.active);
   const pendingMembership = memberships.find((m) => !m.active && m.gymId === joinGymId) ?? memberships.find((m) => !m.active);
@@ -129,16 +136,14 @@ function MembershipContent() {
             retries: 1,
           });
           if (verifyResult.ok) {
-            toast({ title: "Payment successful", description: "Membership activated." });
-            setMemberships((prev) =>
-              prev.map((m) =>
-                m.id === membershipId ? { ...m, active: true } : m
-              )
-            );
+            toast({ title: "Payment received", description: "Activation will complete after confirmation." });
           } else {
             toast({ title: "Verification failed", description: verifyResult.error ?? "Payment failed", variant: "destructive" });
           }
           setPaying(null);
+        },
+        modal: {
+          ondismiss: () => setPaying(null),
         },
       });
       rzp.open();

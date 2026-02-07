@@ -39,8 +39,10 @@ export default function OwnerDiscountsPage() {
   const [promoCodes, setPromoCodes] = useState<any[]>([]);
 
   useEffect(() => {
+    let active = true;
     fetchJson<{ gyms?: any[]; error?: string }>("/api/owner/gym", { retries: 1 })
       .then((result) => {
+        if (!active) return;
         if (!result.ok) {
           setError(result.error ?? "Failed to load gyms");
           setLoading(false);
@@ -62,9 +64,13 @@ export default function OwnerDiscountsPage() {
         setLoading(false);
       })
       .catch(() => {
+        if (!active) return;
         setError("Failed to load gyms");
         setLoading(false);
       });
+    return () => {
+      active = false;
+    };
   }, []);
 
   useEffect(() => {
@@ -81,21 +87,26 @@ export default function OwnerDiscountsPage() {
   }, [selectedGymId, gyms]);
 
   useEffect(() => {
-    if (selectedGymId) {
-      fetchJson<{ codes?: any[]; error?: string }>(`/api/owner/discount-codes?gymId=${selectedGymId}`, { retries: 1 })
-        .then((result) => {
-          if (!result.ok) {
-            setError(result.error ?? "Failed to load discount codes");
-            setPromoCodes([]);
-            return;
-          }
-          setPromoCodes(result.data?.codes ?? []);
-        })
-        .catch(() => {
-          setError("Failed to load discount codes");
+    if (!selectedGymId) return;
+    let active = true;
+    fetchJson<{ codes?: any[]; error?: string }>(`/api/owner/discount-codes?gymId=${selectedGymId}`, { retries: 1 })
+      .then((result) => {
+        if (!active) return;
+        if (!result.ok) {
+          setError(result.error ?? "Failed to load discount codes");
           setPromoCodes([]);
-        });
-    }
+          return;
+        }
+        setPromoCodes(result.data?.codes ?? []);
+      })
+      .catch(() => {
+        if (!active) return;
+        setError("Failed to load discount codes");
+        setPromoCodes([]);
+      });
+    return () => {
+      active = false;
+    };
   }, [selectedGymId]);
 
   async function handleAddPromo() {

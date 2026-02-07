@@ -3,7 +3,7 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { requireUser } from "@/lib/permissions";
-import { createRazorpayOrder, PaymentConfigError } from "@/lib/razorpay";
+import { createRazorpayMarketplaceOrder, PaymentConfigError } from "@/lib/razorpay";
 import { jsonError, safeJson } from "@/lib/api";
 import { logServerError } from "@/lib/logger";
 
@@ -36,19 +36,39 @@ export async function POST(req: Request) {
     if (amountPaise <= 0) {
       return jsonError("Invalid amount", 400);
     }
+    if (membership.gym.verificationStatus !== "VERIFIED") {
+      return jsonError("Gym is not verified for payments", 403);
+    }
+    if (!membership.gym.razorpaySubAccountId) {
+      return jsonError("Gym payout account missing", 403);
+    }
+    const platformCommission = Math.floor(amountPaise * 0.05);
+    const gymPayout = amountPaise - platformCommission;
     const receipt = `mem_${membershipId}_${Date.now()}`;
-    const order = await createRazorpayOrder(amountPaise, receipt, {
-      membershipId,
-      userId: uid,
-      gymId: membership.gymId,
-    });
-    await prisma.payment.create({
+    const order = await createRazorpayMarketplaceOrder(
+      amountPaise,
+      receipt,
+      membership.gym.razorpaySubAccountId,
+      gymPayout,
+      {
+        membershipId,
+        userId: uid,
+        gymId: membership.gymId,
+        platformCommission: String(platformCommission),
+        gymPayout: String(gymPayout),
+      }
+    );
+    await prisma.transaction.create({
       data: {
         userId: uid,
         gymId: membership.gymId,
-        amount: amountPaise,
+        membershipId,
+        totalAmount: amountPaise,
+        platformCommissionAmount: platformCommission,
+        gymPayoutAmount: gymPayout,
         razorpayOrderId: order.id,
-        status: "PENDING",
+        paymentStatus: "CREATED",
+        settlementStatus: "NOT_STARTED",
       },
     });
     return NextResponse.json({

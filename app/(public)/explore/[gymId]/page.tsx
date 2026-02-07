@@ -56,9 +56,11 @@ export default function GymProfilePage() {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    if (!gymId) return;
+    let active = true;
+    if (!gymId) return () => { active = false; };
     fetchJson<{ gym?: GymData; error?: string }>(`/api/gyms/${gymId}`, { retries: 1 })
       .then((result) => {
+        if (!active) return;
         if (!result.ok) {
           setError(result.error ?? "Gym not found");
           setLoading(false);
@@ -69,9 +71,13 @@ export default function GymProfilePage() {
         setLoading(false);
       })
       .catch(() => {
+        if (!active) return;
         setError("Failed to load gym details");
         setLoading(false);
       });
+    return () => {
+      active = false;
+    };
   }, [gymId]);
 
   useEffect(() => {
@@ -84,6 +90,12 @@ export default function GymProfilePage() {
       })
       .catch(() => {});
   }, [gymId, status]);
+
+  useEffect(() => {
+    if (status === "unauthenticated") {
+      setSaved(false);
+    }
+  }, [status]);
 
   async function toggleSave() {
     if (status !== "authenticated") return;

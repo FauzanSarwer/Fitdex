@@ -31,6 +31,7 @@ export async function GET(req: Request) {
     const lat = searchParams.get("lat");
     const lng = searchParams.get("lng");
     const gyms = await prisma.gym.findMany({
+      where: { verificationStatus: { not: "REJECTED" } },
       include: {
         owner: { select: { id: true, name: true } },
       },

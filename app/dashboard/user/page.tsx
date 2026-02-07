@@ -67,19 +67,21 @@ function UserDashboardContent() {
         const loc = results[2].status === "fulfilled" ? results[2].value : null;
         const saved = results[3].status === "fulfilled" ? results[3].value : null;
 
-        if (!mem?.ok || !d?.ok || !loc?.ok) {
+        if (!mem?.ok || !d?.ok) {
           setError("Failed to load your dashboard");
         }
 
         setMemberships(mem?.data?.memberships ?? []);
         setDuos(d?.data?.duos ?? []);
-        if (loc?.data?.location?.latitude != null && loc.data.location?.longitude != null) {
+        if (loc?.ok && loc?.data?.location?.latitude != null && loc.data.location?.longitude != null) {
           setLocation({
             latitude: loc.data.location.latitude,
             longitude: loc.data.location.longitude,
           });
         }
-        setSavedGyms(saved?.data?.saved ?? []);
+        if (saved?.ok) {
+          setSavedGyms(saved?.data?.saved ?? []);
+        }
       } catch {
         if (active) setError("Failed to load your dashboard");
       } finally {

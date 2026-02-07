@@ -18,6 +18,9 @@ export async function GET(
     if (!gym) {
       return NextResponse.json({ error: "Gym not found" }, { status: 404 });
     }
+    if (gym.verificationStatus === "REJECTED") {
+      return NextResponse.json({ error: "Gym not available" }, { status: 403 });
+    }
     const monthly = gym.monthlyPrice;
     const quarterly =
       gym.quarterlyPrice ?? Math.round(gym.monthlyPrice * 3 * 0.9);

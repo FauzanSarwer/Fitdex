@@ -15,6 +15,7 @@ import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { useSession } from "next-auth/react";
+import { isOwner } from "@/lib/permissions";
 
 const BENEFITS = [
   {
@@ -65,7 +66,7 @@ const PLANS = [
 
 export default function OwnersPage() {
   const { data: session, status } = useSession();
-  const isOwner = (session?.user as { role?: string })?.role === "OWNER";
+  const owner = status === "authenticated" && isOwner(session);
 
   return (
     <div className="container mx-auto px-4 py-16">
@@ -152,7 +153,7 @@ export default function OwnersPage() {
                     </li>
                   ))}
                 </ul>
-                {isOwner ? (
+                {owner ? (
                   <Button asChild className="w-full mt-4" size="lg" variant={plan.popular ? "default" : "outline"}>
                     <Link href="/dashboard/owner">Open dashboard</Link>
                   </Button>
@@ -191,7 +192,7 @@ export default function OwnersPage() {
           <p className="text-muted-foreground mb-6">
             {status === "loading" ? (
               <span className="inline-block h-5 w-48 bg-white/10 rounded animate-pulse" />
-            ) : isOwner ? (
+            ) : owner ? (
               "Head to your dashboard to manage your gyms."
             ) : (
               "Log in to your owner account or create one to list your gym."
@@ -199,7 +200,7 @@ export default function OwnersPage() {
           </p>
           {status !== "loading" && (
             <div className="flex flex-col sm:flex-row gap-3 justify-center">
-              {isOwner ? (
+              {owner ? (
                 <Button asChild size="lg">
                   <Link href="/dashboard/owner">Go to Owner Dashboard</Link>
                 </Button>

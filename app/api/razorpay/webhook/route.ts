@@ -14,52 +14,136 @@ export async function POST(req: Request) {
     if (!verifyRazorpayWebhookSignature(raw, sig)) {
       return jsonError("Invalid signature", 400);
     }
-    let body: {
-      event: string;
-      payload?: { payment?: { entity?: { id: string; order_id: string } } };
-    };
+    let body: any;
     try {
       body = JSON.parse(raw);
     } catch {
       return jsonError("Invalid JSON", 400);
     }
-    if (body.event === "payment.captured") {
-      const paymentId = body.payload?.payment?.entity?.id;
-      const orderId = body.payload?.payment?.entity?.order_id;
-      if (paymentId && orderId) {
-        const payment = await prisma.payment.findFirst({
+    const eventType = String(body?.event ?? "unknown");
+    const eventId = String(
+      body?.id ??
+        createWebhookEventId(raw)
+    );
+
+    const existing = await prisma.razorpayWebhookEvent.findUnique({
+      where: { eventId },
+    });
+    if (existing) {
+      return NextResponse.json({ received: true, duplicate: true });
+    }
+
+    await prisma.razorpayWebhookEvent.create({
+      data: {
+        eventId,
+        eventType,
+        payload: body,
+      },
+    });
+
+    if (eventType === "payment.captured") {
+      const paymentId = body?.payload?.payment?.entity?.id as string | undefined;
+      const orderId = body?.payload?.payment?.entity?.order_id as string | undefined;
+      if (orderId) {
+        const transaction = await prisma.transaction.findFirst({
           where: { razorpayOrderId: orderId },
         });
-        if (payment) {
-          await prisma.payment.update({
-            where: { id: payment.id },
-            data: { razorpayPaymentId: paymentId, status: "CAPTURED" },
+        if (transaction) {
+          await prisma.transaction.update({
+            where: { id: transaction.id },
+            data: {
+              razorpayPaymentId: paymentId ?? transaction.razorpayPaymentId,
+              paymentStatus: "PAID",
+            },
+          });
+          await prisma.membership.update({
+            where: { id: transaction.membershipId },
+            data: { active: true },
           });
           const membership = await prisma.membership.findFirst({
-            where: { userId: payment.userId, gymId: payment.gymId },
-            orderBy: { startedAt: "desc" },
+            where: { id: transaction.membershipId },
           });
-          if (membership && !membership.active) {
-            await prisma.membership.update({
-              where: { id: membership.id },
-              data: { active: true },
+          if (membership) {
+            const { gymId, userId } = membership;
+            const invite = await prisma.invite.findFirst({
+              where: {
+                gymId,
+                accepted: false,
+                OR: [{ inviterId: userId }, { invitedUserId: userId }],
+              },
             });
+            if (invite && invite.invitedUserId) {
+              const inviterActive = await prisma.membership.findFirst({
+                where: { userId: invite.inviterId, gymId, active: true },
+              });
+              const inviteeActive = await prisma.membership.findFirst({
+                where: { userId: invite.invitedUserId, gymId, active: true },
+              });
+              if (inviterActive && inviteeActive) {
+                const [u1, u2] =
+                  invite.inviterId < invite.invitedUserId
+                    ? [invite.inviterId, invite.invitedUserId]
+                    : [invite.invitedUserId, invite.inviterId];
+                await prisma.duo.upsert({
+                  where: {
+                    userOneId_userTwoId_gymId: { userOneId: u1, userTwoId: u2, gymId },
+                  },
+                  create: { userOneId: u1, userTwoId: u2, gymId, active: true },
+                  update: {},
+                });
+                await prisma.invite.update({
+                  where: { id: invite.id },
+                  data: { accepted: true },
+                });
+              }
+            }
           }
         }
       }
     }
-    if (body.event === "payment.failed") {
-      const orderId = body.payload?.payment?.entity?.order_id;
+
+    if (eventType === "payment.failed") {
+      const orderId = body?.payload?.payment?.entity?.order_id as string | undefined;
       if (orderId) {
-        await prisma.payment.updateMany({
+        await prisma.transaction.updateMany({
           where: { razorpayOrderId: orderId },
-          data: { status: "FAILED" },
+          data: { paymentStatus: "FAILED" },
         });
       }
     }
+
+    if (eventType === "transfer.processed") {
+      const orderId = body?.payload?.transfer?.entity?.order_id as string | undefined;
+      if (orderId) {
+        await prisma.transaction.updateMany({
+          where: { razorpayOrderId: orderId },
+          data: { settlementStatus: "COMPLETED" },
+        });
+      }
+    }
+
+    if (eventType === "transfer.failed") {
+      const orderId = body?.payload?.transfer?.entity?.order_id as string | undefined;
+      if (orderId) {
+        await prisma.transaction.updateMany({
+          where: { razorpayOrderId: orderId },
+          data: { settlementStatus: "PARTIAL" },
+        });
+      }
+    }
+
+    await prisma.razorpayWebhookEvent.update({
+      where: { eventId },
+      data: { processedAt: new Date() },
+    });
     return NextResponse.json({ received: true });
   } catch (error) {
     logServerError(error as Error, { route: "/api/razorpay/webhook" });
     return jsonError("Webhook processing failed", 500);
   }
+}
+
+function createWebhookEventId(raw: string) {
+  const crypto = require("crypto");
+  return crypto.createHash("sha256").update(raw).digest("hex");
 }

@@ -83,10 +83,13 @@ export default function ExplorePage() {
     };
     if (!navigator.geolocation) {
       loadGyms("/api/gyms");
-      return;
+      return () => {
+        cancelled = true;
+      };
     }
     navigator.geolocation.getCurrentPosition(
       (pos) => {
+        if (cancelled) return;
         const lat = pos.coords.latitude;
         const lng = pos.coords.longitude;
         setUserLat(lat);
@@ -94,6 +97,7 @@ export default function ExplorePage() {
         loadGyms(`/api/gyms?lat=${lat}&lng=${lng}`);
       },
       () => {
+        if (cancelled) return;
         loadGyms("/api/gyms");
       }
     );
@@ -111,6 +115,12 @@ export default function ExplorePage() {
         setSavedIds(ids);
       })
       .catch(() => {});
+  }, [status]);
+
+  useEffect(() => {
+    if (status === "unauthenticated") {
+      setSavedIds(new Set());
+    }
   }, [status]);
 
   async function toggleSave(gymId: string) {
@@ -191,7 +201,7 @@ export default function ExplorePage() {
         list.sort((a, b) => (a.distance ?? Infinity) - (b.distance ?? Infinity));
     }
     return list;
-  }, [gyms, maxDistance, maxPrice, query, sortBy]);
+  }, [gyms, maxDistance, maxPrice, query, sortBy, searchScope, onlyFeatured, onlyVerified]);
 
   const activeFilters = useMemo(() => {
     const filters: { label: string; onClear: () => void }[] = [];

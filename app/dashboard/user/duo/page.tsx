@@ -25,23 +25,33 @@ export default function DuoPage() {
   const [lastInviteCode, setLastInviteCode] = useState<string | null>(null);
 
   useEffect(() => {
+    let active = true;
     Promise.all([
-      fetchJson<{ duos?: any[] }>("/api/duos", { retries: 1 }),
-      fetchJson<{ memberships?: any[] }>("/api/memberships", { retries: 1 }),
+      fetchJson<{ duos?: any[]; error?: string }>("/api/duos", { retries: 1 }),
+      fetchJson<{ memberships?: any[]; error?: string }>("/api/memberships", { retries: 1 }),
     ])
       .then(([d, m]) => {
+        if (!active) return;
+        if (!d.ok || !m.ok) {
+          setError("Failed to load duo data");
+          toast({ title: "Error", description: "Failed to load duo data", variant: "destructive" });
+        }
         setDuos(d.ok ? d.data?.duos ?? [] : []);
         setMemberships(m.ok ? m.data?.memberships ?? [] : []);
-        const active = (m.ok ? m.data?.memberships ?? [] : []).find((x: any) => x.active);
-        if (active) setInviteGymId(active.gymId);
+        const activeMembership = (m.ok ? m.data?.memberships ?? [] : []).find((x: any) => x.active);
+        if (activeMembership) setInviteGymId(activeMembership.gymId);
         setLoading(false);
       })
       .catch(() => {
+        if (!active) return;
         toast({ title: "Error", description: "Failed to load duo data", variant: "destructive" });
         setError("Failed to load duo data");
         setLoading(false);
       });
-  }, []);
+    return () => {
+      active = false;
+    };
+  }, [toast]);
 
   const activeMembership = memberships.find((m) => m.active);
   const activeDuo = duos.find((d) => d.active);
@@ -61,7 +71,6 @@ export default function DuoPage() {
       });
       if (!result.ok) {
         toast({ title: "Error", description: result.error ?? "Failed to send invite", variant: "destructive" });
-        setSending(false);
         return;
       }
       if (result.data?.code) {
@@ -74,8 +83,9 @@ export default function DuoPage() {
       setDuos((prev) => [...prev]); // refetch would be better
     } catch {
       toast({ title: "Error", variant: "destructive" });
+    } finally {
+      setSending(false);
     }
-    setSending(false);
   }
 
   async function acceptInvite() {
@@ -90,7 +100,6 @@ export default function DuoPage() {
       });
       if (!result.ok) {
         toast({ title: "Error", description: result.error ?? "Invalid code", variant: "destructive" });
-        setAccepting(false);
         return;
       }
       toast({ title: "Duo activated", description: "You're now partners!" });
@@ -98,8 +107,9 @@ export default function DuoPage() {
       setDuos((prev) => [...prev]);
     } catch {
       toast({ title: "Error", variant: "destructive" });
+    } finally {
+      setAccepting(false);
     }
-    setAccepting(false);
   }
 
   if (loading) {

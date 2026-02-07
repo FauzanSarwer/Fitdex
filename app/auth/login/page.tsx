@@ -90,7 +90,12 @@ function LoginForm() {
     setLoading(true);
     const inferredRole = callbackUrl.startsWith("/dashboard/owner") ? "OWNER" : "USER";
     const completeUrl = `/auth/complete?next=${encodeURIComponent(callbackUrl)}&role=${encodeURIComponent(inferredRole)}`;
-    await signIn("google", { callbackUrl: completeUrl });
+    try {
+      await signIn("google", { callbackUrl: completeUrl });
+    } catch {
+      setLoading(false);
+      setError("Google sign-in failed to start");
+    }
   }
 
   return (
@@ -129,6 +134,14 @@ function LoginForm() {
                 ref={passwordRef}
                 autoComplete="current-password"
               />
+              <div className="flex justify-end">
+                <Link
+                  href={`/auth/forgot?email=${encodeURIComponent(email)}`}
+                  className="text-xs text-primary hover:underline"
+                >
+                  Forgot password?
+                </Link>
+              </div>
             </div>
             {error && (
               <p className="text-sm text-destructive">{error}</p>

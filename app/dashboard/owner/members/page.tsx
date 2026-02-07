@@ -23,8 +23,10 @@ export default function OwnerMembersPage() {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
+    let active = true;
     fetchJson<{ gyms?: any[]; error?: string }>("/api/owner/gym", { retries: 1 })
       .then((result) => {
+        if (!active) return;
         if (!result.ok) {
           setError(result.error ?? "Failed to load gyms");
           setGyms([]);
@@ -37,15 +39,21 @@ export default function OwnerMembersPage() {
         setLoading(false);
       })
       .catch(() => {
+        if (!active) return;
         setError("Failed to load gyms");
         setLoading(false);
       });
+    return () => {
+      active = false;
+    };
   }, []);
 
   useEffect(() => {
     if (!selectedGymId) return;
+    let active = true;
     fetchJson<{ members?: any[]; error?: string }>(`/api/owner/members?gymId=${selectedGymId}`, { retries: 1 })
       .then((result) => {
+        if (!active) return;
         if (!result.ok) {
           setError(result.error ?? "Failed to load members");
           setMembers([]);
@@ -54,9 +62,13 @@ export default function OwnerMembersPage() {
         setMembers(result.data?.members ?? []);
       })
       .catch(() => {
+        if (!active) return;
         setError("Failed to load members");
         setMembers([]);
       });
+    return () => {
+      active = false;
+    };
   }, [selectedGymId]);
 
   if (loading) {

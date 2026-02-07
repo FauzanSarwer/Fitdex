@@ -18,7 +18,7 @@ interface LocationState {
   serviceable?: boolean;
 }
 
-const AUTH_PATHS = ["/auth/login", "/auth/register"];
+const SKIP_PATH_PREFIXES = ["/auth/login", "/auth/register", "/auth/complete", "/dashboard"];
 
 export function LocationGate({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
@@ -27,7 +27,7 @@ export function LocationGate({ children }: { children: React.ReactNode }) {
   const [waitlistEmail, setWaitlistEmail] = useState("");
   const hasRequestedRef = useRef(false);
 
-  const skipGate = AUTH_PATHS.some((p) => pathname?.startsWith(p));
+  const skipGate = SKIP_PATH_PREFIXES.some((p) => pathname?.startsWith(p));
 
   const requestLocation = useCallback(() => {
     if (typeof window === "undefined") return;

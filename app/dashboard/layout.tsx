@@ -3,7 +3,6 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { LocationGate } from "@/components/layout/location-gate";
 import { DashboardNav } from "@/components/layout/dashboard-nav";
-import { DashboardRedirect } from "@/components/layout/dashboard-redirect";
 
 export default async function DashboardLayout({
   children,
@@ -12,7 +11,7 @@ export default async function DashboardLayout({
 }) {
   const session = await getServerSession(authOptions);
   if (!session?.user) {
-    redirect("/auth/login?callbackUrl=/dashboard/user");
+    redirect("/auth/login?callbackUrl=/dashboard");
   }
   const role = (session.user as { role?: string }).role;
   if (role !== "USER" && role !== "OWNER" && role !== "ADMIN") {
@@ -24,7 +23,6 @@ export default async function DashboardLayout({
     <LocationGate>
       <div className="min-h-screen bg-background">
         <DashboardNav role={role ?? "USER"} isOwner={isOwner} />
-        <DashboardRedirect />
         <main className="pl-0 md:pl-56 pt-16 min-h-screen">
           {children}
         </main>

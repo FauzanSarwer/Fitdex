@@ -24,12 +24,7 @@ export async function createRazorpayOrder(
   receipt: string,
   notes?: Record<string, string>
 ) {
-  const crypto = await import("crypto");
-  const keyId = requireEnv("RAZORPAY_KEY_ID");
-  const keySecret = requireEnv("RAZORPAY_KEY_SECRET");
-  const key = Buffer.from(keyId + ":" + keySecret).toString(
-    "base64"
-  );
+  const key = getRazorpayAuthHeader();
   const res = await fetch("https://api.razorpay.com/v1/orders", {
     method: "POST",
     headers: {
@@ -46,6 +41,42 @@ export async function createRazorpayOrder(
   if (!res.ok) {
     const err = await res.text();
     throw new Error("Razorpay order failed: " + err);
+  }
+  return res.json() as Promise<{ id: string; amount: number; currency: string }>;
+}
+
+export async function createRazorpayMarketplaceOrder(
+  amountPaise: number,
+  receipt: string,
+  transferAccountId: string,
+  transferAmountPaise: number,
+  notes?: Record<string, string>
+) {
+  const key = getRazorpayAuthHeader();
+  const res = await fetch("https://api.razorpay.com/v1/orders", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: "Basic " + key,
+    },
+    body: JSON.stringify({
+      amount: amountPaise,
+      currency: "INR",
+      receipt,
+      notes: notes ?? {},
+      transfers: [
+        {
+          account: transferAccountId,
+          amount: transferAmountPaise,
+          currency: "INR",
+          on_hold: false,
+        },
+      ],
+    }),
+  });
+  if (!res.ok) {
+    const err = await res.text();
+    throw new Error("Razorpay marketplace order failed: " + err);
   }
   return res.json() as Promise<{ id: string; amount: number; currency: string }>;
 }
@@ -82,6 +113,12 @@ export function verifyRazorpayWebhookSignature(
     .update(body)
     .digest("hex");
   return timingSafeEqualHex(expected, signature);
+}
+
+function getRazorpayAuthHeader() {
+  const keyId = requireEnv("RAZORPAY_KEY_ID");
+  const keySecret = requireEnv("RAZORPAY_KEY_SECRET");
+  return Buffer.from(keyId + ":" + keySecret).toString("base64");
 }
 
 function timingSafeEqualHex(expected: string, actual: string): boolean {

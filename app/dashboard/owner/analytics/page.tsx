@@ -16,6 +16,7 @@ import {
 import { formatPrice } from "@/lib/utils";
 import { Skeleton } from "@/components/ui/skeleton";
 import { BarChart3, TrendingUp, Users, Sparkles, Wallet, Percent } from "lucide-react";
+import { fetchJson } from "@/lib/client-fetch";
 import {
   BarChart,
   Bar,
@@ -61,15 +62,13 @@ export default function OwnerAnalyticsPage() {
     let active = true;
     setLoading(true);
     setError(null);
-    fetch("/api/owner/gym")
-      .then(async (r) => {
-        const payload = await r.json().catch(() => ({}));
-        if (!r.ok) throw new Error(payload?.error ?? "Failed to load gyms");
-        return payload;
-      })
-      .then((d) => {
+    fetchJson<{ gyms?: any[]; error?: string }>("/api/owner/gym", { retries: 1 })
+      .then((result) => {
         if (!active) return;
-        const list = d.gyms ?? [];
+        if (!result.ok) {
+          throw new Error(result.error ?? "Failed to load gyms");
+        }
+        const list = result.data?.gyms ?? [];
         setGyms(list);
         const q = searchParams.get("gymId");
         if (q && list.some((g: any) => g.id === q)) setSelectedGymId(q);
@@ -98,15 +97,13 @@ export default function OwnerAnalyticsPage() {
     }
     let active = true;
     setAnalyticsLoading(true);
-    fetch(`/api/owner/analytics?gymId=${selectedGymId}`)
-      .then(async (r) => {
-        const payload = await r.json().catch(() => ({}));
-        if (!r.ok) throw new Error(payload?.error ?? "Failed to load analytics");
-        return payload;
-      })
-      .then((payload) => {
+    fetchJson<any>(`/api/owner/analytics?gymId=${selectedGymId}`, { retries: 1 })
+      .then((result) => {
         if (!active) return;
-        setData(payload);
+        if (!result.ok) {
+          throw new Error(result.error ?? "Failed to load analytics");
+        }
+        setData(result.data ?? null);
         setError(null);
       })
       .catch((e: any) => {

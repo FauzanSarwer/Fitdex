@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useSession, signOut } from "next-auth/react";
+import { isOwner } from "@/lib/permissions";
 import { motion } from "framer-motion";
 import { Dumbbell, MapPin, User, LayoutDashboard, LogOut } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -14,7 +15,7 @@ import {
 
 export function Header() {
   const { data: session, status } = useSession();
-  const role = (session?.user as { role?: string })?.role;
+  const owner = status === "authenticated" && isOwner(session);
 
   return (
     <motion.header
@@ -62,7 +63,7 @@ export function Header() {
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end" className="w-48 glass border-white/10">
                   <DropdownMenuItem asChild>
-                    <Link href={role === "OWNER" ? "/dashboard/owner" : "/dashboard/user"}>
+                    <Link href={owner ? "/dashboard/owner" : "/dashboard/user"}>
                       <LayoutDashboard className="mr-2 h-4 w-4" />
                       Dashboard
                     </Link>

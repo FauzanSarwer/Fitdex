@@ -38,67 +38,23 @@ export async function POST(req: Request) {
     if (!valid) {
       return jsonError("Invalid payment signature", 400);
     }
-    const payment = await prisma.payment.findFirst({
+    const transaction = await prisma.transaction.findFirst({
       where: {
         razorpayOrderId: razorpay_order_id,
         userId: uid,
+        membershipId,
       },
     });
-    if (!payment) {
-      return jsonError("Payment not found", 404);
+    if (!transaction) {
+      return jsonError("Transaction not found", 404);
     }
-    await prisma.payment.update({
-      where: { id: payment.id },
-      data: {
-        razorpayPaymentId: razorpay_payment_id,
-        status: "CAPTURED",
-      },
-    });
-    const membership = await prisma.membership.findFirst({
-      where: { id: membershipId, userId: uid },
-    });
-    if (membership) {
-      await prisma.membership.update({
-        where: { id: membershipId },
-        data: { active: true },
+    if (!transaction.razorpayPaymentId) {
+      await prisma.transaction.update({
+        where: { id: transaction.id },
+        data: { razorpayPaymentId: razorpay_payment_id },
       });
-      const { gymId } = membership;
-
-      // Create duo if both inviter and invitee now have active membership (join-together or invite-after-join)
-      const invite = await prisma.invite.findFirst({
-        where: {
-          gymId,
-          accepted: false,
-          OR: [{ inviterId: uid }, { invitedUserId: uid }],
-        },
-      });
-      if (invite && invite.invitedUserId) {
-        const inviterActive = await prisma.membership.findFirst({
-          where: { userId: invite.inviterId, gymId, active: true },
-        });
-        const inviteeActive = await prisma.membership.findFirst({
-          where: { userId: invite.invitedUserId, gymId, active: true },
-        });
-        if (inviterActive && inviteeActive) {
-          const [u1, u2] =
-            invite.inviterId < invite.invitedUserId
-              ? [invite.inviterId, invite.invitedUserId]
-              : [invite.invitedUserId, invite.inviterId];
-          await prisma.duo.upsert({
-            where: {
-              userOneId_userTwoId_gymId: { userOneId: u1, userTwoId: u2, gymId },
-            },
-            create: { userOneId: u1, userTwoId: u2, gymId, active: true },
-            update: {},
-          });
-          await prisma.invite.update({
-            where: { id: invite.id },
-            data: { accepted: true },
-          });
-        }
-      }
     }
-    return NextResponse.json({ success: true });
+    return NextResponse.json({ success: true, message: "Payment received; awaiting confirmation." });
   } catch (error) {
     if (error instanceof PaymentConfigError) {
       return jsonError("Payments unavailable", 503);

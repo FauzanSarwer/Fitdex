@@ -29,11 +29,25 @@ model User {
   duosAsTwo    Duo[]       @relation("UserTwo")
   invitesSent  Invite[]    @relation("Inviter")
   payments     Payment[]
+  transactions Transaction[]
   ownedGyms    Gym[]
   savedGyms    SavedGym[]
   featuredPurchases FeaturedListingPurchase[]
   verifiedPurchases VerifiedBadgePurchase[]
   notifications Notification[]
+  passwordResetTokens PasswordResetToken[]
+}
+
+model PasswordResetToken {
+  id        String   @id @default(cuid())
+  userId    String
+  tokenHash String   @unique
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
 }
 
 model Account {
@@ -79,6 +93,14 @@ model Gym {
   latitude               Float
   longitude              Float
   ownerId                String
+  verificationStatus     String   @default("UNVERIFIED") // UNVERIFIED | PENDING | VERIFIED | REJECTED
+  verificationNotes      String?
+  gstNumber              String?
+  gstCertificateUrl      String?
+  gstVerifiedAt          DateTime?
+  razorpaySubAccountId   String?
+  bankAccountLast4       String?
+  bankAccountVerified    Boolean  @default(false)
   openTime               String?  // "HH:mm"
   closeTime              String?  // "HH:mm"
   openDays               String?  // "MON,TUE,WED,THU,FRI,SAT,SUN"
@@ -106,6 +128,7 @@ model Gym {
   savedBy      SavedGym[]
   featuredPurchases FeaturedListingPurchase[]
   verifiedPurchases VerifiedBadgePurchase[]
+  transactions Transaction[]
 }
 
 model Notification {
@@ -197,6 +220,7 @@ model Membership {
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
   gym  Gym  @relation(fields: [gymId], references: [id], onDelete: Cascade)
+  transactions Transaction[]
 }
 
 model Duo {
@@ -240,4 +264,37 @@ model Payment {
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
   gym  Gym  @relation(fields: [gymId], references: [id], onDelete: Cascade)
+}
+
+model Transaction {
+  id                        String   @id @default(cuid())
+  userId                    String
+  gymId                     String
+  membershipId              String
+  totalAmount               Int      // in paise
+  platformCommissionAmount  Int      // in paise
+  gymPayoutAmount           Int      // in paise
+  razorpayOrderId           String   @unique
+  razorpayPaymentId         String?
+  paymentStatus             String   // CREATED | PAID | FAILED
+  settlementStatus          String   // NOT_STARTED | PARTIAL | COMPLETED
+  createdAt                 DateTime @default(now())
+  updatedAt                 DateTime @updatedAt
+
+  user       User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  gym        Gym        @relation(fields: [gymId], references: [id], onDelete: Cascade)
+  membership Membership @relation(fields: [membershipId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([gymId])
+  @@index([membershipId])
+}
+
+model RazorpayWebhookEvent {
+  id          String   @id @default(cuid())
+  eventId     String   @unique
+  eventType   String
+  payload     Json
+  processedAt DateTime?
+  createdAt   DateTime @default(now())
 }

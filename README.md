@@ -1,14 +1,17 @@
-# GYMDUO — District of Gyms
 
-A premium gym discovery and duo accountability platform for Delhi NCR.
+# GYMDUO — Find Your Gym, Bring Your Duo
 
-## Features
+Welcome to GymDuo — the easiest way to discover gyms, join with a friend, and unlock exclusive duo discounts in Delhi NCR. Whether you're a fitness enthusiast or a gym owner, GymDuo makes memberships, payments, and partnerships effortless.
 
-- 🗺️ **Map-based gym discovery** — Find gyms near you
-- 👥 **Duo system** — Invite a partner, stack discounts
-- 💳 **Real payments** — Razorpay integration
-- 📊 **Analytics dashboards** — For members and gym owners
-- 🎨 **Premium dark UI** — Glassmorphism, gradients, smooth animations
+
+
+## Why GymDuo?
+
+- 🗺️ **Find Gyms Near You:** Instantly browse gyms on a map, see real prices, and check reviews.
+- 👥 **Bring a Friend, Save More:** Invite a partner and both get duo discounts on memberships.
+- 💳 **Easy Online Payments:** Pay securely online—no cash, no hassle.
+- 📊 **Track Your Progress:** Members get a dashboard to view their memberships, payments, and duo status.
+- 🏋️ **For Gym Owners:** List your gym, manage members, offer discounts, and see analytics—all in one place.
 
 ## Tech Stack
 
@@ -18,50 +21,39 @@ A premium gym discovery and duo accountability platform for Delhi NCR.
 - **Payments**: Razorpay Checkout
 - **Maps**: OpenStreetMap (Leaflet + Nominatim)
 
-## Quick Start
 
-1. **Install dependencies**
-   ```bash
-   npm install
-   ```
+## How It Works
 
-2. **Set up environment variables**
-   ```bash
-   cp .env.example .env
-   ```
-   Edit `.env` and add your API keys (leave as `XXXXX` for local dev if you don't have keys).
+1. **Explore Gyms:** Open GymDuo and browse gyms on the map. Filter by location, price, or features.
+2. **Register & Login:** Create your account in seconds—use email or Google.
+3. **Invite a Friend:** Want a duo discount? Invite your workout partner to join the same gym.
+4. **Pay Online:** Choose your plan and pay securely. Both you and your duo get instant access.
+5. **Track Everything:** See your active memberships, duo status, and payment history in your dashboard.
 
-3. **Set up database**
-   ```bash
-   npx prisma migrate dev --schema=db/schema.prisma
-   npx tsx db/seed.ts
-   ```
+**For Gym Owners:**
+- List your gym for free and reach more members.
+- Manage memberships, offer discounts, and track revenue with your own dashboard.
 
-4. **Run development server**
-   ```bash
-   npm run dev
-   ```
 
-5. **Open** [http://localhost:3000](http://localhost:3000)
+## FAQ
 
-## Database
+**Q: Do I need a partner to join?**
+A: No! You can join solo, but bringing a friend unlocks extra discounts.
 
-- SQLite database at `dev.db` (created automatically)
-- Prisma schema at `db/schema.prisma`
-- Seed script creates 3 Delhi gyms automatically
+**Q: How do I pay?**
+A: All payments are online and secure. No cash needed.
 
-## Project Structure
+**Q: What if my friend joins later?**
+A: You can invite them anytime. Once they join, your duo discount activates automatically.
 
-```
-/app
-  /(public)      # Public pages (home, explore, pricing)
-  /auth          # Login, register
-  /dashboard     # User & owner dashboards
-  /api           # API routes
-/components      # React components
-/lib             # Utilities (auth, prisma, razorpay, etc.)
-/db              # Prisma schema & seed
-```
+**Q: I'm a gym owner. How do I list my gym?**
+A: Click "List Your Gym" on the site, register as an owner, and follow the steps.
+
+
+
+## Support
+
+Need help? Have feedback? Reach out via the contact form on the website or email support@gymduo.com.
 
 ## Environment Variables
 
@@ -73,31 +65,11 @@ See `.env.example` for all required variables. Key ones:
 - `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` — Google OAuth
 - `RAZORPAY_KEY_ID` / `RAZORPAY_KEY_SECRET` — Razorpay keys
 
-## Features in Detail
 
-### Discount Engine
-- Welcome discount (first-time users)
-- Yearly discount (yearly plans)
-- Partner discount (active duos)
-- Discounts stack, capped at `maxDiscountCapPercent` (default 40%)
 
-### Duo System
-- Invite via email or code
-- Both users must have active memberships at the same gym
-- Duo auto-activates when both memberships are active
-
-### Location & Service Area
-- Delhi NCR only
-- GPS required on first visit
-- Shows waitlist if outside service area
-
-## Development
-
-- `npm run dev` — Start dev server
-- `npm run build` — Production build
-- `npm run db:migrate` — Run migrations
-- `npm run db:seed` — Seed database
+---
 
 ## License
 
 Private — All rights reserved
+

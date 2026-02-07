@@ -106,7 +106,12 @@ function RegisterForm() {
   async function handleGoogle() {
     setLoading(true);
     const completeUrl = `/auth/complete?next=${encodeURIComponent(callbackUrl)}&role=${encodeURIComponent(role)}`;
-    await signIn("google", { callbackUrl: completeUrl });
+    try {
+      await signIn("google", { callbackUrl: completeUrl });
+    } catch {
+      setLoading(false);
+      setError("Google sign-in failed to start");
+    }
   }
 
   return (
@@ -151,7 +156,7 @@ function RegisterForm() {
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 required
-                minLength={6}
+                minLength={8}
               />
             </div>
             <div className="space-y-2">

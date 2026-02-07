@@ -15,8 +15,10 @@ export default function PaymentsPage() {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
+    let active = true;
     fetchJson<{ payments?: any[]; error?: string }>("/api/payments", { retries: 1 })
       .then((result) => {
+        if (!active) return;
         if (!result.ok) {
           setError(result.error ?? "Failed to load payments");
           setLoading(false);
@@ -26,9 +28,13 @@ export default function PaymentsPage() {
         setLoading(false);
       })
       .catch(() => {
+        if (!active) return;
         setError("Failed to load payments");
         setLoading(false);
       });
+    return () => {
+      active = false;
+    };
   }, []);
 
   if (loading) {
@@ -80,10 +86,10 @@ export default function PaymentsPage() {
                 <div>
                   <p className="font-medium">{p.gym?.name}</p>
                   <p className="text-sm text-muted-foreground">
-                    {new Date(p.createdAt).toLocaleString()} · {p.status}
+                    {new Date(p.createdAt).toLocaleString()} · {p.paymentStatus ?? p.status}
                   </p>
                 </div>
-                <p className="font-semibold text-primary">{formatPrice(p.amount)}</p>
+                <p className="font-semibold text-primary">{formatPrice(p.totalAmount ?? p.amount)}</p>
               </CardContent>
             </Card>
           ))}

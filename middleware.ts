@@ -1,5 +1,5 @@
-import { NextResponse, type NextRequest, type NextFetchEvent } from "next/server";
-import { withAuth, type NextRequestWithAuth } from "next-auth/middleware";
+import { NextResponse, type NextRequest } from "next/server";
+import { getToken } from "next-auth/jwt";
 
 type RateLimitEntry = {
   count: number;
@@ -16,12 +16,7 @@ const securityHeaders: Record<string, string> = {
   "Permissions-Policy": "geolocation=(self), camera=(), microphone=()",
 };
 
-const authMiddleware = withAuth({
-  callbacks: {
-    authorized: ({ token }) => !!token,
-  },
-  pages: { signIn: "/auth/login" },
-});
+const OWNER_ROLES = new Set(["OWNER", "ADMIN"]);
 
 function getClientIp(req: NextRequest) {
   const forwardedFor = req.headers.get("x-forwarded-for");
@@ -84,7 +79,7 @@ function applySecurityHeaders(response: NextResponse) {
   return response;
 }
 
-export default function middleware(req: NextRequest, event: NextFetchEvent) {
+export default async function middleware(req: NextRequest) {
   try {
     if (req.nextUrl.pathname.startsWith("/api")) {
       const rateLimitResponse = applyRateLimit(req);
@@ -94,8 +89,36 @@ export default function middleware(req: NextRequest, event: NextFetchEvent) {
       return applySecurityHeaders(NextResponse.next());
     }
 
-    const response = authMiddleware(req as NextRequestWithAuth, event) as NextResponse;
-    return applySecurityHeaders(response);
+    const pathname = req.nextUrl.pathname;
+    if (pathname.startsWith("/dashboard")) {
+      const token = await getToken({ req });
+      if (!token) {
+        const callbackUrl = `${pathname}${req.nextUrl.search}`;
+        const loginUrl = new URL("/auth/login", req.url);
+        loginUrl.searchParams.set("callbackUrl", callbackUrl || "/dashboard");
+        return applySecurityHeaders(NextResponse.redirect(loginUrl));
+      }
+
+      const role = (token as { role?: string }).role;
+      const isOwner = !!role && OWNER_ROLES.has(role);
+
+      if (pathname === "/dashboard" || pathname === "/dashboard/") {
+        const target = isOwner ? "/dashboard/owner" : "/dashboard/user";
+        return applySecurityHeaders(NextResponse.redirect(new URL(target, req.url)));
+      }
+
+      if (pathname.startsWith("/dashboard/owner") && !isOwner) {
+        return applySecurityHeaders(NextResponse.redirect(new URL("/dashboard/user", req.url)));
+      }
+
+      if (pathname.startsWith("/dashboard/user") && isOwner) {
+        return applySecurityHeaders(NextResponse.redirect(new URL("/dashboard/owner", req.url)));
+      }
+
+      return applySecurityHeaders(NextResponse.next());
+    }
+
+    return applySecurityHeaders(NextResponse.next());
   } catch {
     return applySecurityHeaders(NextResponse.next());
   }

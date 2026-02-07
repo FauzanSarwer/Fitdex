@@ -15,13 +15,14 @@ import {
   Sparkles,
   ArrowRight,
 } from "lucide-react";
-import { Card, CardContent, CardHeader } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { formatPrice } from "@/lib/utils";
 import type { PlanType } from "@/lib/discounts";
 import { useToast } from "@/hooks/use-toast";
 import { Skeleton } from "@/components/ui/skeleton";
+import { fetchJson } from "@/lib/client-fetch";
 
 declare global {
   interface Window {
@@ -36,6 +37,7 @@ declare global {
         razorpay_order_id: string;
         razorpay_signature: string;
       }) => void;
+      modal?: { ondismiss?: () => void };
     }) => { open: () => void };
   }
 }
@@ -63,6 +65,7 @@ function JoinContent() {
   const { toast } = useToast();
   const [gym, setGym] = useState<GymData | null>(null);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [selectedPlan, setSelectedPlan] = useState<PlanType>("MONTHLY");
   const [discountCode, setDiscountCode] = useState("");
   const [inviteCode, setInviteCode] = useState("");
@@ -73,13 +76,27 @@ function JoinContent() {
   const [creatingInvite, setCreatingInvite] = useState(false);
 
   useEffect(() => {
-    if (!gymId) return;
-    fetch(`/api/gyms/${gymId}`)
-      .then((r) => r.json())
-      .then((d) => {
-        if (d.gym) setGym(d.gym);
+    let active = true;
+    if (!gymId) return () => { active = false; };
+    fetchJson<{ gym?: GymData; error?: string }>(`/api/gyms/${gymId}`, { retries: 1 })
+      .then((result) => {
+        if (!active) return;
+        if (!result.ok || !result.data?.gym) {
+          setError(result.error ?? "Gym not found");
+          setLoading(false);
+          return;
+        }
+        setGym(result.data.gym);
+        setLoading(false);
+      })
+      .catch(() => {
+        if (!active) return;
+        setError("Failed to load gym");
         setLoading(false);
       });
+    return () => {
+      active = false;
+    };
   }, [gymId]);
 
   useEffect(() => {
@@ -114,42 +131,43 @@ function JoinContent() {
   }, [inviteCode, gymId]);
 
   useEffect(() => {
-    fetch("/api/duos")
-      .then((r) => r.json())
-      .then((d) => {
-        const active = (d.duos ?? []).find((x: any) => x.active && x.gym?.id === gymId);
+    fetchJson<{ duos?: any[] }>("/api/duos", { retries: 1 })
+      .then((result) => {
+        if (!result.ok) return;
+        const active = (result.data?.duos ?? []).find((x: any) => x.active && x.gym?.id === gymId);
         setHasDuo(!!active);
-      });
+      })
+      .catch(() => {});
   }, [gymId]);
 
   async function handleCreateInvite() {
     if (!gymId) return;
     setCreatingInvite(true);
     try {
-      const res = await fetch("/api/duos", {
+      const result = await fetchJson<{ code?: string; error?: string }>("/api/duos", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ gymId, joinTogether: true }),
+        retries: 1,
       });
-      const data = await res.json();
-      if (!res.ok) {
-        toast({ title: "Error", description: data.error ?? "Failed to create invite", variant: "destructive" });
-        setCreatingInvite(false);
+      if (!result.ok || !result.data?.code) {
+        toast({ title: "Error", description: result.error ?? "Failed to create invite", variant: "destructive" });
         return;
       }
-      setInviteCreated({ code: data.code });
+      setInviteCreated({ code: result.data.code });
       toast({ title: "Invite created", description: "Share this code with your partner" });
     } catch {
       toast({ title: "Error", variant: "destructive" });
+    } finally {
+      setCreatingInvite(false);
     }
-    setCreatingInvite(false);
   }
 
   async function handleCheckout() {
     if (!gymId || !selectedPlan) return;
     setCheckingOut(true);
     try {
-      const res = await fetch("/api/memberships", {
+      const result = await fetchJson<{ membership?: { id: string }; finalPricePaise?: number; error?: string }>("/api/memberships", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -158,49 +176,51 @@ function JoinContent() {
           discountCode: discountCode.trim() || undefined,
           inviteCode: inviteCode.trim() || undefined,
         }),
+        retries: 1,
       });
-      const data = await res.json();
-      if (!res.ok) {
+      if (!result.ok || !result.data?.membership?.id) {
         toast({
           title: "Error",
-          description: data.error ?? "Failed to create membership",
+          description: result.error ?? "Failed to create membership",
           variant: "destructive",
         });
-        setCheckingOut(false);
         return;
       }
       toast({
         title: "Redirecting to checkout",
         description: "Complete payment to activate your membership.",
       });
-      await openRazorpay(data.membership.id, data.finalPricePaise);
-      router.push("/dashboard/user/membership");
+      const paid = await openRazorpay(result.data.membership.id, result.data.finalPricePaise ?? 0);
+      if (paid) {
+        router.push("/dashboard/user/membership");
+      }
     } catch {
       toast({ title: "Something went wrong", variant: "destructive" });
+    } finally {
+      setCheckingOut(false);
     }
-    setCheckingOut(false);
   }
 
-  async function openRazorpay(membershipId: string, amountPaise: number) {
+  async function openRazorpay(membershipId: string, amountPaise: number): Promise<boolean> {
     try {
-      const orderRes = await fetch("/api/razorpay/order", {
+      const orderResult = await fetchJson<{ orderId?: string; amount?: number; currency?: string; error?: string }>("/api/razorpay/order", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ membershipId }),
+        retries: 1,
       });
-      const orderData = await orderRes.json().catch(() => ({}));
-      if (!orderRes.ok) {
+      if (!orderResult.ok || !orderResult.data?.orderId) {
         toast({
           title: "Error",
-          description: orderData.error ?? "Failed to create order",
+          description: orderResult.error ?? "Failed to create order",
           variant: "destructive",
         });
-        return;
+        return false;
       }
       const key = process.env.NEXT_PUBLIC_RAZORPAY_KEY_ID;
       if (!key || key === "XXXXX") {
         toast({ title: "Payments unavailable", description: "Missing Razorpay key", variant: "destructive" });
-        return;
+        return false;
       }
       if (typeof window.Razorpay === "undefined") {
         const script = document.createElement("script");
@@ -209,27 +229,66 @@ function JoinContent() {
         document.body.appendChild(script);
         await new Promise((r) => (script.onload = r));
       }
-      const rzp = new window.Razorpay!({
-        key,
-        amount: orderData.amount,
-        currency: orderData.currency ?? "INR",
-        name: "GYMDUO",
-        order_id: orderData.orderId,
-        handler: async () => {
-          toast({ title: "Payment successful", description: "Membership activated." });
-        },
+      return await new Promise<boolean>((resolve) => {
+        const rzp = new window.Razorpay!({
+          key,
+          amount: orderResult.data?.amount ?? amountPaise,
+          currency: orderResult.data?.currency ?? "INR",
+          name: "GYMDUO",
+          order_id: orderResult.data.orderId,
+          handler: async (res) => {
+            const verifyResult = await fetchJson<{ error?: string }>("/api/razorpay/verify", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                razorpay_order_id: res.razorpay_order_id,
+                razorpay_payment_id: res.razorpay_payment_id,
+                razorpay_signature: res.razorpay_signature,
+                membershipId,
+              }),
+              retries: 1,
+            });
+            if (verifyResult.ok) {
+              toast({ title: "Payment received", description: "Activation will complete after confirmation." });
+              resolve(true);
+            } else {
+              toast({ title: "Verification failed", description: verifyResult.error ?? "Payment failed", variant: "destructive" });
+              resolve(false);
+            }
+          },
+          modal: {
+            ondismiss: () => resolve(false),
+          },
+        });
+        rzp.open();
       });
-      rzp.open();
     } catch {
       toast({ title: "Payment failed", variant: "destructive" });
+      return false;
     }
   }
 
-  if (loading || !gym) {
+  if (loading) {
     return (
       <div className="p-6 max-w-2xl mx-auto">
         <Skeleton className="h-48 rounded-2xl mb-6" />
         <Skeleton className="h-32 rounded-2xl" />
+      </div>
+    );
+  }
+
+  if (error || !gym) {
+    return (
+      <div className="p-6 max-w-2xl mx-auto">
+        <Card className="glass-card p-10 text-center">
+          <CardHeader>
+            <CardTitle>Unable to load gym</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            <p className="text-sm text-muted-foreground">{error ?? "Please try again."}</p>
+            <Button onClick={() => window.location.reload()}>Retry</Button>
+          </CardContent>
+        </Card>
       </div>
     );
   }
