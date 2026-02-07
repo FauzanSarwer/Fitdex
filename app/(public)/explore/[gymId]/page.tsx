@@ -2,21 +2,24 @@
 
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { useParams } from "next/navigation";
+import { useParams, useRouter } from "next/navigation";
 import { useSession } from "next-auth/react";
 import { motion } from "framer-motion";
 import {
   ArrowRight,
+  Facebook,
+  Instagram,
   MapPin,
   Sparkles,
   ShieldCheck,
   Users,
+  Youtube,
   Clock,
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
-import { formatPrice } from "@/lib/utils";
+import { buildGymSlug, formatPrice, parseGymIdFromSlug } from "@/lib/utils";
 import { getGymOpenStatus } from "@/lib/gym-hours";
 import { fetchJson } from "@/lib/client-fetch";
 
@@ -24,7 +27,6 @@ interface GymData {
   id: string;
   name: string;
   address: string;
-  latitude: number;
   longitude: number;
   verificationStatus: string;
   coverImageUrl: string | null;
@@ -43,6 +45,9 @@ interface GymData {
   yearlyDiscountValue: number;
   welcomeDiscountType: "PERCENT" | "FLAT";
   welcomeDiscountValue: number;
+  instagramUrl?: string | null;
+  facebookUrl?: string | null;
+  youtubeUrl?: string | null;
   yearlySavePercent: number;
   quarterlySavePercent: number;
   featuredUntil?: string | Date | null;
@@ -51,7 +56,9 @@ interface GymData {
 
 export default function GymProfilePage() {
   const params = useParams();
-  const gymId = params.gymId as string;
+  const router = useRouter();
+  const slug = params.gymId as string;
+  const gymId = parseGymIdFromSlug(slug);
   const { status } = useSession();
   const [gym, setGym] = useState<GymData | null>(null);
   const [loading, setLoading] = useState(true);
@@ -82,6 +89,15 @@ export default function GymProfilePage() {
       active = false;
     };
   }, [gymId]);
+
+  useEffect(() => {
+    if (!gym) return;
+    const expected = buildGymSlug(gym.name, gym.id);
+    if (slug !== expected) {
+      router.replace(`/explore/${expected}`);
+    }
+  }, [gym, slug, router]);
+
 
   useEffect(() => {
     if (!gymId) return;
@@ -234,6 +250,17 @@ export default function GymProfilePage() {
                     {saved ? "Saved" : "Save"}
                   </Button>
                 )}
+                <Button asChild size="lg" variant="secondary">
+                  <Link
+                    href={
+                      status === "authenticated"
+                        ? "/dashboard/user/duo"
+                        : `/auth/login?callbackUrl=${encodeURIComponent("/dashboard/user/duo")}`
+                    }
+                  >
+                    Invite partner
+                  </Link>
+                </Button>
                 {isVerified ? (
                   <Button asChild size="lg">
                     <Link href={`/dashboard/user/join/${gym.id}`}>
@@ -287,6 +314,29 @@ export default function GymProfilePage() {
           </Card>
         )}
 
+        <Card className="glass-card border-primary/30 bg-primary/10">
+          <CardHeader>
+            <CardTitle className="text-lg">Duo discount highlight</CardTitle>
+          </CardHeader>
+          <CardContent className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+            <div className="text-sm text-muted-foreground">
+              Save up to <span className="font-semibold text-foreground">{gym.partnerDiscountPercent}%</span> when you invite a
+              partner. Duo discounts are one of the most popular ways to join.
+            </div>
+            <Button asChild variant="secondary">
+              <Link
+                href={
+                  status === "authenticated"
+                    ? "/dashboard/user/duo"
+                    : `/auth/login?callbackUrl=${encodeURIComponent("/dashboard/user/duo")}`
+                }
+              >
+                Invite partner
+              </Link>
+            </Button>
+          </CardContent>
+        </Card>
+
         <div className="grid gap-4 md:grid-cols-3">
           {pricing.map((p) => (
             <Card key={p.label} className="glass-card hover:border-primary/30 transition-all duration-300 hover:-translate-y-1">
@@ -313,6 +363,49 @@ export default function GymProfilePage() {
             <div>Quarterly discount: up to {formatDiscount(gym.quarterlyDiscountType, gym.quarterlyDiscountValue)}</div>
           </CardContent>
         </Card>
+
+        {(gym.instagramUrl || gym.facebookUrl || gym.youtubeUrl) && (
+          <Card className="glass-card">
+            <CardHeader>
+              <CardTitle>Social profiles</CardTitle>
+            </CardHeader>
+            <CardContent className="flex flex-wrap gap-3 text-sm">
+              {gym.instagramUrl && (
+                <a
+                  href={gym.instagramUrl}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="inline-flex items-center gap-2 rounded-full border border-white/10 px-3 py-1 text-muted-foreground hover:text-foreground"
+                >
+                  <Instagram className="h-4 w-4" />
+                  Instagram
+                </a>
+              )}
+              {gym.facebookUrl && (
+                <a
+                  href={gym.facebookUrl}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="inline-flex items-center gap-2 rounded-full border border-white/10 px-3 py-1 text-muted-foreground hover:text-foreground"
+                >
+                  <Facebook className="h-4 w-4" />
+                  Facebook
+                </a>
+              )}
+              {gym.youtubeUrl && (
+                <a
+                  href={gym.youtubeUrl}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="inline-flex items-center gap-2 rounded-full border border-white/10 px-3 py-1 text-muted-foreground hover:text-foreground"
+                >
+                  <Youtube className="h-4 w-4" />
+                  YouTube
+                </a>
+              )}
+            </CardContent>
+          </Card>
+        )}
 
         <div className="text-center">
           {isVerified ? (

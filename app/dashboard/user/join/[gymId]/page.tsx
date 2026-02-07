@@ -232,7 +232,7 @@ function JoinContent() {
         orderId: orderResult.data.orderId,
         amount: orderResult.data?.amount ?? amountPaise,
         currency: orderResult.data?.currency ?? "INR",
-        name: "GYMDUO",
+        name: "FITDEX",
         onSuccess: async (res) => {
           const verifyResult = await fetchJson<{ error?: string }>("/api/razorpay/verify", {
             method: "POST",
@@ -495,7 +495,7 @@ function JoinContent() {
                           size="sm"
                           onClick={() => {
                             const link = `${window.location.origin}/invite/${inviteCreated.code}`;
-                            const text = `Join me at GymDuo and unlock partner discount: ${link}`;
+                            const text = `Join me at FitDex and unlock partner discount: ${link}`;
                             window.open(`https://wa.me/?text=${encodeURIComponent(text)}`, "_blank");
                           }}
                         >

@@ -9,7 +9,7 @@ import { MapPin, CreditCard, Users, Loader2, Sparkles, Trophy, Bookmark } from "
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { MapView } from "@/components/maps/MapView";
-import { formatPrice } from "@/lib/utils";
+import { buildGymSlug, formatPrice } from "@/lib/utils";
 import { Skeleton } from "@/components/ui/skeleton";
 import { fetchJson } from "@/lib/client-fetch";
 
@@ -174,7 +174,19 @@ function UserDashboardContent() {
           <MapView
             latitude={location.latitude}
             longitude={location.longitude}
-            gyms={activeMembership ? [{ id: activeMembership.gym.id, name: activeMembership.gym.name, latitude: activeMembership.gym.latitude, longitude: activeMembership.gym.longitude }] : []}
+            gyms={
+              activeMembership
+                ? [
+                    {
+                      id: activeMembership.gym.id,
+                      name: activeMembership.gym.name,
+                      latitude: activeMembership.gym.latitude,
+                      longitude: activeMembership.gym.longitude,
+                      url: `/explore/${buildGymSlug(activeMembership.gym.name, activeMembership.gym.id)}`,
+                    },
+                  ]
+                : []
+            }
             className="w-full h-full"
           />
         </motion.div>
@@ -289,7 +301,9 @@ function UserDashboardContent() {
                           <p className="text-sm text-muted-foreground">{s.gym?.address}</p>
                         </div>
                         <Button size="sm" variant="outline" asChild>
-                          <Link href={`/explore/${s.gym?.id}`}>View</Link>
+                          <Link href={s.gym?.id ? `/explore/${buildGymSlug(s.gym?.name ?? "gym", s.gym.id)}` : "/explore"}>
+                            View
+                          </Link>
                         </Button>
                       </div>
                     ))}

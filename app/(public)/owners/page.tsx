@@ -64,10 +64,10 @@ const PLANS = [
   },
   {
     name: "Feature your gym",
-    price: 999,
-    period: "month",
+    price: 99,
+    period: "3 days",
     features: ["Featured badge", "Top placement in Explore", "Boosted discovery for new members"],
-    cta: "Feature now",
+    cta: "Boost for 3 days",
   },
 ];
 
@@ -87,7 +87,7 @@ export default function OwnersPage() {
           For Gym Owners
         </div>
         <h1 className="text-4xl md:text-5xl font-bold tracking-tight">
-          List your gym on GymDuo
+          List your gym on FitDex
         </h1>
         <p className="text-muted-foreground mt-4 text-lg">
           Reach more members, get analytics, and manage everything in one place. Join hundreds of gyms already on the platform.
@@ -101,7 +101,7 @@ export default function OwnersPage() {
         transition={{ delay: 0.1 }}
         className="mb-20"
       >
-        <h2 className="text-2xl font-bold text-center mb-10">Why list on GymDuo?</h2>
+        <h2 className="text-2xl font-bold text-center mb-10">Why list on FitDex?</h2>
         <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-6">
           {BENEFITS.map((b, i) => (
             <Card key={i} className="glass-card border-white/10">

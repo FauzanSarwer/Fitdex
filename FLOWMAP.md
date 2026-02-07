@@ -1,4 +1,4 @@
-# GymDuo End-to-End Flow Map
+# FitDex End-to-End Flow Map
 
 ## 1. Authentication & Session Flows
 

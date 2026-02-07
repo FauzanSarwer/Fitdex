@@ -26,7 +26,7 @@ export function Footer() {
               <Dumbbell className="h-5 w-5 text-white" />
             </div>
             <div>
-              <div className="text-lg font-semibold">GYMDUO</div>
+              <div className="text-lg font-semibold">FITDEX</div>
               <div className="text-sm text-muted-foreground">District of Gyms</div>
             </div>
           </div>
@@ -51,7 +51,7 @@ export function Footer() {
           </div>
         </motion.div>
         <div className="mt-8 text-xs text-muted-foreground">
-          © {new Date().getFullYear()} GymDuo. All rights reserved.
+          © {new Date().getFullYear()} FitDex. All rights reserved.
         </div>
       </div>
     </footer>

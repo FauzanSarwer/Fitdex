@@ -56,7 +56,7 @@ export function LocationGate({ children }: { children: React.ReactNode }) {
               serviceable: true,
             });
             try {
-              localStorage.setItem("gymduo_location", JSON.stringify({
+              localStorage.setItem("fitdex_location", JSON.stringify({
                 latitude: lat,
                 longitude: lng,
                 serviceable: true,
@@ -76,7 +76,7 @@ export function LocationGate({ children }: { children: React.ReactNode }) {
             };
             setLocation(loc);
             try {
-              localStorage.setItem("gymduo_location", JSON.stringify({
+              localStorage.setItem("fitdex_location", JSON.stringify({
                 latitude: lat,
                 longitude: lng,
                 city: data.city,
@@ -93,7 +93,7 @@ export function LocationGate({ children }: { children: React.ReactNode }) {
             };
             setLocation(loc);
             try {
-              localStorage.setItem("gymduo_location", JSON.stringify({
+              localStorage.setItem("fitdex_location", JSON.stringify({
                 latitude: lat,
                 longitude: lng,
                 city: data.city,
@@ -110,7 +110,7 @@ export function LocationGate({ children }: { children: React.ReactNode }) {
             serviceable: true,
           });
           try {
-            localStorage.setItem("gymduo_location", JSON.stringify({
+            localStorage.setItem("fitdex_location", JSON.stringify({
               latitude: lat,
               longitude: lng,
               serviceable: true,
@@ -132,13 +132,13 @@ export function LocationGate({ children }: { children: React.ReactNode }) {
 
     // Cached location — use it and skip request
     try {
-      const override = localStorage.getItem("gymduo_location_override");
+      const override = localStorage.getItem("fitdex_location_override");
       if (override === "true") {
         setLocation({ status: "ready", serviceable: true });
         hasRequestedRef.current = true;
         return;
       }
-      const cached = localStorage.getItem("gymduo_location");
+      const cached = localStorage.getItem("fitdex_location");
       if (cached) {
         const parsed = JSON.parse(cached);
         if (parsed.latitude && parsed.longitude && parsed.serviceable) {
@@ -170,7 +170,7 @@ export function LocationGate({ children }: { children: React.ReactNode }) {
             };
             setLocation(loc);
             try {
-              localStorage.setItem("gymduo_location", JSON.stringify({
+              localStorage.setItem("fitdex_location", JSON.stringify({
                 latitude: loc.latitude,
                 longitude: loc.longitude,
                 city: loc.city,
@@ -216,7 +216,7 @@ export function LocationGate({ children }: { children: React.ReactNode }) {
                 Location required
               </CardTitle>
               <CardDescription>
-                GymDuo needs your location to show gyms near you. Please enable location access and try again.
+                FitDex needs your location to show gyms near you. Please enable location access and try again.
               </CardDescription>
             </CardHeader>
             <CardContent>
@@ -243,7 +243,7 @@ export function LocationGate({ children }: { children: React.ReactNode }) {
             <CardHeader>
               <CardTitle className="text-2xl">Currently not serviceable</CardTitle>
               <CardDescription>
-                GymDuo is available only in Delhi / Delhi NCR. We’re expanding soon.
+                FitDex is available only in Delhi / Delhi NCR. We’re expanding soon.
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
@@ -263,7 +263,7 @@ export function LocationGate({ children }: { children: React.ReactNode }) {
                   onClick={() => {
                     if (waitlistEmail) {
                       try {
-                        localStorage.setItem("gymduo_waitlist", waitlistEmail);
+                        localStorage.setItem("fitdex_waitlist", waitlistEmail);
                       } catch {}
                     }
                   }}
@@ -274,7 +274,7 @@ export function LocationGate({ children }: { children: React.ReactNode }) {
               <Button
                 onClick={() => {
                   try {
-                    localStorage.setItem("gymduo_location_override", "true");
+                    localStorage.setItem("fitdex_location_override", "true");
                   } catch {}
                   setLocation({ status: "ready", serviceable: true });
                 }}

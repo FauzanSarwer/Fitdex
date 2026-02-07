@@ -61,7 +61,7 @@ export async function openRazorpayCheckout(options: CheckoutOptions): Promise<{ 
         key,
         amount: options.amount,
         currency: options.currency ?? "INR",
-        name: options.name ?? "GYMDUO",
+        name: options.name ?? "FITDEX",
         order_id: options.orderId,
         handler: async (res) => {
           await options.onSuccess(res);

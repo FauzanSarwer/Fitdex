@@ -274,7 +274,7 @@ export default function OwnerDiscountsPage() {
             <CardHeader>
               <CardTitle>Discount configuration</CardTitle>
               <CardDescription>
-                Discounts follow GymDuo stacking rules. Welcome cannot stack. Duo stacks only with quarterly/yearly. Promo stacks with quarterly/yearly.
+                Discounts follow FitDex stacking rules. Welcome cannot stack. Duo stacks only with quarterly/yearly. Promo stacks with quarterly/yearly.
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">

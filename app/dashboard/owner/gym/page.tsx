@@ -23,6 +23,9 @@ export default function OwnerGymPage() {
     name: "",
     address: "",
     coverImageUrl: "",
+    instagramUrl: "",
+    facebookUrl: "",
+    youtubeUrl: "",
     openTime: "",
     closeTime: "",
     openDays: ["MON", "TUE", "WED", "THU", "FRI", "SAT"] as string[],
@@ -76,6 +79,9 @@ export default function OwnerGymPage() {
           name: form.name,
           address: form.address,
           coverImageUrl: form.coverImageUrl,
+          instagramUrl: form.instagramUrl,
+          facebookUrl: form.facebookUrl,
+          youtubeUrl: form.youtubeUrl,
           openTime: form.openTime || null,
           closeTime: form.closeTime || null,
           openDays: form.openDays.length > 0 ? form.openDays.join(",") : null,
@@ -100,6 +106,9 @@ export default function OwnerGymPage() {
         name: "",
         address: "",
         coverImageUrl: "",
+        instagramUrl: "",
+        facebookUrl: "",
+        youtubeUrl: "",
         openTime: "",
         closeTime: "",
         openDays: ["MON", "TUE", "WED", "THU", "FRI", "SAT"],
@@ -243,6 +252,32 @@ export default function OwnerGymPage() {
                   </div>
                 )}
                 {uploading && <p className="text-xs text-muted-foreground">Uploading image…</p>}
+              </div>
+              <div className="md:col-span-2 grid gap-4 md:grid-cols-3">
+                <div className="space-y-2">
+                  <Label>Instagram (optional)</Label>
+                  <Input
+                    value={form.instagramUrl}
+                    onChange={(e) => setForm((p) => ({ ...p, instagramUrl: e.target.value }))}
+                    placeholder="https://instagram.com/yourgym"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label>Facebook (optional)</Label>
+                  <Input
+                    value={form.facebookUrl}
+                    onChange={(e) => setForm((p) => ({ ...p, facebookUrl: e.target.value }))}
+                    placeholder="https://facebook.com/yourgym"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label>YouTube (optional)</Label>
+                  <Input
+                    value={form.youtubeUrl}
+                    onChange={(e) => setForm((p) => ({ ...p, youtubeUrl: e.target.value }))}
+                    placeholder="https://youtube.com/@yourgym"
+                  />
+                </div>
               </div>
               <div className="space-y-2">
                 <Label>Opening time</Label>
@@ -398,7 +433,7 @@ export default function OwnerGymPage() {
                           orderId: result.data?.orderId ?? "",
                           amount: result.data?.amount ?? 0,
                           currency: result.data?.currency ?? "INR",
-                          name: "GYMDUO",
+                          name: "FITDEX",
                           onSuccess: async (res) => {
                             const verifyResult = await fetchJson<{
                               featuredUntil?: string;
@@ -485,7 +520,7 @@ export default function OwnerGymPage() {
                           orderId: result.data?.orderId ?? "",
                           amount: result.data?.amount ?? 0,
                           currency: result.data?.currency ?? "INR",
-                          name: "GYMDUO",
+                          name: "FITDEX",
                           onSuccess: async (res) => {
                             const verifyResult = await fetchJson<{
                               verifiedUntil?: string;

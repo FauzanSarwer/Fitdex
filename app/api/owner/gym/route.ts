@@ -55,6 +55,9 @@ export async function POST(req: Request) {
     welcomeDiscountType?: "PERCENT" | "FLAT";
     welcomeDiscountValue?: number;
     coverImageUrl?: string | null;
+    instagramUrl?: string | null;
+    facebookUrl?: string | null;
+    youtubeUrl?: string | null;
   }>(req);
   if (!parsed.ok) {
     return jsonError("Invalid JSON body", 400);
@@ -79,6 +82,9 @@ export async function POST(req: Request) {
     welcomeDiscountType,
     welcomeDiscountValue,
     coverImageUrl,
+    instagramUrl,
+    facebookUrl,
+    youtubeUrl,
   } = parsed.data;
   if (!name || !address || monthlyPrice == null || yearlyPrice == null || !coverImageUrl) {
     return jsonError(
@@ -119,6 +125,9 @@ export async function POST(req: Request) {
         welcomeDiscountType: welcomeDiscountType ?? "PERCENT",
         welcomeDiscountValue: Number(welcomeDiscountValue ?? 10),
         coverImageUrl: coverImageUrl?.trim() || null,
+        instagramUrl: instagramUrl?.trim() || null,
+        facebookUrl: facebookUrl?.trim() || null,
+        youtubeUrl: youtubeUrl?.trim() || null,
       },
     });
     return NextResponse.json({ gym });
@@ -155,6 +164,9 @@ export async function PATCH(req: Request) {
     welcomeDiscountType?: "PERCENT" | "FLAT";
     welcomeDiscountValue?: number;
     coverImageUrl?: string | null;
+    instagramUrl?: string | null;
+    facebookUrl?: string | null;
+    youtubeUrl?: string | null;
   }>(req);
   if (!parsed.ok) {
     return jsonError("Invalid JSON body", 400);
@@ -197,6 +209,9 @@ export async function PATCH(req: Request) {
     if (data.welcomeDiscountType != null) update.welcomeDiscountType = data.welcomeDiscountType;
     if (data.welcomeDiscountValue != null) update.welcomeDiscountValue = data.welcomeDiscountValue;
     if (data.coverImageUrl !== undefined) update.coverImageUrl = data.coverImageUrl;
+    if (data.instagramUrl !== undefined) update.instagramUrl = data.instagramUrl?.trim() || null;
+    if (data.facebookUrl !== undefined) update.facebookUrl = data.facebookUrl?.trim() || null;
+    if (data.youtubeUrl !== undefined) update.youtubeUrl = data.youtubeUrl?.trim() || null;
     const gym = await prisma.gym.update({
       where: { id: gymId },
       data: update,

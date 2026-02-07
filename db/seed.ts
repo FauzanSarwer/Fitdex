@@ -51,13 +51,13 @@ async function main() {
     return;
   }
 
-  const adminEmail = "admin@gymduo.com";
+  const adminEmail = "admin@fitdex.com";
   let admin = await prisma.user.findUnique({ where: { email: adminEmail } });
   if (!admin) {
     admin = await prisma.user.create({
       data: {
         email: adminEmail,
-        name: "GYMDUO Admin",
+        name: "FitDex Admin",
         role: "ADMIN",
       },
     });

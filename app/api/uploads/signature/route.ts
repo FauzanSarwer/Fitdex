@@ -20,7 +20,7 @@ export async function GET() {
   }
 
   const timestamp = Math.round(Date.now() / 1000);
-  const folder = "gymduo/gyms";
+  const folder = "fitdex/gyms";
 
   const signature = cloudinary.utils.api_sign_request(
     { timestamp, folder },

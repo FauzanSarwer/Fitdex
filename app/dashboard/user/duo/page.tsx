@@ -224,7 +224,7 @@ export default function DuoPage() {
                     variant="outline"
                     onClick={() => {
                       const link = `${window.location.origin}/invite/${lastInviteCode}`;
-                      const text = `Join me at GymDuo and unlock partner discount: ${link}`;
+                      const text = `Join me at FitDex and unlock partner discount: ${link}`;
                       window.open(`https://wa.me/?text=${encodeURIComponent(text)}`, "_blank");
                     }}
                   >

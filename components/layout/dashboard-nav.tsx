@@ -14,6 +14,8 @@ import {
   Percent,
   Dumbbell,
   Compass,
+  ShieldCheck,
+  Bell,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -28,16 +30,49 @@ const USER_LINKS = [
 const OWNER_LINKS = [
   { href: "/dashboard/owner", label: "Overview", icon: LayoutDashboard },
   { href: "/dashboard/owner/gym", label: "Gym", icon: MapPin },
-  { href: "/dashboard/owner/explore", label: "Explore", icon: Compass },
+  { href: "/dashboard/owner/explore", label: "Owner explore", icon: Compass },
   { href: "/dashboard/owner/members", label: "Members", icon: Users },
   { href: "/dashboard/owner/analytics", label: "Analytics", icon: BarChart3 },
   { href: "/dashboard/owner/discounts", label: "Discounts", icon: Percent },
   { href: "/dashboard/owner/settings", label: "Settings", icon: Settings },
 ];
 
-export function DashboardNav({ role, isOwner }: { role: string; isOwner?: boolean }) {
+const ADMIN_LINKS = [
+  { href: "/dashboard/admin", label: "Overview", icon: LayoutDashboard },
+  { href: "/dashboard/admin/verification", label: "Verification", icon: ShieldCheck },
+  { href: "/dashboard/admin/gyms", label: "Gyms", icon: MapPin },
+  { href: "/dashboard/admin/users", label: "Users", icon: Users },
+  { href: "/dashboard/admin/memberships", label: "Memberships", icon: CreditCard },
+  { href: "/dashboard/admin/transactions", label: "Transactions", icon: BarChart3 },
+  { href: "/dashboard/admin/payments", label: "Payments", icon: CreditCard },
+  { href: "/dashboard/admin/duos", label: "Duos", icon: Users },
+  { href: "/dashboard/admin/invites", label: "Invites", icon: Users },
+  { href: "/dashboard/admin/notifications", label: "Notifications", icon: Bell },
+  { href: "/dashboard/admin/discounts", label: "Discounts", icon: Percent },
+  { href: "/dashboard/admin/settings", label: "Settings", icon: Settings },
+];
+
+export function DashboardNav({
+  role,
+  isOwner,
+  showVerification,
+}: {
+  role: string;
+  isOwner?: boolean;
+  showVerification?: boolean;
+}) {
   const pathname = usePathname();
-  const links = isOwner ? OWNER_LINKS : USER_LINKS;
+  const links = role === "ADMIN"
+    ? ADMIN_LINKS
+    : isOwner
+      ? [
+          ...OWNER_LINKS.slice(0, 2),
+          ...(showVerification
+            ? [{ href: "/dashboard/owner/verification", label: "Verification", icon: ShieldCheck }]
+            : []),
+          ...OWNER_LINKS.slice(2),
+        ]
+      : USER_LINKS;
 
   return (
     <>
@@ -47,15 +82,15 @@ export function DashboardNav({ role, isOwner }: { role: string; isOwner?: boolea
             <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-br from-primary to-accent shadow-glow-sm">
               <Dumbbell className="h-5 w-5 text-white" />
             </div>
-            <span className="text-lg font-bold">GYMDUO</span>
+            <span className="text-lg font-bold">FITDEX</span>
           </Link>
         </div>
       </header>
       <aside className="fixed left-0 top-0 z-50 hidden h-full w-56 flex-col border-r border-white/10 bg-background/95 backdrop-blur md:flex">
         <div className="flex h-16 items-center border-b border-white/10 px-4">
-          <Link href={isOwner ? "/dashboard/owner" : "/dashboard/user"} className="flex items-center gap-2">
+          <Link href={role === "ADMIN" ? "/dashboard/admin" : isOwner ? "/dashboard/owner" : "/dashboard/user"} className="flex items-center gap-2">
             <User className="h-5 w-5 text-primary" />
-            <span className="font-semibold">{isOwner ? "Owner" : "Member"}</span>
+            <span className="font-semibold">{role === "ADMIN" ? "Admin" : isOwner ? "Owner" : "Member"}</span>
           </Link>
         </div>
         <nav className="flex-1 space-y-1 p-2">

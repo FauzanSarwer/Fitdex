@@ -30,7 +30,7 @@ export function Header() {
           <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-br from-primary to-accent shadow-glow-sm">
             <Dumbbell className="h-5 w-5 text-white" />
           </div>
-          <span className="text-xl font-bold tracking-tight">GYMDUO</span>
+          <span className="text-xl font-bold tracking-tight">FITDEX</span>
         </Link>
         <nav className="hidden md:flex items-center gap-4">
           <Link

@@ -1,4 +1,4 @@
-# GymDuo Production Sanity Checklist
+# FitDex Production Sanity Checklist
 
 ## 1. Fresh Install
 - [ ] Clone repo, install dependencies, set up .env, run migrations/seed

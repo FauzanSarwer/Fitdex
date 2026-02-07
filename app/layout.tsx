@@ -3,7 +3,7 @@ import "./globals.css";
 import { Providers } from "@/components/providers";
 
 export const metadata: Metadata = {
-  title: "GYMDUO — District of Gyms",
+  title: "FITDEX — District of Gyms",
   description: "Premium gym discovery and duo accountability in Delhi",
 };
 

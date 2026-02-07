@@ -6,7 +6,7 @@ import { cn } from "@/lib/utils";
 interface MapViewProps {
   latitude: number;
   longitude: number;
-  gyms?: Array<{ id: string; name: string; latitude: number; longitude: number }>;
+  gyms?: Array<{ id: string; name: string; latitude: number; longitude: number; url?: string }>;
   className?: string;
   zoom?: number;
 }
@@ -103,7 +103,11 @@ export function MapView({ latitude, longitude, gyms = [], className, zoom = 13 }
         }),
       })
         .addTo(markersRef.current)
-        .bindPopup(gym.name);
+        .bindPopup(
+          gym.url
+            ? `<div style="display:flex;flex-direction:column;gap:4px"><strong>${gym.name}</strong><a href="${gym.url}" style="color:#22c55e;text-decoration:underline" target="_blank" rel="noreferrer">View gym</a></div>`
+            : gym.name
+        );
     });
   };
 

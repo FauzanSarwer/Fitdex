@@ -1,11 +1,11 @@
 
-# GYMDUO — Find Your Gym, Bring Your Duo
+# FITDEX — Find Your Gym, Bring Your Duo
 
-Welcome to GymDuo — the easiest way to discover gyms, join with a friend, and unlock exclusive duo discounts in Delhi NCR. Whether you're a fitness enthusiast or a gym owner, GymDuo makes memberships, payments, and partnerships effortless.
+Welcome to FitDex — the easiest way to discover gyms, join with a friend, and unlock exclusive duo discounts in Delhi NCR. Whether you're a fitness enthusiast or a gym owner, FitDex makes memberships, payments, and partnerships effortless.
 
 
 
-## Why GymDuo?
+## Why FitDex?
 
 - 🗺️ **Find Gyms Near You:** Instantly browse gyms on a map, see real prices, and check reviews.
 - 👥 **Bring a Friend, Save More:** Invite a partner and both get duo discounts on memberships.
@@ -24,7 +24,7 @@ Welcome to GymDuo — the easiest way to discover gyms, join with a friend, and 
 
 ## How It Works
 
-1. **Explore Gyms:** Open GymDuo and browse gyms on the map. Filter by location, price, or features.
+1. **Explore Gyms:** Open FitDex and browse gyms on the map. Filter by location, price, or features.
 2. **Register & Login:** Create your account in seconds—use email or Google.
 3. **Invite a Friend:** Want a duo discount? Invite your workout partner to join the same gym.
 4. **Pay Online:** Choose your plan and pay securely. Both you and your duo get instant access.
@@ -53,7 +53,7 @@ A: Click "List Your Gym" on the site, register as an owner, and follow the steps
 
 ## Support
 
-Need help? Have feedback? Reach out via the contact form on the website or email support@gymduo.com.
+Need help? Have feedback? Reach out via the contact form on the website or email support@fitdex.com.
 
 ## Environment Variables
 

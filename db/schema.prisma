@@ -19,6 +19,12 @@ model User {
   longitude     Float?
   city          String?
   state         String?
+  phoneNumber   String?
+  billingEmail  String?
+  timezone      String?
+  notifyMemberships Boolean @default(true)
+  notifyPromos  Boolean  @default(true)
+  notifyDuo     Boolean  @default(true)
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
 
@@ -117,6 +123,9 @@ model Gym {
   welcomeDiscountType    String   @default("PERCENT") // PERCENT | FLAT
   welcomeDiscountValue   Int      @default(10)        // percent or paise (if FLAT)
   coverImageUrl          String?  // optional gym photo
+  instagramUrl           String?
+  facebookUrl            String?
+  youtubeUrl             String?
   featuredUntil          DateTime?
   verifiedUntil          DateTime?
   createdAt              DateTime @default(now())

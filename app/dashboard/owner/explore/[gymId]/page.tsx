@@ -4,14 +4,15 @@ import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { motion } from "framer-motion";
-import { ArrowLeft, Clock, MapPin, ShieldCheck, Sparkles, Users } from "lucide-react";
+import { ArrowLeft, Clock, Loader2, MapPin, ShieldCheck, Sparkles, Users } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
 import { fetchJson } from "@/lib/client-fetch";
-import { formatPrice } from "@/lib/utils";
+import { isPaymentsEnabled, openRazorpayCheckout } from "@/lib/razorpay-checkout";
+import { buildGymSlug, formatPrice } from "@/lib/utils";
 import { getGymOpenStatus } from "@/lib/gym-hours";
 import { useToast } from "@/hooks/use-toast";
 
@@ -35,6 +36,9 @@ interface GymData {
   yearlyDiscountValue: number;
   welcomeDiscountType: "PERCENT" | "FLAT";
   welcomeDiscountValue: number;
+  instagramUrl?: string | null;
+  facebookUrl?: string | null;
+  youtubeUrl?: string | null;
   featuredUntil?: string | Date | null;
   verifiedUntil?: string | Date | null;
   hasPremiumAccess?: boolean;
@@ -53,10 +57,15 @@ export default function OwnerGymProfilePage() {
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [uploading, setUploading] = useState(false);
+  const [featuring, setFeaturing] = useState(false);
+  const paymentsEnabled = isPaymentsEnabled();
   const [editForm, setEditForm] = useState({
     name: "",
     address: "",
     coverImageUrl: "",
+    instagramUrl: "",
+    facebookUrl: "",
+    youtubeUrl: "",
     openTime: "",
     closeTime: "",
     openDays: ["MON", "TUE", "WED", "THU", "FRI", "SAT"] as string[],
@@ -93,6 +102,9 @@ export default function OwnerGymProfilePage() {
           name: found.name ?? "",
           address: found.address ?? "",
           coverImageUrl: found.coverImageUrl ?? "",
+          instagramUrl: found.instagramUrl ?? "",
+          facebookUrl: found.facebookUrl ?? "",
+          youtubeUrl: found.youtubeUrl ?? "",
           openTime: found.openTime ?? "",
           closeTime: found.closeTime ?? "",
           openDays: found.openDays ? String(found.openDays).split(",") : ["MON", "TUE", "WED", "THU", "FRI", "SAT"],
@@ -166,6 +178,9 @@ export default function OwnerGymProfilePage() {
           name: editForm.name,
           address: editForm.address,
           coverImageUrl: editForm.coverImageUrl,
+          instagramUrl: editForm.instagramUrl,
+          facebookUrl: editForm.facebookUrl,
+          youtubeUrl: editForm.youtubeUrl,
           openTime: editForm.openTime || null,
           closeTime: editForm.closeTime || null,
           openDays: editForm.openDays.length > 0 ? editForm.openDays.join(",") : null,
@@ -238,7 +253,81 @@ export default function OwnerGymProfilePage() {
           </Button>
           <div className="flex flex-wrap gap-2">
             <Button asChild variant="outline">
-              <Link href={`/explore/${gym.id}`}>See customer preview</Link>
+              <Link href={`/explore/${buildGymSlug(gym.name, gym.id)}`}>See customer preview</Link>
+            </Button>
+            <Button
+              variant="secondary"
+              disabled={!paymentsEnabled || featuring}
+              onClick={async () => {
+                if (!paymentsEnabled) {
+                  toast({ title: "Payments not available yet", description: "Please try again later." });
+                  return;
+                }
+                setFeaturing(true);
+                try {
+                  const result = await fetchJson<{
+                    amount: number;
+                    currency?: string;
+                    orderId: string;
+                    error?: string;
+                  }>("/api/owner/gym/feature", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ gymId: gym.id }),
+                    retries: 1,
+                  });
+                  if (!result.ok) {
+                    toast({
+                      title: "Error",
+                      description: result.error ?? "Failed to start payment",
+                      variant: "destructive",
+                    });
+                    setFeaturing(false);
+                    return;
+                  }
+                  const checkout = await openRazorpayCheckout({
+                    orderId: result.data?.orderId ?? "",
+                    amount: result.data?.amount ?? 0,
+                    currency: result.data?.currency ?? "INR",
+                    name: "FITDEX",
+                    onSuccess: async (res) => {
+                      const verifyResult = await fetchJson<{
+                        featuredUntil?: string;
+                        error?: string;
+                      }>("/api/owner/gym/feature/verify", {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({
+                          gymId: gym.id,
+                          orderId: res.razorpay_order_id,
+                          paymentId: res.razorpay_payment_id,
+                          signature: res.razorpay_signature,
+                        }),
+                        retries: 1,
+                      });
+                      if (verifyResult.ok) {
+                        toast({ title: "Boost activated", description: "Your gym is featured for 3 days." });
+                        setGym((prev) => (prev ? { ...prev, featuredUntil: verifyResult.data?.featuredUntil } : prev));
+                      } else {
+                        toast({
+                          title: "Verification failed",
+                          description: verifyResult.error ?? "Payment failed",
+                          variant: "destructive",
+                        });
+                      }
+                    },
+                  });
+                  if (!checkout.ok && checkout.error && checkout.error !== "DISMISSED") {
+                    const message = checkout.error === "PAYMENTS_DISABLED" ? "Payments not available yet" : checkout.error;
+                    toast({ title: "Payments unavailable", description: message, variant: "destructive" });
+                  }
+                } catch {
+                  toast({ title: "Error", variant: "destructive" });
+                }
+                setFeaturing(false);
+              }}
+            >
+              {featuring ? <Loader2 className="h-4 w-4 animate-spin" /> : "Boost ₹99 / 3 days"}
             </Button>
           </div>
         </div>
@@ -282,7 +371,7 @@ export default function OwnerGymProfilePage() {
               </div>
               <div className="flex flex-col sm:flex-row gap-3">
                 <Button size="lg" variant="outline" asChild>
-                  <Link href={`/explore/${gym.id}`}>Customer preview</Link>
+                  <Link href={`/explore/${buildGymSlug(gym.name, gym.id)}`}>Customer preview</Link>
                 </Button>
               </div>
             </div>
@@ -447,6 +536,32 @@ export default function OwnerGymProfilePage() {
                   <img src={editForm.coverImageUrl} alt="Gym" className="h-28 w-full rounded-lg object-cover" />
                 )}
                 {uploading && <p className="text-xs text-muted-foreground">Uploading…</p>}
+              </div>
+              <div className="grid gap-4 md:grid-cols-3">
+                <div className="space-y-2">
+                  <Label>Instagram (optional)</Label>
+                  <Input
+                    value={editForm.instagramUrl}
+                    onChange={(e) => setEditForm((p) => ({ ...p, instagramUrl: e.target.value }))}
+                    placeholder="https://instagram.com/yourgym"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label>Facebook (optional)</Label>
+                  <Input
+                    value={editForm.facebookUrl}
+                    onChange={(e) => setEditForm((p) => ({ ...p, facebookUrl: e.target.value }))}
+                    placeholder="https://facebook.com/yourgym"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label>YouTube (optional)</Label>
+                  <Input
+                    value={editForm.youtubeUrl}
+                    onChange={(e) => setEditForm((p) => ({ ...p, youtubeUrl: e.target.value }))}
+                    placeholder="https://youtube.com/@yourgym"
+                  />
+                </div>
               </div>
               <div className="grid gap-4 md:grid-cols-2">
                 <div className="space-y-2">

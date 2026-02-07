@@ -49,7 +49,7 @@ export async function reverseGeocode(
     const res = await fetch(url, {
       headers: {
         Accept: "application/json",
-        "User-Agent": process.env.NOMINATIM_USER_AGENT ?? "GymDuo/1.0",
+        "User-Agent": process.env.NOMINATIM_USER_AGENT ?? "FitDex/1.0",
       },
       signal: controller.signal,
     });
@@ -90,7 +90,7 @@ export async function forwardGeocode(
     const res = await fetch(url, {
       headers: {
         Accept: "application/json",
-        "User-Agent": process.env.NOMINATIM_USER_AGENT ?? "GymDuo/1.0",
+        "User-Agent": process.env.NOMINATIM_USER_AGENT ?? "FitDex/1.0",
       },
       signal: controller.signal,
     });

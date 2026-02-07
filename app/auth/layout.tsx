@@ -13,7 +13,7 @@ export default function AuthLayout({
           <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-gradient-to-br from-primary to-accent">
             <Dumbbell className="h-4 w-4 text-white" />
           </div>
-          <span className="font-bold">GYMDUO</span>
+          <span className="font-bold">FITDEX</span>
         </Link>
       </header>
       <main className="flex-1 flex items-center justify-center p-4">

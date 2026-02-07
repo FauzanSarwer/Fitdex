@@ -18,7 +18,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { MapView } from "@/components/maps/MapView";
-import { formatPrice } from "@/lib/utils";
+import { buildGymSlug, formatPrice } from "@/lib/utils";
 import { Skeleton } from "@/components/ui/skeleton";
 import { getGymOpenStatus } from "@/lib/gym-hours";
 import { fetchJson } from "@/lib/client-fetch";
@@ -443,6 +443,7 @@ export default function ExplorePage() {
               name: g.name,
               latitude: g.latitude,
               longitude: g.longitude,
+              url: `/explore/${buildGymSlug(g.name, g.id)}`,
             }))}
             className="w-full h-full"
           />
@@ -504,7 +505,7 @@ export default function ExplorePage() {
                           <Heart className={`h-4 w-4 ${savedIds.has(gym.id) ? "fill-primary" : ""}`} />
                         </button>
                       )}
-                      <Link href={`/explore/${gym.id}`} className="text-xs text-primary hover:underline">
+                      <Link href={`/explore/${buildGymSlug(gym.name, gym.id)}`} className="text-xs text-primary hover:underline">
                         View
                       </Link>
                     </div>
@@ -529,7 +530,7 @@ export default function ExplorePage() {
                     )}
                   </div>
                   <Button asChild size="sm">
-                    <Link href={`/explore/${gym.id}`}>
+                    <Link href={`/explore/${buildGymSlug(gym.name, gym.id)}`}>
                       Explore
                       <ArrowRight className="ml-2 h-3 w-3" />
                     </Link>

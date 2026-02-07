@@ -32,16 +32,16 @@ function applyRateLimit(req: NextRequest) {
     const key = `${getClientIp(req)}:${req.nextUrl.pathname}`;
     const now = Date.now();
     const store = (globalThis as typeof globalThis & {
-      __gymduoRateLimit__?: Map<string, RateLimitEntry>;
+      __fitdexRateLimit__?: Map<string, RateLimitEntry>;
     });
 
-    if (!store.__gymduoRateLimit__) {
-      store.__gymduoRateLimit__ = new Map();
+    if (!store.__fitdexRateLimit__) {
+      store.__fitdexRateLimit__ = new Map();
     }
 
-    const bucket = store.__gymduoRateLimit__.get(key);
+    const bucket = store.__fitdexRateLimit__.get(key);
     if (!bucket || now > bucket.reset) {
-      store.__gymduoRateLimit__.set(key, {
+      store.__fitdexRateLimit__.set(key, {
         count: 1,
         reset: now + RATE_LIMIT_WINDOW_MS,
       });
@@ -62,7 +62,7 @@ function applyRateLimit(req: NextRequest) {
     }
 
     bucket.count += 1;
-    store.__gymduoRateLimit__.set(key, bucket);
+    store.__fitdexRateLimit__.set(key, bucket);
     return null;
   } catch {
     return null;

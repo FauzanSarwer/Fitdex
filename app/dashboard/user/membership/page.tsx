@@ -100,7 +100,7 @@ function MembershipContent() {
         orderId: orderResult.data.orderId,
         amount: orderResult.data?.amount ?? 0,
         currency: orderResult.data?.currency ?? "INR",
-        name: "GYMDUO",
+        name: "FITDEX",
         onSuccess: async (res) => {
           const verifyResult = await fetchJson<{ error?: string }>("/api/razorpay/verify", {
             method: "POST",
