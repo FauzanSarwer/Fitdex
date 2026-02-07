@@ -3,12 +3,14 @@
 import Link from "next/link";
 import { motion } from "framer-motion";
 import { useSession } from "next-auth/react";
+import { isOwner } from "@/lib/permissions";
 import { Dumbbell } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
 export function Footer() {
   const { data: session, status } = useSession();
   const showOwnerCta = status !== "loading" && !session;
+  const showOwnerExplore = status === "authenticated" && isOwner(session);
 
   return (
     <footer className="mt-auto border-t border-white/10 bg-white/5 backdrop-blur">
@@ -36,6 +38,11 @@ export function Footer() {
             <Link href="/pricing" className="text-muted-foreground hover:text-foreground transition-colors">
               Pricing
             </Link>
+            {showOwnerExplore && (
+              <Link href="/dashboard/owner/explore" className="text-muted-foreground hover:text-foreground transition-colors">
+                Owner Explore
+              </Link>
+            )}
             {showOwnerCta && (
               <Button asChild size="sm" className="bg-gradient-to-r from-primary to-accent shadow-glow">
                 <Link href="/owners">Gym Owner?</Link>

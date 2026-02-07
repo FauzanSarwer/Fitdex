@@ -62,6 +62,13 @@ const PLANS = [
     popular: true,
     cta: "Go Pro",
   },
+  {
+    name: "Feature your gym",
+    price: 999,
+    period: "month",
+    features: ["Featured badge", "Top placement in Explore", "Boosted discovery for new members"],
+    cta: "Feature now",
+  },
 ];
 
 export default function OwnersPage() {
@@ -123,11 +130,11 @@ export default function OwnersPage() {
         <p className="text-muted-foreground text-center mb-10">
           Choose the plan that fits your gym. No hidden fees.
         </p>
-        <div className="grid md:grid-cols-2 gap-6 max-w-4xl mx-auto">
+        <div className="grid md:grid-cols-3 gap-6 max-w-5xl mx-auto">
           {PLANS.map((plan, i) => (
             <Card
               key={i}
-              className={`glass-card relative overflow-hidden ${
+              className={`glass-card relative overflow-hidden flex flex-col ${
                 plan.popular ? "border-primary/50 ring-2 ring-primary/20" : "border-white/10"
               }`}
             >
@@ -144,8 +151,8 @@ export default function OwnersPage() {
                   <span className="text-muted-foreground">/{plan.period}</span>
                 </div>
               </CardHeader>
-              <CardContent className="space-y-4">
-                <ul className="space-y-3">
+              <CardContent className="space-y-4 flex flex-col flex-1">
+                <ul className="space-y-3 flex-1">
                   {plan.features.map((f, j) => (
                     <li key={j} className="flex items-center gap-2 text-sm">
                       <Check className="h-4 w-4 text-primary shrink-0" />
@@ -154,13 +161,13 @@ export default function OwnersPage() {
                   ))}
                 </ul>
                 {owner ? (
-                  <Button asChild className="w-full mt-4" size="lg" variant={plan.popular ? "default" : "outline"}>
-                    <Link href="/dashboard/owner">Open dashboard</Link>
+                  <Button asChild className="w-full mt-auto" size="lg" variant={plan.popular ? "default" : "outline"}>
+                    <Link href="/dashboard/owner">Buy now</Link>
                   </Button>
                 ) : (
-                  <Button asChild className="w-full mt-4" size="lg" variant={plan.popular ? "default" : "outline"}>
+                  <Button asChild className="w-full mt-auto" size="lg" variant={plan.popular ? "default" : "outline"}>
                     <Link href={`/auth/login?callbackUrl=${encodeURIComponent("/dashboard/owner")}`}>
-                      Log in to get started
+                      Buy now
                     </Link>
                   </Button>
                 )}
@@ -168,13 +175,15 @@ export default function OwnersPage() {
             </Card>
           ))}
         </div>
-        <p className="text-center text-sm text-muted-foreground mt-6">
-          Already have an account?{" "}
-          <Link href="/auth/register" className="text-primary hover:underline">
-            Sign up as owner
-          </Link>{" "}
-          to create one.
-        </p>
+        {!owner && (
+          <p className="text-center text-sm text-muted-foreground mt-6">
+            Already have an account?{" "}
+            <Link href="/auth/register" className="text-primary hover:underline">
+              Sign up as owner
+            </Link>{" "}
+            to create one.
+          </p>
+        )}
       </motion.section>
 
       {/* CTA - Login to owner dashboard */}

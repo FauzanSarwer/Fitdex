@@ -17,6 +17,7 @@ export function Header() {
   const { data: session, status } = useSession();
   const owner = status === "authenticated" && isOwner(session);
   const showOwnerCta = status !== "loading" && !session;
+  const showOwnerExplore = status === "authenticated" && owner;
 
   return (
     <motion.header
@@ -45,6 +46,14 @@ export function Header() {
           >
             Pricing
           </Link>
+          {showOwnerExplore && (
+            <Link
+              href="/dashboard/owner/explore"
+              className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors"
+            >
+              Owner Explore
+            </Link>
+          )}
           {showOwnerCta && (
             <Button asChild size="sm" className="bg-gradient-to-r from-primary to-accent shadow-glow">
               <Link href="/owners">Gym Owner?</Link>
