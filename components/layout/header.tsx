@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useState } from "react";
 import { useSession, signOut } from "next-auth/react";
 import { isOwner } from "@/lib/permissions";
 import { motion } from "framer-motion";
@@ -18,6 +19,9 @@ export function Header() {
   const owner = status === "authenticated" && isOwner(session);
   const showOwnerCta = status !== "loading" && !session;
   const showOwnerExplore = status === "authenticated" && owner;
+  const emailVerified = !!(session?.user as { emailVerified?: boolean })?.emailVerified;
+  const [sendingVerification, setSendingVerification] = useState(false);
+  const [verificationSent, setVerificationSent] = useState(false);
 
   return (
     <motion.header
@@ -25,6 +29,31 @@ export function Header() {
       animate={{ y: 0, opacity: 1 }}
       className="fixed top-0 left-0 right-0 z-50 glass border-b border-white/10"
     >
+      {!emailVerified && session && (
+        <div className="bg-amber-500/20 border-b border-amber-500/30">
+          <div className="container mx-auto px-4 py-2 text-xs text-amber-100 flex flex-wrap items-center gap-2 justify-between">
+            <span>
+              Verify your email address. A link has been sent to {session.user.email ?? "your email"}.
+            </span>
+            <button
+              type="button"
+              disabled={sendingVerification}
+              className="text-amber-50 underline hover:text-white disabled:opacity-60"
+              onClick={async () => {
+                setSendingVerification(true);
+                try {
+                  const res = await fetch("/api/auth/verify", { method: "POST" });
+                  if (res.ok) setVerificationSent(true);
+                } finally {
+                  setSendingVerification(false);
+                }
+              }}
+            >
+              {sendingVerification ? "Sending…" : verificationSent ? "Link sent" : "Resend link"}
+            </button>
+          </div>
+        </div>
+      )}
       <div className="container mx-auto flex h-16 items-center justify-between px-4">
         <Link href="/" className="flex items-center gap-2">
           <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-br from-primary to-accent shadow-glow-sm">

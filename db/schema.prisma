@@ -43,6 +43,40 @@ model User {
   notifications Notification[]
   passwordResetTokens PasswordResetToken[]
   gymPageViews GymPageView[]
+  emailVerificationTokens EmailVerificationToken[]
+  ownerSubscriptions OwnerSubscription[]
+}
+
+model OwnerSubscription {
+  id                 String   @id @default(cuid())
+  ownerId            String
+  plan               String   // STARTER | PRO
+  status             String   // PENDING | ACTIVE | CANCELED | EXPIRED
+  startsAt           DateTime
+  expiresAt          DateTime
+  razorpayOrderId    String?  @unique
+  razorpayPaymentId  String?
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+
+  owner User @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+
+  @@index([ownerId])
+  @@index([status])
+}
+
+model EmailVerificationToken {
+  id        String   @id @default(cuid())
+  userId    String
+  tokenHash String   @unique
+  purpose   String   // VERIFY | DELETE
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([expiresAt])
 }
 
 model PasswordResetToken {

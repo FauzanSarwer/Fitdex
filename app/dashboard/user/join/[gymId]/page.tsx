@@ -3,6 +3,7 @@
 import { useState, useEffect, Suspense } from "react";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
+import { useSession } from "next-auth/react";
 import { motion } from "framer-motion";
 import {
   MapPin,
@@ -64,6 +65,8 @@ function JoinContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const gymId = params.gymId as string;
+  const { data: session } = useSession();
+  const emailVerified = !!(session?.user as { emailVerified?: boolean })?.emailVerified;
   const { toast } = useToast();
   const [gym, setGym] = useState<GymData | null>(null);
   const [loading, setLoading] = useState(true);
@@ -144,6 +147,10 @@ function JoinContent() {
   }, [gymId]);
 
   async function handleCreateInvite() {
+    if (!emailVerified) {
+      toast({ title: "Verify your email", description: "Please verify your email to invite a partner.", variant: "destructive" });
+      return;
+    }
     if (!gymId) return;
     setCreatingInvite(true);
     try {
@@ -168,6 +175,10 @@ function JoinContent() {
 
   async function handleCheckout() {
     if (!gymId || !selectedPlan) return;
+    if (!emailVerified) {
+      toast({ title: "Verify your email", description: "Please verify your email to join this gym.", variant: "destructive" });
+      return;
+    }
     if (gym?.verificationStatus !== "VERIFIED") {
       toast({ title: "Verification pending", description: "This gym can't accept new members yet." });
       return;
@@ -387,6 +398,17 @@ function JoinContent() {
           </Card>
         )}
 
+        {!emailVerified && (
+          <Card className="glass-card border-amber-500/30 bg-amber-500/10">
+            <CardHeader>
+              <CardTitle className="text-lg">Verify your email</CardTitle>
+            </CardHeader>
+            <CardContent className="text-sm text-muted-foreground">
+              You can browse plans, but you’ll need to verify your email before joining or inviting a partner.
+            </CardContent>
+          </Card>
+        )}
+
         {/* Plan selection */}
         <Card className="glass-card">
           <CardHeader>
@@ -454,10 +476,16 @@ function JoinContent() {
                     value={inviteCode}
                     onChange={(e) => setInviteCode(e.target.value.toUpperCase())}
                     className="uppercase max-w-[200px]"
+                    disabled={!emailVerified}
                   />
                   {inviteInfo && (
                     <p className={`mt-2 text-xs ${inviteInfo.valid ? "text-primary" : "text-destructive"}`}>
                       {inviteInfo.message}
+                    </p>
+                  )}
+                  {!emailVerified && (
+                    <p className="mt-2 text-xs text-amber-200">
+                      Verify your email to apply a partner invite.
                     </p>
                   )}
                 </div>
@@ -508,7 +536,7 @@ function JoinContent() {
                       variant="outline"
                       size="sm"
                       onClick={handleCreateInvite}
-                      disabled={creatingInvite}
+                      disabled={creatingInvite || !emailVerified}
                     >
                       {creatingInvite ? <Loader2 className="h-4 w-4 animate-spin" /> : "Get invite code"}
                     </Button>
@@ -544,10 +572,12 @@ function JoinContent() {
               className="w-full h-12 text-base"
               size="lg"
               onClick={handleCheckout}
-              disabled={checkingOut || !paymentsEnabled || !isVerified}
+              disabled={checkingOut || !paymentsEnabled || !isVerified || !emailVerified}
             >
               {checkingOut ? (
                 <Loader2 className="h-5 w-5 animate-spin" />
+              ) : !emailVerified ? (
+                "Verify email to continue"
               ) : !isVerified ? (
                 "Verification pending"
               ) : !paymentsEnabled ? (
@@ -560,11 +590,13 @@ function JoinContent() {
               )}
             </Button>
             <p className="text-center text-xs text-muted-foreground mt-3">
-              {!isVerified
-                ? "Verification is required before joining."
-                : paymentsEnabled
-                  ? "You’ll complete payment on the next screen"
-                  : "Payments are not available yet."}
+              {!emailVerified
+                ? "Email verification is required before joining."
+                : !isVerified
+                  ? "Verification is required before joining."
+                  : paymentsEnabled
+                    ? "You’ll complete payment on the next screen"
+                    : "Payments are not available yet."}
             </p>
           </CardContent>
         </Card>

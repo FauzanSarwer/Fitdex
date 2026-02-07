@@ -31,6 +31,18 @@ export async function POST(req: Request) {
     if (!gym) {
       return jsonError("Gym not found", 404);
     }
+    const now = new Date();
+    const isAlreadyFeatured = gym.featuredUntil && gym.featuredUntil > now;
+    if (!isAlreadyFeatured) {
+      const [totalGyms, featuredCount] = await Promise.all([
+        prisma.gym.count({ where: { verificationStatus: { not: "REJECTED" } } }),
+        prisma.gym.count({ where: { featuredUntil: { gt: now }, verificationStatus: { not: "REJECTED" } } }),
+      ]);
+      const maxFeatured = Math.max(1, Math.floor(totalGyms * 0.2));
+      if (featuredCount >= maxFeatured) {
+        return jsonError("All featured slots are full. Check back tomorrow.", 409);
+      }
+    }
     const receipt = `feature_${gymId}_${Date.now()}`;
     const order = await createRazorpayOrder(FEATURE_PRICE_PAISE, receipt, {
       gymId,

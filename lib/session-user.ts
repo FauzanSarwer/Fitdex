@@ -8,6 +8,7 @@ export const SessionUserSchema = z.object({
   name: z.string().optional().nullable(),
   image: z.string().optional().nullable(),
   role: z.enum(["USER", "OWNER", "ADMIN"]).optional(),
+  emailVerified: z.boolean().optional(),
 });
 
 export function getSessionUser(session: Session | null) {

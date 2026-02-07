@@ -11,6 +11,10 @@ export async function POST(req: Request) {
   if (!requireUser(session)) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
+  const emailVerified = !!(session!.user as { emailVerified?: boolean }).emailVerified;
+  if (!emailVerified) {
+    return jsonError("Please verify your email to continue", 403);
+  }
   const uid = (session!.user as { id: string }).id;
   const parsed = await safeJson<{ code?: string }>(req);
   if (!parsed.ok) {

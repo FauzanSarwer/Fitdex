@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
 import {
   BarChart3,
@@ -16,6 +17,10 @@ import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { useSession } from "next-auth/react";
 import { isOwner } from "@/lib/permissions";
+import { fetchJson } from "@/lib/client-fetch";
+import { isPaymentsEnabled, openRazorpayCheckout } from "@/lib/razorpay-checkout";
+import { Loader2 } from "lucide-react";
+import { useToast } from "@/hooks/use-toast";
 
 const BENEFITS = [
   {
@@ -40,9 +45,20 @@ const BENEFITS = [
   },
 ];
 
-const PLANS = [
+type OwnerPlanType = "STARTER" | "PRO" | "FEATURED";
+
+const PLANS: Array<{
+  name: string;
+  planType: OwnerPlanType;
+  price: number;
+  period: string;
+  features: string[];
+  cta: string;
+  popular?: boolean;
+}> = [
   {
     name: "Starter",
+    planType: "STARTER",
     price: 1499,
     period: "month",
     features: ["Analytics dashboard", "Priority support", "Gym listing on map", "Membership management"],
@@ -50,6 +66,7 @@ const PLANS = [
   },
   {
     name: "Pro",
+    planType: "PRO",
     price: 1999,
     period: "month",
     features: [
@@ -64,6 +81,7 @@ const PLANS = [
   },
   {
     name: "Feature your gym",
+    planType: "FEATURED",
     price: 99,
     period: "3 days",
     features: ["Featured badge", "Top placement in Explore", "Boosted discovery for new members"],
@@ -74,6 +92,90 @@ const PLANS = [
 export default function OwnersPage() {
   const { data: session, status } = useSession();
   const owner = status === "authenticated" && isOwner(session);
+  const { toast } = useToast();
+  const [subscription, setSubscription] = useState<any | null>(null);
+  const [loadingSub, setLoadingSub] = useState(false);
+  const [processingPlan, setProcessingPlan] = useState<string | null>(null);
+  const paymentsEnabled = isPaymentsEnabled();
+
+  useEffect(() => {
+    if (!owner) return;
+    let active = true;
+    setLoadingSub(true);
+    fetchJson<{ subscription?: any }>("/api/owner/subscription", { retries: 1 })
+      .then((result) => {
+        if (!active) return;
+        if (result.ok) setSubscription(result.data?.subscription ?? null);
+      })
+      .finally(() => {
+        if (active) setLoadingSub(false);
+      });
+    return () => {
+      active = false;
+    };
+  }, [owner]);
+
+  const activePlan = subscription?.status === "ACTIVE" && new Date(subscription.expiresAt).getTime() > Date.now()
+    ? subscription.plan
+    : null;
+
+  const startCheckout = async (plan: "STARTER" | "PRO") => {
+    if (!paymentsEnabled) {
+      toast({ title: "Payments not available", description: "Please try again later." });
+      return;
+    }
+    setProcessingPlan(plan);
+    try {
+      const orderResult = await fetchJson<{ orderId?: string; amount?: number; currency?: string; error?: string }>(
+        "/api/owner/subscription/order",
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ plan }),
+          retries: 1,
+        }
+      );
+      if (!orderResult.ok || !orderResult.data?.orderId) {
+        toast({ title: "Error", description: orderResult.error ?? "Failed to start checkout", variant: "destructive" });
+        setProcessingPlan(null);
+        return;
+      }
+      const checkout = await openRazorpayCheckout({
+        orderId: orderResult.data.orderId,
+        amount: orderResult.data.amount ?? 0,
+        currency: orderResult.data.currency ?? "INR",
+        name: "FITDEX",
+        onSuccess: async (res) => {
+          const verifyResult = await fetchJson<{ subscription?: any; error?: string }>(
+            "/api/owner/subscription/verify",
+            {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                orderId: res.razorpay_order_id,
+                paymentId: res.razorpay_payment_id,
+                signature: res.razorpay_signature,
+              }),
+              retries: 1,
+            }
+          );
+          if (verifyResult.ok) {
+            toast({ title: "Subscription active", description: "Your plan has been updated." });
+            setSubscription(verifyResult.data?.subscription ?? null);
+          } else {
+            toast({ title: "Verification failed", description: verifyResult.error ?? "Payment failed", variant: "destructive" });
+          }
+        },
+      });
+      if (!checkout.ok && checkout.error && checkout.error !== "DISMISSED") {
+        const message = checkout.error === "PAYMENTS_DISABLED" ? "Payments not available" : checkout.error;
+        toast({ title: "Payments unavailable", description: message, variant: "destructive" });
+      }
+    } catch {
+      toast({ title: "Error", variant: "destructive" });
+    }
+    setProcessingPlan(null);
+  };
 
   return (
     <div className="container mx-auto px-4 py-16">
@@ -161,9 +263,34 @@ export default function OwnersPage() {
                   ))}
                 </ul>
                 {owner ? (
-                  <Button asChild className="w-full mt-auto" size="lg" variant={plan.popular ? "default" : "outline"}>
-                    <Link href="/dashboard/owner">Buy now</Link>
-                  </Button>
+                  plan.planType === "FEATURED" ? (
+                    <Button asChild className="w-full mt-auto" size="lg" variant={plan.popular ? "default" : "outline"}>
+                      <Link href="/dashboard/owner/explore">Boost a gym</Link>
+                    </Button>
+                  ) : activePlan && activePlan === plan.planType ? (
+                    <Button asChild className="w-full mt-auto" size="lg" variant={plan.popular ? "default" : "outline"}>
+                      <Link href="/dashboard/owner/subscription">Manage</Link>
+                    </Button>
+                  ) : activePlan === "STARTER" && plan.planType === "PRO" ? (
+                    <Button
+                      className="w-full mt-auto"
+                      size="lg"
+                      onClick={() => startCheckout("PRO")}
+                      disabled={processingPlan != null || loadingSub}
+                    >
+                      {processingPlan === "PRO" ? <Loader2 className="h-4 w-4 animate-spin" /> : "Upgrade"}
+                    </Button>
+                  ) : (
+                    <Button
+                      className="w-full mt-auto"
+                      size="lg"
+                      variant={plan.popular ? "default" : "outline"}
+                      onClick={() => startCheckout(plan.planType === "PRO" ? "PRO" : "STARTER")}
+                      disabled={processingPlan != null || loadingSub}
+                    >
+                      {processingPlan === plan.planType ? <Loader2 className="h-4 w-4 animate-spin" /> : "Buy now"}
+                    </Button>
+                  )
                 ) : (
                   <Button asChild className="w-full mt-auto" size="lg" variant={plan.popular ? "default" : "outline"}>
                     <Link href={`/auth/login?callbackUrl=${encodeURIComponent("/dashboard/owner")}`}>

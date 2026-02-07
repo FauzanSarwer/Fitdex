@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import crypto from "crypto";
 import { prisma } from "@/lib/prisma";
 import { getOptionalEnv, getRequiredEnv } from "@/lib/env";
+import { sendPasswordResetEmail } from "@/lib/email";
 import { jsonError, safeJson } from "@/lib/api";
 import { logServerError } from "@/lib/logger";
 
@@ -48,8 +49,10 @@ export async function POST(req: Request) {
       const resetUrl = appUrl ? `${appUrl}/auth/reset?token=${encodeURIComponent(token)}` : "";
       if (process.env.NODE_ENV !== "production") {
         console.info("[auth] Password reset link:", resetUrl || token);
+        await sendPasswordResetEmail(user.email, resetUrl);
         return NextResponse.json({ ok: true, resetUrl });
       }
+      await sendPasswordResetEmail(user.email, resetUrl);
     }
 
     return NextResponse.json({ ok: true });

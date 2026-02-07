@@ -7,6 +7,8 @@ import { getOptionalEnv, getRequiredEnv } from "./env";
 import bcrypt from "bcryptjs";
 import { z } from "zod";
 import { SessionUserSchema } from "./session-user";
+import { createEmailVerificationLinks } from "@/lib/email-verification";
+import { sendVerificationEmail } from "@/lib/email";
 
 const googleClientId = getOptionalEnv("GOOGLE_CLIENT_ID");
 const googleClientSecret = getOptionalEnv("GOOGLE_CLIENT_SECRET");
@@ -75,6 +77,13 @@ export const authOptions: NextAuthOptions = {
       if (user) {
         token.id = user.id;
         token.role = (user as { role?: "USER" | "OWNER" | "ADMIN" }).role;
+        if (user.email) {
+          const u = await prisma.user.findUnique({
+            where: { email: user.email },
+            select: { emailVerified: true },
+          });
+          token.emailVerified = !!u?.emailVerified;
+        }
       }
       if (trigger === "update" && session) {
         token.name = session.name;
@@ -83,9 +92,10 @@ export const authOptions: NextAuthOptions = {
       if (!token.role && token.sub) {
         const u = await prisma.user.findUnique({
           where: { id: token.sub },
-          select: { role: true },
+          select: { role: true, emailVerified: true },
         });
         if (u?.role) token.role = u.role as "USER" | "OWNER" | "ADMIN";
+        if (u?.emailVerified != null) token.emailVerified = !!u.emailVerified;
       }
       return token;
     },
@@ -93,6 +103,8 @@ export const authOptions: NextAuthOptions = {
       if (session.user) {
         session.user.id = token.id ?? token.sub!;
         (session.user as { role?: string }).role = token.role as string;
+        (session.user as { emailVerified?: boolean }).emailVerified =
+          typeof token.emailVerified === "boolean" ? token.emailVerified : false;
       }
       // Enforce contract
       const parsed = SessionUserSchema.safeParse(session.user);
@@ -109,6 +121,22 @@ export const authOptions: NextAuthOptions = {
             where: { id: existing.id },
             data: { role: "USER" },
           });
+        }
+        if (existing && !existing.emailVerified) {
+          await prisma.user.update({
+            where: { id: existing.id },
+            data: { emailVerified: new Date() },
+          });
+        }
+      }
+      if (account?.provider === "credentials" && user?.email) {
+        const existing = await prisma.user.findUnique({
+          where: { email: user.email },
+          select: { id: true, email: true, emailVerified: true },
+        });
+        if (existing && !existing.emailVerified) {
+          const links = await createEmailVerificationLinks(existing.id, existing.email);
+          await sendVerificationEmail(existing.email, links.verifyUrl, links.deleteUrl);
         }
       }
       return true;

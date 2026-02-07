@@ -34,6 +34,7 @@ const OWNER_LINKS = [
   { href: "/dashboard/owner/members", label: "Members", icon: Users },
   { href: "/dashboard/owner/analytics", label: "Analytics", icon: BarChart3 },
   { href: "/dashboard/owner/discounts", label: "Discounts", icon: Percent },
+  { href: "/dashboard/owner/subscription", label: "Subscription", icon: CreditCard },
   { href: "/dashboard/owner/settings", label: "Settings", icon: Settings },
 ];
 
@@ -84,6 +85,16 @@ export function DashboardNav({
             </div>
             <span className="text-lg font-bold">FITDEX</span>
           </Link>
+          {role === "ADMIN" && (
+            <div className="ml-auto">
+              <Link
+                href="/dashboard/admin"
+                className="rounded-full bg-primary/20 px-4 py-2 text-xs font-semibold text-primary hover:bg-primary/30"
+              >
+                Admin panel
+              </Link>
+            </div>
+          )}
         </div>
       </header>
       <aside className="fixed left-0 top-0 z-50 hidden h-full w-56 flex-col border-r border-white/10 bg-background/95 backdrop-blur md:flex">
@@ -95,7 +106,8 @@ export function DashboardNav({
         </div>
         <nav className="flex-1 space-y-1 p-2">
           {links.map((item) => {
-            const active = pathname === item.href || (item.href !== "/dashboard/user" && item.href !== "/dashboard/owner" && pathname?.startsWith(item.href));
+            const isOverview = item.href === "/dashboard/user" || item.href === "/dashboard/owner" || item.href === "/dashboard/admin";
+            const active = isOverview ? pathname === item.href : pathname?.startsWith(item.href);
             return (
               <Link
                 key={item.href}

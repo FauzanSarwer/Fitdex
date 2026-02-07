@@ -18,7 +18,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { MapView } from "@/components/maps/MapView";
-import { buildGymSlug, formatPrice } from "@/lib/utils";
+import { buildGymSlug, cn, formatPrice } from "@/lib/utils";
 import { Skeleton } from "@/components/ui/skeleton";
 import { getGymOpenStatus } from "@/lib/gym-hours";
 import { fetchJson } from "@/lib/client-fetch";
@@ -469,20 +469,27 @@ export default function ExplorePage() {
         </Card>
       ) : (
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-          {filteredGyms.map((gym, i) => (
+          {filteredGyms.map((gym, i) => {
+            const isFeatured = gym.featuredUntil && new Date(gym.featuredUntil).getTime() > Date.now();
+            return (
             <motion.div
               key={gym.id}
               initial={{ opacity: 0, y: 10 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: i * 0.05 }}
             >
-              <Card className="glass-card overflow-hidden hover:border-primary/30 transition-all duration-300 hover:-translate-y-1">
+              <Card
+                className={cn(
+                  "glass-card overflow-hidden hover:border-primary/30 transition-all duration-300 hover:-translate-y-1",
+                  isFeatured && "border-primary/40 shadow-[0_0_24px_rgba(99,102,241,0.25)]"
+                )}
+              >
                 <CardHeader className="pb-2">
                   <div className="flex items-center justify-between">
                     <h3 className="font-semibold text-lg">{gym.name}</h3>
                     <div className="flex items-center gap-2">
-                      {gym.featuredUntil && new Date(gym.featuredUntil).getTime() > Date.now() && (
-                        <span className="text-[10px] uppercase tracking-wide bg-primary/20 text-primary px-2 py-0.5 rounded-full">
+                      {isFeatured && (
+                        <span className="text-[10px] uppercase tracking-wide bg-primary/20 text-primary px-2 py-0.5 rounded-full animate-pulse">
                           Featured
                         </span>
                       )}
@@ -538,7 +545,8 @@ export default function ExplorePage() {
                 </CardContent>
               </Card>
             </motion.div>
-          ))}
+            );
+          })}
         </div>
       )}
     </div>

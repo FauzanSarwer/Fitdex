@@ -59,7 +59,8 @@ export default function GymProfilePage() {
   const router = useRouter();
   const slug = params.gymId as string;
   const gymId = parseGymIdFromSlug(slug);
-  const { status } = useSession();
+  const { status, data: session } = useSession();
+  const emailVerified = !!(session?.user as { emailVerified?: boolean })?.emailVerified;
   const [gym, setGym] = useState<GymData | null>(null);
   const [loading, setLoading] = useState(true);
   const [saved, setSaved] = useState(false);
@@ -223,7 +224,7 @@ export default function GymProfilePage() {
             )}
             <div className="absolute top-4 right-4 flex items-center gap-2">
               {gym.featuredUntil && new Date(gym.featuredUntil).getTime() > Date.now() && (
-                <span className="rounded-full bg-primary/20 text-primary px-3 py-1 text-xs">Featured</span>
+                <span className="rounded-full bg-primary/20 text-primary px-3 py-1 text-xs animate-pulse">Featured</span>
               )}
               {isVerified ? (
                 <span className="rounded-full bg-emerald-500/20 text-emerald-400 px-3 py-1 text-xs">Verified</span>
@@ -250,24 +251,36 @@ export default function GymProfilePage() {
                     {saved ? "Saved" : "Save"}
                   </Button>
                 )}
-                <Button asChild size="lg" variant="secondary">
-                  <Link
-                    href={
-                      status === "authenticated"
-                        ? "/dashboard/user/duo"
-                        : `/auth/login?callbackUrl=${encodeURIComponent("/dashboard/user/duo")}`
-                    }
-                  >
-                    Invite partner
-                  </Link>
-                </Button>
-                {isVerified ? (
-                  <Button asChild size="lg">
-                    <Link href={`/dashboard/user/join/${gym.id}`}>
-                      Join this gym
-                      <ArrowRight className="ml-2 h-4 w-4" />
+                {status === "authenticated" && !emailVerified ? (
+                  <Button size="lg" variant="secondary" disabled>
+                    Verify email to invite
+                  </Button>
+                ) : (
+                  <Button asChild size="lg" variant="secondary">
+                    <Link
+                      href={
+                        status === "authenticated"
+                          ? "/dashboard/user/duo"
+                          : `/auth/login?callbackUrl=${encodeURIComponent("/dashboard/user/duo")}`
+                      }
+                    >
+                      Invite partner
                     </Link>
                   </Button>
+                )}
+                {isVerified ? (
+                  status === "authenticated" && !emailVerified ? (
+                    <Button size="lg" disabled>
+                      Verify email to join
+                    </Button>
+                  ) : (
+                    <Button asChild size="lg">
+                      <Link href={`/dashboard/user/join/${gym.id}`}>
+                        Join this gym
+                        <ArrowRight className="ml-2 h-4 w-4" />
+                      </Link>
+                    </Button>
+                  )
                 ) : (
                   <Button size="lg" variant="outline" disabled>
                     Verification pending
@@ -323,17 +336,23 @@ export default function GymProfilePage() {
               Save up to <span className="font-semibold text-foreground">{gym.partnerDiscountPercent}%</span> when you invite a
               partner. Duo discounts are one of the most popular ways to join.
             </div>
-            <Button asChild variant="secondary">
-              <Link
-                href={
-                  status === "authenticated"
-                    ? "/dashboard/user/duo"
-                    : `/auth/login?callbackUrl=${encodeURIComponent("/dashboard/user/duo")}`
-                }
-              >
-                Invite partner
-              </Link>
-            </Button>
+            {status === "authenticated" && !emailVerified ? (
+              <Button variant="secondary" disabled>
+                Verify email to invite
+              </Button>
+            ) : (
+              <Button asChild variant="secondary">
+                <Link
+                  href={
+                    status === "authenticated"
+                      ? "/dashboard/user/duo"
+                      : `/auth/login?callbackUrl=${encodeURIComponent("/dashboard/user/duo")}`
+                  }
+                >
+                  Invite partner
+                </Link>
+              </Button>
+            )}
           </CardContent>
         </Card>
 
@@ -409,12 +428,18 @@ export default function GymProfilePage() {
 
         <div className="text-center">
           {isVerified ? (
-            <Button asChild size="lg" className="text-base">
-              <Link href={`/dashboard/user/join/${gym.id}`}>
-                Continue to join
-                <ArrowRight className="ml-2 h-4 w-4" />
-              </Link>
-            </Button>
+            status === "authenticated" && !emailVerified ? (
+              <Button size="lg" className="text-base" disabled>
+                Verify email to continue
+              </Button>
+            ) : (
+              <Button asChild size="lg" className="text-base">
+                <Link href={`/dashboard/user/join/${gym.id}`}>
+                  Continue to join
+                  <ArrowRight className="ml-2 h-4 w-4" />
+                </Link>
+              </Button>
+            )
           ) : (
             <Button size="lg" className="text-base" variant="outline" disabled>
               Verification pending

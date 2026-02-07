@@ -22,6 +22,12 @@ export async function GET() {
       orderBy: { createdAt: "desc" },
     });
 
+    const activeSubscription = await prisma.ownerSubscription.findFirst({
+      where: { ownerId: uid, status: "ACTIVE", expiresAt: { gt: new Date() } },
+      orderBy: { expiresAt: "desc" },
+    });
+    const hasOwnerSubscription = !!activeSubscription;
+
     const viewCounts = await (prisma as any).gymPageView.groupBy({
       by: ["gymId"],
       _count: { _all: true },
@@ -32,6 +38,7 @@ export async function GET() {
     const list = gyms.map((g: any) => {
       const isOwner = g.ownerId === uid;
       const hasPremiumAccess =
+        hasOwnerSubscription ||
         (g.featuredUntil && new Date(g.featuredUntil).getTime() > now) ||
         (g.verifiedUntil && new Date(g.verifiedUntil).getTime() > now);
 

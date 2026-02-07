@@ -62,11 +62,11 @@ export async function GET(req: Request) {
       verifiedUntil: g.verifiedUntil,
       createdAt: g.createdAt,
     }));
+    const now = Date.now();
     if (lat && lng) {
       const numLat = parseFloat(lat);
       const numLng = parseFloat(lng);
       if (Number.isFinite(numLat) && Number.isFinite(numLng)) {
-        const now = Date.now();
         list = list
           .map((g) => ({
             ...g,
@@ -79,6 +79,13 @@ export async function GET(req: Request) {
             return (a.distance ?? 0) - (b.distance ?? 0);
           });
       }
+    } else {
+      list = list.sort((a, b) => {
+        const aFeatured = a.featuredUntil ? new Date(a.featuredUntil).getTime() > now : false;
+        const bFeatured = b.featuredUntil ? new Date(b.featuredUntil).getTime() > now : false;
+        if (aFeatured !== bFeatured) return aFeatured ? -1 : 1;
+        return new Date(b.createdAt ?? 0).getTime() - new Date(a.createdAt ?? 0).getTime();
+      });
     }
     return NextResponse.json(
       { gyms: list },

@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { useSession } from "next-auth/react";
 import { motion } from "framer-motion";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -13,6 +14,8 @@ import { fetchJson } from "@/lib/client-fetch";
 
 export default function DuoPage() {
   const { toast } = useToast();
+  const { data: session } = useSession();
+  const emailVerified = !!(session?.user as { emailVerified?: boolean })?.emailVerified;
   const [duos, setDuos] = useState<any[]>([]);
   const [memberships, setMemberships] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -57,6 +60,10 @@ export default function DuoPage() {
   const activeDuo = duos.find((d) => d.active);
 
   async function sendInvite() {
+    if (!emailVerified) {
+      toast({ title: "Verify your email", description: "Verify your email to invite a partner.", variant: "destructive" });
+      return;
+    }
     if (!inviteGymId) {
       toast({ title: "No gym", description: "You need an active membership first.", variant: "destructive" });
       return;
@@ -89,6 +96,10 @@ export default function DuoPage() {
   }
 
   async function acceptInvite() {
+    if (!emailVerified) {
+      toast({ title: "Verify your email", description: "Verify your email to accept invites.", variant: "destructive" });
+      return;
+    }
     if (!acceptCode.trim()) return;
     setAccepting(true);
     try {
@@ -180,7 +191,7 @@ export default function DuoPage() {
                   value={inviteEmail}
                   onChange={(e) => setInviteEmail(e.target.value)}
                 />
-                <Button onClick={sendInvite} disabled={sending}>
+                <Button onClick={sendInvite} disabled={sending || !emailVerified}>
                   {sending ? "Sending…" : "Send invite"}
                 </Button>
               </div>
@@ -189,6 +200,7 @@ export default function DuoPage() {
               <Label>Or generate code</Label>
               <Button
                 variant="outline"
+                disabled={!emailVerified}
                 onClick={() =>
                   fetchJson<{ code?: string }>("/api/duos", {
                     method: "POST",
@@ -250,7 +262,7 @@ export default function DuoPage() {
               onChange={(e) => setAcceptCode(e.target.value.toUpperCase())}
               className="uppercase"
             />
-            <Button onClick={acceptInvite} disabled={accepting || !acceptCode.trim()}>
+            <Button onClick={acceptInvite} disabled={accepting || !acceptCode.trim() || !emailVerified}>
               {accepting ? "Accepting…" : "Accept"}
             </Button>
           </div>

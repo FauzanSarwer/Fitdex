@@ -116,7 +116,7 @@ export default async function middleware(req: NextRequest) {
         return applySecurityHeaders(NextResponse.redirect(new URL("/dashboard/user", req.url)));
       }
 
-      if (pathname.startsWith("/dashboard/user") && isOwner) {
+      if (pathname.startsWith("/dashboard/user") && isOwner && role !== "ADMIN") {
         return applySecurityHeaders(NextResponse.redirect(new URL("/dashboard/owner", req.url)));
       }
 
