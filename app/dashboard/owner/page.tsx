@@ -157,7 +157,7 @@ export default function OwnerDashboardPage() {
     0
   );
 
-  const formatStatus = (status: string) => status.replace(/_/g, " ");
+  const formatStatus = (status?: string | null) => (status ?? "unknown").replace(/_/g, " ");
 
   const openGstDialog = (gym: any) => {
     setGstGym(gym);

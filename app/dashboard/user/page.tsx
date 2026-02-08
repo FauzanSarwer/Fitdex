@@ -113,7 +113,7 @@ function UserDashboardContent() {
     };
   }, [searchParams, router]);
 
-  const activeMembership = memberships.find((m) => m.active);
+  const activeMembership = memberships.find((m) => m.active && m.gym);
   const activeDuo = duos.find((d) => d.active);
   const streakDays = activeMembership
     ? Math.max(
@@ -253,7 +253,7 @@ function UserDashboardContent() {
 
       <div className="h-px bg-white/10" />
 
-      {location && (
+      {location && activeMembership?.gym && (
         <div className="h-48 rounded-2xl overflow-hidden">
           <MapView
             latitude={location.latitude}

@@ -9,6 +9,7 @@ import { z } from "zod";
 import { SessionUserSchema } from "./session-user";
 import { createEmailVerificationLinks } from "@/lib/email-verification";
 import { sendVerificationEmail } from "@/lib/email";
+import { logServerError } from "@/lib/logger";
 import { hashOtp, normalizePhoneNumber, timingSafeEqual } from "@/lib/otp";
 const prismaAny = prisma as any;
 
@@ -196,14 +197,22 @@ export const authOptions: NextAuthOptions = {
     },
     async session({ session, token }) {
       if (session.user) {
-        session.user.id = token.id ?? token.sub!;
+        session.user.id = token.id ?? token.sub ?? session.user.id;
         (session.user as { role?: string }).role = token.role as string;
         (session.user as { emailVerified?: boolean }).emailVerified =
           typeof token.emailVerified === "boolean" ? token.emailVerified : false;
       }
       // Enforce contract
       const parsed = SessionUserSchema.safeParse(session.user);
-      if (!parsed.success) throw new Error("Session user contract violated");
+      if (!parsed.success) {
+        logServerError(new Error("Session user contract violated"), {
+          scope: "auth/session",
+          issues: parsed.error.issues,
+          tokenSub: token.sub,
+          tokenId: token.id,
+        });
+        return session;
+      }
       return session;
     },
     async signIn({ user, account }) {
