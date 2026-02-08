@@ -178,13 +178,58 @@ function MembershipContent() {
       <motion.div
         initial={{ opacity: 0, y: 10 }}
         animate={{ opacity: 1, y: 0 }}
+        className="space-y-2"
       >
         <h1 className="text-2xl font-bold">Membership</h1>
-        <p className="text-muted-foreground text-sm">Manage your gym membership.</p>
+        <p className="text-muted-foreground text-sm">A simple path to consistent training and savings.</p>
       </motion.div>
 
+      <div className="grid gap-4 lg:grid-cols-[1.1fr_0.9fr]">
+        <Card className="glass-card border border-white/10">
+          <CardHeader>
+            <CardTitle>How it works</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-3 text-sm text-muted-foreground">
+            <div className="flex items-start gap-3">
+              <span className="mt-0.5 rounded-full bg-primary/15 px-2 py-0.5 text-xs text-primary">1</span>
+              <p>Pick a gym you love and choose monthly or yearly.</p>
+            </div>
+            <div className="flex items-start gap-3">
+              <span className="mt-0.5 rounded-full bg-primary/15 px-2 py-0.5 text-xs text-primary">2</span>
+              <p>Pay securely and get instant membership access.</p>
+            </div>
+            <div className="flex items-start gap-3">
+              <span className="mt-0.5 rounded-full bg-primary/15 px-2 py-0.5 text-xs text-primary">3</span>
+              <p>Invite a duo partner to unlock extra savings on renewal.</p>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card className="glass-card border border-white/10">
+          <CardHeader>
+            <CardTitle>Benefits</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-3 text-sm text-muted-foreground">
+            <div className="flex items-center justify-between">
+              <span>Predictable pricing</span>
+              <span className="text-xs rounded-full bg-white/10 px-2 py-1">Transparent</span>
+            </div>
+            <div className="flex items-center justify-between">
+              <span>Partner savings</span>
+              <span className="text-xs rounded-full bg-emerald-500/15 px-2 py-1 text-emerald-200">Duo perks</span>
+            </div>
+            <div className="flex items-center justify-between">
+              <span>Anytime support</span>
+              <span className="text-xs rounded-full bg-white/10 px-2 py-1">In-app</span>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+
+      <div className="h-px bg-white/10" />
+
       {activeMembership && (
-        <Card className="glass-card">
+        <Card className="glass-card max-w-2xl border border-white/10">
           <CardHeader>
             <CardTitle>{activeMembership.gym.name}</CardTitle>
           </CardHeader>
@@ -209,8 +254,35 @@ function MembershipContent() {
         </Card>
       )}
 
+      <div className="grid gap-4 md:grid-cols-3">
+        <Card className="glass-card border border-white/10">
+          <CardHeader>
+            <CardTitle>When active</CardTitle>
+          </CardHeader>
+          <CardContent className="text-sm text-muted-foreground">
+            Your gym pass stays active until the expiry date shown above.
+          </CardContent>
+        </Card>
+        <Card className="glass-card border border-white/10">
+          <CardHeader>
+            <CardTitle>If expired</CardTitle>
+          </CardHeader>
+          <CardContent className="text-sm text-muted-foreground">
+            We’ll remind you to renew so you never lose momentum.
+          </CardContent>
+        </Card>
+        <Card className="glass-card border border-white/10">
+          <CardHeader>
+            <CardTitle>Renewal CTA</CardTitle>
+          </CardHeader>
+          <CardContent className="text-sm text-muted-foreground">
+            A single primary button will appear here when renewal is available.
+          </CardContent>
+        </Card>
+      </div>
+
       {memberships.filter((m) => !m.active).length > 0 && !activeMembership && (
-        <Card className="glass-card">
+        <Card className="glass-card border border-white/10">
           <CardHeader>
             <CardTitle>Pending payment</CardTitle>
           </CardHeader>
@@ -245,7 +317,7 @@ function MembershipContent() {
       )}
 
       {joinGymId && !activeMembership && !memberships.some((m) => m.gymId === joinGymId) && (
-        <Card className="glass-card">
+        <Card className="glass-card border border-white/10">
           <CardHeader>
             <CardTitle>Join this gym</CardTitle>
           </CardHeader>
@@ -268,11 +340,21 @@ function MembershipContent() {
       )}
 
       {!activeMembership && memberships.filter((m) => !m.active).length === 0 && !joinGymId && (
-        <Card className="glass-card p-8 text-center">
-          <p className="text-muted-foreground mb-4">No membership yet</p>
-          <Button asChild>
-            <Link href="/explore">Explore gyms</Link>
-          </Button>
+        <Card className="glass-card p-8 text-left border border-white/10">
+          <div className="space-y-3">
+            <h2 className="text-lg font-semibold">Ready when you are</h2>
+            <p className="text-sm text-muted-foreground">
+              Start with a gym you like. Your membership unlocks consistent access and duo savings.
+            </p>
+            <div className="flex flex-col sm:flex-row gap-3">
+              <Button asChild>
+                <Link href="/explore">Explore gyms</Link>
+              </Button>
+              <Button asChild variant="outline">
+                <Link href="/dashboard/user/duo">Learn about duo</Link>
+              </Button>
+            </div>
+          </div>
         </Card>
       )}
     </div>

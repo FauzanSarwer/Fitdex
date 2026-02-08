@@ -129,6 +129,26 @@ function UserDashboardContent() {
     activeMembership?.planType === "YEARLY" ? "Yearly commitment" : null,
     activeDuo ? "Duo partner" : null,
   ].filter(Boolean) as string[];
+  const progressSteps = [
+    {
+      title: "Explore gyms",
+      description: "Find the vibe that fits your goals.",
+      href: "/explore",
+      complete: Boolean(location || savedGyms.length > 0 || memberships.length > 0),
+    },
+    {
+      title: "Invite a duo partner",
+      description: "Unlock partner savings together.",
+      href: "/dashboard/user/duo",
+      complete: Boolean(activeDuo),
+    },
+    {
+      title: "Join a gym",
+      description: "Start your membership momentum.",
+      href: "/explore",
+      complete: Boolean(activeMembership),
+    },
+  ];
 
   if (loading) {
     return (
@@ -168,6 +188,9 @@ function UserDashboardContent() {
             {location && <MapPin className="h-4 w-4" />}
             {session?.user?.email}
           </p>
+          <p className="text-sm text-muted-foreground mt-2">
+            Let’s keep the streak alive — every small step counts.
+          </p>
         </div>
         <div className="flex flex-wrap gap-3">
           <Button asChild variant={activeMembership ? "outline" : "default"}>
@@ -178,6 +201,57 @@ function UserDashboardContent() {
           </Button>
         </div>
       </div>
+
+      <Card className="glass-card border border-white/10 p-6 transition-all hover:border-primary/30 hover:shadow-lg">
+        <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+          <div className="space-y-2">
+            <div className="inline-flex items-center gap-2 rounded-full bg-primary/10 px-3 py-1 text-xs text-primary">
+              Getting started
+            </div>
+            <h2 className="text-xl font-semibold">Build your Fitdex momentum</h2>
+            <p className="text-sm text-muted-foreground">
+              Complete these steps to unlock a confident, consistent routine.
+            </p>
+          </div>
+          <div className="text-sm text-muted-foreground">
+            {progressSteps.filter((step) => step.complete).length} of {progressSteps.length} completed
+          </div>
+        </div>
+        <div className="mt-4 grid gap-3 md:grid-cols-3">
+          {progressSteps.map((step) => (
+            <Link
+              key={step.title}
+              href={step.href}
+              className={`group rounded-xl border border-white/10 p-4 transition-all hover:border-primary/40 hover:bg-white/5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/60 ${
+                step.complete ? "bg-emerald-500/10" : "bg-transparent"
+              }`}
+            >
+              <div className="flex items-center justify-between">
+                <p className="font-medium">
+                  {step.title}
+                </p>
+                <span
+                  className={
+                    step.complete
+                      ? "rounded-full bg-emerald-500/20 px-2 py-0.5 text-xs text-emerald-200"
+                      : "rounded-full bg-white/10 px-2 py-0.5 text-xs text-muted-foreground"
+                  }
+                >
+                  {step.complete ? "Done" : "Next"}
+                </span>
+              </div>
+              <p className="text-sm text-muted-foreground mt-1">
+                {step.description}
+              </p>
+              <span className="mt-3 inline-flex text-xs font-medium text-primary/80 group-hover:text-primary">
+                {step.complete ? "Review" : "Start"}
+              </span>
+            </Link>
+          ))}
+        </div>
+      </Card>
+
+      <div className="h-px bg-white/10" />
 
       {location && (
         <div className="h-48 rounded-2xl overflow-hidden">
@@ -205,7 +279,7 @@ function UserDashboardContent() {
       {activeMembership ? (
         <>
           <div className="grid gap-4 md:grid-cols-3">
-            <Card className="glass-card">
+            <Card className="glass-card transition-all hover:border-primary/30 hover:shadow-lg">
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
                   <Sparkles className="h-5 w-5" />
@@ -217,7 +291,7 @@ function UserDashboardContent() {
                 {formatPrice(activeMembership.finalPrice)} per {activeMembership.planType === "YEARLY" ? "year" : "month"}
               </CardContent>
             </Card>
-            <Card className="glass-card">
+            <Card className="glass-card transition-all hover:border-primary/30 hover:shadow-lg">
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
                   <Trophy className="h-5 w-5" />
@@ -229,7 +303,7 @@ function UserDashboardContent() {
                 <p className="text-3xl font-bold text-primary">{streakDays} days</p>
               </CardContent>
             </Card>
-            <Card className="glass-card">
+            <Card className="glass-card transition-all hover:border-primary/30 hover:shadow-lg">
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
                   <Users className="h-5 w-5" />
@@ -245,7 +319,7 @@ function UserDashboardContent() {
             </Card>
           </div>
 
-          <Card className="glass-card">
+          <Card className="glass-card transition-all hover:border-primary/30 hover:shadow-lg">
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <CreditCard className="h-5 w-5" />
@@ -273,7 +347,7 @@ function UserDashboardContent() {
           </Card>
 
           <div className="grid gap-4 md:grid-cols-2">
-            <Card className="glass-card">
+            <Card className="glass-card transition-all hover:border-primary/30 hover:shadow-lg">
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
                   <Trophy className="h-5 w-5" />
@@ -289,11 +363,11 @@ function UserDashboardContent() {
                     </span>
                   ))
                 ) : (
-                  <span className="text-sm text-muted-foreground">No badges yet</span>
+                  <span className="text-sm text-muted-foreground">Your first badge is closer than you think.</span>
                 )}
               </CardContent>
             </Card>
-            <Card className="glass-card">
+            <Card className="glass-card transition-all hover:border-primary/30 hover:shadow-lg">
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
                   <Bookmark className="h-5 w-5" />
@@ -319,15 +393,20 @@ function UserDashboardContent() {
                     ))}
                   </div>
                 ) : (
-                  <Button asChild size="sm" variant="outline">
-                    <Link href="/explore">Browse gyms</Link>
-                  </Button>
+                  <div className="space-y-2">
+                    <p className="text-sm text-muted-foreground">
+                      Save a gym to return quickly and compare options.
+                    </p>
+                    <Button asChild size="sm" variant="outline">
+                      <Link href="/explore">Browse gyms</Link>
+                    </Button>
+                  </div>
                 )}
               </CardContent>
             </Card>
           </div>
 
-          <Card className="glass-card">
+          <Card className="glass-card transition-all hover:border-primary/30 hover:shadow-lg">
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <Users className="h-5 w-5" />
@@ -355,15 +434,34 @@ function UserDashboardContent() {
 
         </>
       ) : (
-        <Card className="glass-card p-12 text-center">
-          <p className="text-muted-foreground mb-4">No active membership</p>
-          <div className="flex flex-col sm:flex-row gap-3 justify-center">
-            <Button asChild>
-              <Link href="/explore">Explore gyms</Link>
-            </Button>
-            <Button asChild variant="outline">
-              <Link href="/dashboard/user/duo">Find a duo</Link>
-            </Button>
+        <Card className="glass-card p-8 md:p-10 text-left transition-all hover:border-primary/30 hover:shadow-lg">
+          <div className="flex flex-col gap-6 md:flex-row md:items-center md:justify-between">
+            <div className="space-y-2">
+              <h2 className="text-xl font-semibold">No membership yet</h2>
+              <p className="text-sm text-muted-foreground">
+                Start with a gym visit, invite a duo, and build momentum at your pace.
+              </p>
+            </div>
+            <div className="flex flex-col sm:flex-row gap-3">
+              <Button asChild>
+                <Link href="/explore">Explore gyms</Link>
+              </Button>
+              <Button asChild variant="outline">
+                <Link href="/dashboard/user/duo">Find a duo</Link>
+              </Button>
+            </div>
+          </div>
+          <div className="mt-6 grid gap-3 md:grid-cols-3">
+            {progressSteps.map((step) => (
+              <Link
+                key={`${step.title}-empty`}
+                href={step.href}
+                className="rounded-xl border border-white/10 p-4 text-sm transition-all hover:border-primary/40 hover:bg-white/5"
+              >
+                <p className="font-medium">{step.title}</p>
+                <p className="text-muted-foreground mt-1">{step.description}</p>
+              </Link>
+            ))}
           </div>
         </Card>
       )}

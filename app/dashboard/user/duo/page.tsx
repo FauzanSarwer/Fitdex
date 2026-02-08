@@ -173,12 +173,40 @@ export default function DuoPage() {
           Duo
         </h1>
         <p className="text-muted-foreground text-sm">
-          Invite a partner to join your gym. If they join, your partner discount will apply on your next renewal.
+          Pair up to save together and stay accountable.
         </p>
       </motion.div>
 
+      <div className="grid gap-4 md:grid-cols-3">
+        <Card className="glass-card border border-white/10 md:col-span-2">
+          <CardHeader>
+            <CardTitle>Duo benefits</CardTitle>
+            <CardDescription>Small wins feel bigger together.</CardDescription>
+          </CardHeader>
+          <CardContent className="text-sm text-muted-foreground grid gap-2">
+            <div className="flex items-center justify-between">
+              <span>Partner savings on renewal</span>
+              <span className="rounded-full bg-emerald-500/15 px-2 py-0.5 text-xs text-emerald-200">Savings</span>
+            </div>
+            <div className="flex items-center justify-between">
+              <span>Motivation through accountability</span>
+              <span className="rounded-full bg-white/10 px-2 py-0.5 text-xs">Support</span>
+            </div>
+          </CardContent>
+        </Card>
+        <Card className="glass-card border border-white/10">
+          <CardHeader>
+            <CardTitle>Tip</CardTitle>
+            <CardDescription>Use WhatsApp for fastest invites.</CardDescription>
+          </CardHeader>
+          <CardContent className="text-sm text-muted-foreground">
+            Share a link or code in seconds and keep the momentum going.
+          </CardContent>
+        </Card>
+      </div>
+
       {activeDuo && (
-        <Card className="glass-card">
+        <Card className="glass-card border border-white/10">
           <CardHeader>
             <CardTitle>Active duo</CardTitle>
             <CardDescription>
@@ -189,7 +217,7 @@ export default function DuoPage() {
       )}
 
       {inviteStatuses.length > 0 && (
-        <Card className="glass-card">
+        <Card className="glass-card border border-white/10">
           <CardHeader>
             <CardTitle>Duo invite status</CardTitle>
             <CardDescription>Track your recent invites.</CardDescription>
@@ -218,121 +246,130 @@ export default function DuoPage() {
         </Card>
       )}
 
-      {!activeDuo && (
-        <Card className="glass-card">
-          <CardHeader>
-            <CardTitle>Invite partner (discount on next renewal)</CardTitle>
-            <CardDescription>
-              Invite someone before or after you join. They get the discount when they join. Your partner discount applies on your next renewal cycle.
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="space-y-2">
-              <Label>Choose a gym</Label>
-              <select
-                className="w-full rounded-md border border-white/10 bg-transparent px-3 py-2 text-sm"
-                value={inviteGymId}
-                onChange={(e) => setInviteGymId(e.target.value)}
-              >
-                <option value="">Select a gym</option>
-                {gyms.map((gym) => (
-                  <option key={gym.id} value={gym.id}>
-                    {gym.name}
-                  </option>
-                ))}
-              </select>
-            </div>
-            <div className="space-y-2">
-              <Label>Partner email (optional)</Label>
-              <div className="flex gap-2">
-                <Input
-                  type="email"
-                  placeholder="partner@example.com"
-                  value={inviteEmail}
-                  onChange={(e) => setInviteEmail(e.target.value)}
-                />
-                <Button onClick={sendInvite} disabled={sending || !emailVerified}>
-                  {sending ? "Sending…" : "Send invite"}
-                </Button>
-              </div>
-            </div>
-            <div className="space-y-2">
-              <Label>Or generate code</Label>
-              <Button
-                variant="outline"
-                disabled={!emailVerified}
-                onClick={() =>
-                  fetchJson<{ code?: string }>("/api/duos", {
-                    method: "POST",
-                    headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({ gymId: inviteGymId, joinTogether: !activeMembership }),
-                    retries: 1,
-                  }).then((result) => {
-                    if (result.ok && result.data?.code) {
-                      setLastInviteCode(result.data.code);
-                      toast({ title: "Code", description: result.data.code });
-                    }
-                  })
-                }
-              >
-                Generate code
-              </Button>
-            </div>
-            {lastInviteCode && (
+      <div className="grid gap-4 lg:grid-cols-[1.2fr_0.8fr]">
+        {!activeDuo && (
+          <Card className="glass-card border border-primary/20">
+            <CardHeader>
+              <CardTitle>Invite partner</CardTitle>
+              <CardDescription>
+                Primary flow — get them in fast and lock in duo savings.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
               <div className="space-y-2">
-                <Label>Share partner link</Label>
-                <div className="flex flex-wrap gap-2">
-                  <Button
-                    variant="secondary"
-                    onClick={() => {
-                      const link = `${window.location.origin}/invite/${lastInviteCode}`;
-                      navigator.clipboard.writeText(link);
-                      toast({ title: "Link copied", description: "Invite link copied to clipboard" });
-                    }}
-                  >
-                    Copy partner link
-                  </Button>
-                  <Button
-                    variant="outline"
-                    onClick={() => {
-                      const link = `${window.location.origin}/invite/${lastInviteCode}`;
-                      const gymName = gyms.find((g) => g.id === inviteGymId)?.name ?? "a gym";
-                      const text = `Join me at ${gymName} on Fitdex and unlock partner discount. Invite link: ${link}`;
-                      window.open(`https://wa.me/?text=${encodeURIComponent(text)}`, "_blank");
-                    }}
-                  >
-                    Send via WhatsApp
+                <Label>Choose a gym</Label>
+                <select
+                  className="w-full rounded-md border border-white/10 bg-transparent px-3 py-2 text-sm"
+                  value={inviteGymId}
+                  onChange={(e) => setInviteGymId(e.target.value)}
+                >
+                  <option value="">Select a gym</option>
+                  {gyms.map((gym) => (
+                    <option key={gym.id} value={gym.id}>
+                      {gym.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div className="space-y-2">
+                <Label>Partner email (optional)</Label>
+                <div className="flex flex-col gap-2 sm:flex-row">
+                  <Input
+                    type="email"
+                    placeholder="partner@example.com"
+                    value={inviteEmail}
+                    onChange={(e) => setInviteEmail(e.target.value)}
+                  />
+                  <Button onClick={sendInvite} disabled={sending || !emailVerified}>
+                    {sending ? "Sending…" : "Send invite"}
                   </Button>
                 </div>
               </div>
-            )}
+              <div className="space-y-2">
+                <Label>Or generate a share code</Label>
+                <p className="text-xs text-muted-foreground">
+                  Great for WhatsApp or SMS. Your partner will paste the code to join.
+                </p>
+                <Button
+                  variant="outline"
+                  disabled={!emailVerified}
+                  onClick={() =>
+                    fetchJson<{ code?: string }>("/api/duos", {
+                      method: "POST",
+                      headers: { "Content-Type": "application/json" },
+                      body: JSON.stringify({ gymId: inviteGymId, joinTogether: !activeMembership }),
+                      retries: 1,
+                    }).then((result) => {
+                      if (result.ok && result.data?.code) {
+                        setLastInviteCode(result.data.code);
+                        toast({ title: "Code", description: result.data.code });
+                      }
+                    })
+                  }
+                >
+                  Generate code
+                </Button>
+              </div>
+              {lastInviteCode && (
+                <div className="space-y-2">
+                  <Label>Share partner link</Label>
+                  <div className="flex flex-wrap gap-2">
+                    <Button
+                      onClick={() => {
+                        const link = `${window.location.origin}/invite/${lastInviteCode}`;
+                        const gymName = gyms.find((g) => g.id === inviteGymId)?.name ?? "a gym";
+                        const text = `Join me at ${gymName} on Fitdex and unlock partner discount. Invite link: ${link}`;
+                        window.open(`https://wa.me/?text=${encodeURIComponent(text)}`, "_blank");
+                      }}
+                    >
+                      Send via WhatsApp
+                    </Button>
+                    <Button
+                      variant="outline"
+                      onClick={() => {
+                        const link = `${window.location.origin}/invite/${lastInviteCode}`;
+                        navigator.clipboard.writeText(link);
+                        toast({ title: "Link copied", description: "Invite link copied to clipboard" });
+                      }}
+                    >
+                      Copy partner link
+                    </Button>
+                  </div>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        )}
+
+        <Card className="glass-card border border-white/10">
+          <CardHeader>
+            <CardTitle>Accept invite</CardTitle>
+            <CardDescription>Secondary flow — enter a code to join.</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            <div className="flex flex-col gap-2 sm:flex-row">
+              <Input
+                placeholder="ABC123XY"
+                value={acceptCode}
+                onChange={(e) => setAcceptCode(e.target.value.toUpperCase())}
+                className="uppercase"
+              />
+              <Button onClick={acceptInvite} disabled={accepting || !acceptCode.trim() || !emailVerified}>
+                {accepting ? "Accepting…" : "Accept"}
+              </Button>
+            </div>
+            <p className="text-xs text-muted-foreground">
+              The code is case-insensitive and expires after 7 days.
+            </p>
           </CardContent>
         </Card>
-      )}
-
-      <Card className="glass-card">
-        <CardHeader>
-          <CardTitle>Accept invite</CardTitle>
-          <CardDescription>Have a code? Enter it below.</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="flex gap-2">
-            <Input
-              placeholder="ABC123XY"
-              value={acceptCode}
-              onChange={(e) => setAcceptCode(e.target.value.toUpperCase())}
-              className="uppercase"
-            />
-            <Button onClick={acceptInvite} disabled={accepting || !acceptCode.trim() || !emailVerified}>
-              {accepting ? "Accepting…" : "Accept"}
-            </Button>
-          </div>
-        </CardContent>
-      </Card>
+      </div>
 
       {!activeMembership && (
-        <Card className="glass-card p-8 text-center">
-          <p className="text-muted-foreground">Join a gym first to invite a duo partner.</p>
+        <Card className="glass-card p-6 border border-white/10">
+          <p className="text-sm text-muted-foreground">
+            Join a gym first to unlock duo invites and shared savings.
+          </p>
         </Card>
       )}
     </div>
