@@ -19,6 +19,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { MapView } from "@/components/maps/MapView";
 import { buildGymSlug, cn, formatPrice } from "@/lib/utils";
+import { getGymTierRank, isGymFeatured } from "@/lib/gym-utils";
 import { Skeleton } from "@/components/ui/skeleton";
 import { getGymOpenStatus } from "@/lib/gym-hours";
 import { fetchJson } from "@/lib/client-fetch";
@@ -43,6 +44,12 @@ interface Gym {
   coverImageUrl?: string | null;
   featuredUntil?: string | Date | null;
   verifiedUntil?: string | Date | null;
+  isFeatured?: boolean | null;
+  featuredStartAt?: string | Date | null;
+  featuredEndAt?: string | Date | null;
+  gymTier?: string | null;
+  hasAC?: boolean;
+  amenities?: string[];
 }
 
 type SortOption = "price_asc" | "price_desc" | "distance" | "newest";
@@ -275,9 +282,7 @@ export default function ExplorePage() {
       list = list.filter((g) => (g.distance ?? Infinity) <= distCap * 1000);
     }
     if (onlyFeatured) {
-      list = list.filter(
-        (g) => g.featuredUntil && new Date(g.featuredUntil).getTime() > Date.now()
-      );
+      list = list.filter((g) => isGymFeatured(g));
     }
     if (onlyVerified) {
       list = list.filter(
@@ -285,22 +290,27 @@ export default function ExplorePage() {
       );
     }
 
+    const tierSort = (a: Gym, b: Gym) => getGymTierRank(a.gymTier) - getGymTierRank(b.gymTier);
+    const featuredSort = (a: Gym, b: Gym) => {
+      const aFeatured = isGymFeatured(a);
+      const bFeatured = isGymFeatured(b);
+      if (aFeatured !== bFeatured) return aFeatured ? -1 : 1;
+      return 0;
+    };
+
     switch (sortBy) {
       case "price_asc":
-        list.sort((a, b) => a.monthlyPrice - b.monthlyPrice);
+        list.sort((a, b) => tierSort(a, b) || a.monthlyPrice - b.monthlyPrice || (a.distance ?? Infinity) - (b.distance ?? Infinity) || featuredSort(a, b));
         break;
       case "price_desc":
-        list.sort((a, b) => b.monthlyPrice - a.monthlyPrice);
+        list.sort((a, b) => tierSort(a, b) || b.monthlyPrice - a.monthlyPrice || (a.distance ?? Infinity) - (b.distance ?? Infinity) || featuredSort(a, b));
         break;
       case "newest":
-        list.sort((a, b) =>
-          new Date(b.createdAt ?? 0).getTime() -
-          new Date(a.createdAt ?? 0).getTime()
-        );
+        list.sort((a, b) => tierSort(a, b) || new Date(b.createdAt ?? 0).getTime() - new Date(a.createdAt ?? 0).getTime() || featuredSort(a, b));
         break;
       case "distance":
       default:
-        list.sort((a, b) => (a.distance ?? Infinity) - (b.distance ?? Infinity));
+        list.sort((a, b) => tierSort(a, b) || (a.distance ?? Infinity) - (b.distance ?? Infinity) || featuredSort(a, b) || a.monthlyPrice - b.monthlyPrice);
     }
     return list;
   }, [gyms, maxDistance, maxPrice, query, sortBy, onlyFeatured, onlyVerified]);
@@ -608,7 +618,8 @@ export default function ExplorePage() {
       ) : (
         <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
           {filteredGyms.map((gym, i) => {
-            const isFeatured = gym.featuredUntil && new Date(gym.featuredUntil).getTime() > Date.now();
+            const isFeatured = isGymFeatured(gym);
+            const amenities = (gym.amenities ?? []).filter(Boolean).slice(0, 3);
             const images = gym.coverImageUrl ? [gym.coverImageUrl] : [];
             return (
             <motion.div
@@ -648,6 +659,11 @@ export default function ExplorePage() {
                           Unverified
                         </span>
                       )}
+                      {gym.hasAC && (
+                        <span className="text-[10px] uppercase tracking-wide bg-sky-500/20 text-sky-300 px-2 py-0.5 rounded-full">
+                          AC
+                        </span>
+                      )}
                       {status === "authenticated" && (
                         <button
                           type="button"
@@ -670,6 +686,18 @@ export default function ExplorePage() {
                   <p className={`text-xs mt-1 ${getGymOpenStatus({ ...gym, useIst: true }).isOpen ? "text-emerald-400" : "text-muted-foreground"}`}>
                     {getGymOpenStatus({ ...gym, useIst: true }).label}
                   </p>
+                  {amenities.length > 0 && (
+                    <div className="mt-2 flex flex-wrap gap-1">
+                      {amenities.map((item) => (
+                        <span
+                          key={item}
+                          className="text-[10px] uppercase tracking-wide border border-white/10 px-2 py-0.5 rounded-full text-muted-foreground"
+                        >
+                          {item}
+                        </span>
+                      ))}
+                    </div>
+                  )}
                 </CardHeader>
                 <CardContent className="flex items-center justify-between">
                   <div>

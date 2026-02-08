@@ -32,6 +32,7 @@ export default function OwnerDashboardPage() {
   const MAX_UPLOAD_BYTES = 2 * 1024 * 1024;
   const [gyms, setGyms] = useState<any[]>([]);
   const [transactions, setTransactions] = useState<Transaction[]>([]);
+  const [leads, setLeads] = useState<Array<{ gymId: string; gymName: string; totalLeads: number; leadsLast30Days: number }>>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [gstGym, setGstGym] = useState<any | null>(null);
@@ -44,6 +45,10 @@ export default function OwnerDashboardPage() {
   const [uploading, setUploading] = useState(false);
   const [submittingGst, setSubmittingGst] = useState(false);
   const [featuring, setFeaturing] = useState<string | null>(null);
+  const [invoiceNumber, setInvoiceNumber] = useState("");
+  const [invoiceLookup, setInvoiceLookup] = useState<any | null>(null);
+  const [invoiceLookupError, setInvoiceLookupError] = useState<string | null>(null);
+  const [invoiceLookupLoading, setInvoiceLookupLoading] = useState(false);
   const paymentsEnabled = isPaymentsEnabled();
 
   useEffect(() => {
@@ -51,8 +56,12 @@ export default function OwnerDashboardPage() {
     Promise.all([
       fetchJson<{ gyms?: any[]; error?: string }>("/api/owner/gym", { retries: 1 }),
       fetchJson<{ transactions?: Transaction[]; error?: string }>("/api/owner/transactions", { retries: 1 }),
+      fetchJson<{ leads?: Array<{ gymId: string; gymName: string; totalLeads: number; leadsLast30Days: number }>; error?: string }>(
+        "/api/owner/leads",
+        { retries: 1 }
+      ),
     ])
-      .then(([gymResult, txResult]) => {
+      .then(([gymResult, txResult, leadsResult]) => {
         if (!active) return;
         if (!gymResult.ok) {
           setError(gymResult.error ?? "Failed to load gyms");
@@ -64,6 +73,11 @@ export default function OwnerDashboardPage() {
           setTransactions(txResult.data?.transactions ?? []);
         } else {
           setTransactions([]);
+        }
+        if (leadsResult.ok) {
+          setLeads(leadsResult.data?.leads ?? []);
+        } else {
+          setLeads([]);
         }
       })
       .catch(() => {
@@ -187,6 +201,79 @@ export default function OwnerDashboardPage() {
               <CardDescription>Total members</CardDescription>
               <CardTitle className="text-3xl">{totalMembers}</CardTitle>
             </CardHeader>
+          </Card>
+        </div>
+      )}
+
+      {gyms.length > 0 && (
+        <div className="grid gap-4 md:grid-cols-2">
+          <Card className="glass-card">
+            <CardHeader>
+              <CardTitle>Leads</CardTitle>
+              <CardDescription>Total and last 30 days</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-2">
+              {leads.length === 0 ? (
+                <p className="text-sm text-muted-foreground">No leads yet.</p>
+              ) : (
+                <div className="space-y-2">
+                  {leads.map((l) => (
+                    <div key={l.gymId} className="flex items-center justify-between text-sm">
+                      <div className="text-muted-foreground">{l.gymName}</div>
+                      <div className="text-foreground">{l.totalLeads} · last 30 days {l.leadsLast30Days}</div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+          <Card className="glass-card">
+            <CardHeader>
+              <CardTitle>Invoice lookup</CardTitle>
+              <CardDescription>Search by invoice number</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              <div className="flex items-center gap-2">
+                <Input
+                  value={invoiceNumber}
+                  onChange={(e) => setInvoiceNumber(e.target.value)}
+                  placeholder="INV-202602-1234"
+                />
+                <Button
+                  size="sm"
+                  disabled={!invoiceNumber.trim() || invoiceLookupLoading}
+                  onClick={async () => {
+                    setInvoiceLookupLoading(true);
+                    setInvoiceLookupError(null);
+                    setInvoiceLookup(null);
+                    const res = await fetchJson<{ invoice?: any; error?: string }>(
+                      `/api/owner/invoices/lookup?invoiceNumber=${encodeURIComponent(invoiceNumber.trim())}`,
+                      { retries: 1 }
+                    );
+                    if (res.ok && res.data?.invoice) {
+                      setInvoiceLookup(res.data.invoice);
+                    } else {
+                      setInvoiceLookupError(res.error ?? "Invoice not found");
+                    }
+                    setInvoiceLookupLoading(false);
+                  }}
+                >
+                  {invoiceLookupLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : "Lookup"}
+                </Button>
+              </div>
+              {invoiceLookupError && <p className="text-sm text-muted-foreground">{invoiceLookupError}</p>}
+              {invoiceLookup && (
+                <div className="flex items-center justify-between rounded-lg border border-white/10 px-3 py-2 text-sm">
+                  <div>
+                    <div className="font-medium">{invoiceLookup.invoiceNumber}</div>
+                    <div className="text-xs text-muted-foreground">Issued {new Date(invoiceLookup.issuedAt).toLocaleDateString()}</div>
+                  </div>
+                  <Button asChild size="sm" variant="outline">
+                    <a href={`/api/owner/invoices/${invoiceLookup.id}`}>Download PDF</a>
+                  </Button>
+                </div>
+              )}
+            </CardContent>
           </Card>
         </div>
       )}

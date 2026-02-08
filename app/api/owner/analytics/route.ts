@@ -38,7 +38,16 @@ export async function GET(req: Request) {
       where: { gymId },
       orderBy: { startedAt: "asc" },
     });
+    const leads = await prisma.lead.findMany({
+      where: { gymId },
+      orderBy: { createdAt: "asc" },
+    });
+    const paidTransactions = await prisma.transaction.findMany({
+      where: { gymId, paymentStatus: "PAID" },
+      orderBy: { createdAt: "asc" },
+    });
     const totalRevenue = payments.reduce((s, p) => s + p.amount, 0);
+    const estimatedRevenue = paidTransactions.reduce((s, t) => s + t.totalAmount, 0);
     const byMonth: Record<string, number> = {};
     for (const p of payments) {
       const key = `${p.createdAt.getFullYear()}-${String(p.createdAt.getMonth() + 1).padStart(2, "0")}`;
@@ -69,8 +78,32 @@ export async function GET(req: Request) {
     });
     const avgRevenuePerMember = activeMembers > 0 ? Math.round(totalRevenue / activeMembers) : 0;
     const duoRate = activeMembers > 0 ? Math.round((activeDuos / activeMembers) * 100) : 0;
+
+    const now = new Date();
+    const day = now.getDay();
+    const diffToMonday = (day + 6) % 7;
+    const startOfWeek = new Date(now);
+    startOfWeek.setHours(0, 0, 0, 0);
+    startOfWeek.setDate(now.getDate() - diffToMonday);
+    const startOfPrevWeek = new Date(startOfWeek);
+    startOfPrevWeek.setDate(startOfWeek.getDate() - 7);
+
+    const currentWeekBookings = paidTransactions.filter((t) => t.createdAt >= startOfWeek).length;
+    const previousWeekBookings = paidTransactions.filter(
+      (t) => t.createdAt >= startOfPrevWeek && t.createdAt < startOfWeek
+    ).length;
+
+    const thirtyDaysAgo = new Date();
+    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+    const totalLeads = leads.length;
+    const leadsLast30Days = leads.filter((l) => l.createdAt >= thirtyDaysAgo).length;
     return NextResponse.json({
       totalRevenue,
+      estimatedRevenue,
+      totalLeads,
+      leadsLast30Days,
+      bookingsCurrentWeek: currentWeekBookings,
+      bookingsPreviousWeek: previousWeekBookings,
       revenueByMonth: byMonth,
       activeMembers,
       totalMembers,

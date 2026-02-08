@@ -27,7 +27,7 @@ export async function GET(
     if (!gym) {
       return NextResponse.json({ error: "Gym not found" }, { status: 404 });
     }
-    if (gym.verificationStatus === "REJECTED") {
+    if (gym.verificationStatus === "REJECTED" || gym.suspendedAt || !gym.ownerConsentAt) {
       return NextResponse.json({ error: "Gym not available" }, { status: 403 });
     }
     const monthly = gym.monthlyPrice;
@@ -67,10 +67,15 @@ export async function GET(
         yearlyDiscountValue: gym.yearlyDiscountValue,
         welcomeDiscountType: gym.welcomeDiscountType,
         welcomeDiscountValue: gym.welcomeDiscountValue,
+        hasAC: gym.hasAC,
+        amenities: gym.amenities,
         instagramUrl: gym.instagramUrl,
         facebookUrl: gym.facebookUrl,
         youtubeUrl: gym.youtubeUrl,
         featuredUntil: gym.featuredUntil,
+        isFeatured: gym.isFeatured,
+        featuredStartAt: gym.featuredStartAt,
+        featuredEndAt: gym.featuredEndAt,
         verifiedUntil: gym.verifiedUntil,
         yearlySavePercent,
         quarterlySavePercent,

@@ -31,6 +31,7 @@ export async function POST(req: Request) {
   if (!gymId || !orderId || !paymentId || !signature) {
     return jsonError("Missing fields", 400);
   }
+  let purchaseId: string | null = null;
   try {
     const gym = await prisma.gym.findFirst({ where: { id: gymId, ownerId: uid } });
     if (!gym) {
@@ -42,22 +43,7 @@ export async function POST(req: Request) {
     if (!purchase) {
       return jsonError("Purchase not found", 404);
     }
-    const now = new Date();
-    const isAlreadyFeatured = gym.featuredUntil && gym.featuredUntil > now;
-    if (!isAlreadyFeatured) {
-      const [totalGyms, featuredCount] = await Promise.all([
-        prisma.gym.count({ where: { verificationStatus: { not: "REJECTED" } } }),
-        prisma.gym.count({ where: { featuredUntil: { gt: now }, verificationStatus: { not: "REJECTED" } } }),
-      ]);
-      const maxFeatured = Math.max(1, Math.floor(totalGyms * 0.2));
-      if (featuredCount >= maxFeatured) {
-        await prisma.featuredListingPurchase.update({
-          where: { id: purchase.id },
-          data: { status: "FAILED" },
-        });
-        return jsonError("All featured slots are full. Check back tomorrow.", 409);
-      }
-    }
+    purchaseId = purchase.id;
     if (!verifyRazorpayPaymentSignature(orderId, paymentId, signature)) {
       await prisma.featuredListingPurchase.update({
         where: { id: purchase.id },
@@ -65,21 +51,68 @@ export async function POST(req: Request) {
       });
       return jsonError("Invalid signature", 400);
     }
-    const current = gym.featuredUntil && gym.featuredUntil > now ? gym.featuredUntil : now;
-    const featuredUntil = new Date(current.getTime() + FEATURE_DAYS * 24 * 60 * 60 * 1000);
-    await prisma.featuredListingPurchase.update({
-      where: { id: purchase.id },
-      data: { status: "CAPTURED", razorpayPaymentId: paymentId },
-    });
-    const updated = await prisma.gym.update({
-      where: { id: gymId },
-      data: { featuredUntil },
-    });
+    const updated = await prisma.$transaction(async (tx) => {
+      const fresh = await tx.gym.findFirst({ where: { id: gymId, ownerId: uid } });
+      if (!fresh) throw new Error("GYM_NOT_FOUND");
+      const now = new Date();
+      const isAlreadyFeatured = (fresh.featuredEndAt && fresh.featuredEndAt > now) || (fresh.featuredUntil && fresh.featuredUntil > now);
+      if (!isAlreadyFeatured) {
+        const area = fresh.city ?? "UNKNOWN";
+        const [totalGyms, featuredCount] = await Promise.all([
+          tx.gym.count({ where: { verificationStatus: { not: "REJECTED" }, city: area } }),
+          tx.gym.count({
+            where: {
+              verificationStatus: { not: "REJECTED" },
+              city: area,
+              OR: [
+                { featuredEndAt: { gt: now } },
+                { featuredUntil: { gt: now } },
+              ],
+            },
+          }),
+        ]);
+        const maxFeatured = Math.max(1, Math.floor(totalGyms * 0.2));
+        if (featuredCount >= maxFeatured) {
+          throw new Error("FEATURED_FULL");
+        }
+      }
+      const current = fresh.featuredEndAt && fresh.featuredEndAt > now
+        ? fresh.featuredEndAt
+        : fresh.featuredUntil && fresh.featuredUntil > now
+          ? fresh.featuredUntil
+          : now;
+      const featuredEndAt = new Date(current.getTime() + FEATURE_DAYS * 24 * 60 * 60 * 1000);
+      await tx.featuredListingPurchase.update({
+        where: { id: purchase.id },
+        data: { status: "CAPTURED", razorpayPaymentId: paymentId },
+      });
+      return tx.gym.update({
+        where: { id: gymId },
+        data: {
+          isFeatured: true,
+          featuredStartAt: fresh.featuredStartAt ?? now,
+          featuredEndAt,
+          featuredUntil: featuredEndAt,
+        },
+      });
+    }, { isolationLevel: "Serializable" });
     return NextResponse.json({
       ok: true,
-      featuredUntil: updated.featuredUntil,
+      featuredUntil: updated.featuredEndAt ?? updated.featuredUntil,
     });
   } catch (error) {
+    if (error instanceof Error && error.message === "FEATURED_FULL") {
+      if (purchaseId) {
+        await prisma.featuredListingPurchase.update({
+          where: { id: purchaseId },
+          data: { status: "FAILED" },
+        });
+      }
+      return jsonError("All featured slots are full. Check back tomorrow.", 409);
+    }
+    if (error instanceof Error && error.message === "GYM_NOT_FOUND") {
+      return jsonError("Gym not found", 404);
+    }
     if (error instanceof PaymentConfigError) {
       return jsonError("Payments unavailable", 503);
     }

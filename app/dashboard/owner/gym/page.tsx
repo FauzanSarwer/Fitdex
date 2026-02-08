@@ -33,11 +33,15 @@ export default function OwnerGymPage() {
     monthlyPrice: "",
     quarterlyPrice: "",
     yearlyPrice: "",
+    hasAC: false,
+    amenities: "",
+    ownerConsent: false,
   });
   const [saving, setSaving] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [featuring, setFeaturing] = useState<string | null>(null);
   const [verifying, setVerifying] = useState<string | null>(null);
+  const [consentSaving, setConsentSaving] = useState(false);
   const paymentsEnabled = isPaymentsEnabled();
 
   const primaryGym = gyms[0];
@@ -57,6 +61,10 @@ export default function OwnerGymPage() {
     {
       label: "Submit verification",
       done: !!primaryGym && primaryGym.verificationStatus !== "UNVERIFIED",
+    },
+    {
+      label: "Owner consent recorded",
+      done: !!primaryGym?.ownerConsentAt,
     },
   ];
   const completedSteps = onboardingSteps.filter((s) => s.done).length;
@@ -111,6 +119,9 @@ export default function OwnerGymPage() {
           monthlyPrice: Math.round(parseFloat(form.monthlyPrice) * 100) || 29900,
           quarterlyPrice: form.quarterlyPrice ? Math.round(parseFloat(form.quarterlyPrice) * 100) : null,
           yearlyPrice: Math.round(parseFloat(form.yearlyPrice) * 100) || 299000,
+          hasAC: form.hasAC,
+          amenities: form.amenities,
+          ownerConsent: form.ownerConsent,
         }),
         retries: 1,
       });
@@ -138,6 +149,9 @@ export default function OwnerGymPage() {
         monthlyPrice: "",
         quarterlyPrice: "",
         yearlyPrice: "",
+        hasAC: false,
+        amenities: "",
+        ownerConsent: false,
       });
     } catch {
       toast({ title: "Error", variant: "destructive" });
@@ -240,6 +254,26 @@ export default function OwnerGymPage() {
                   placeholder="Address"
                   required
                 />
+              </div>
+              <div className="space-y-2">
+                <Label>Amenities (comma separated)</Label>
+                <Input
+                  value={form.amenities}
+                  onChange={(e) => setForm((p) => ({ ...p, amenities: e.target.value }))}
+                  placeholder="AC, Shower, Parking"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>AC available</Label>
+                <div className="flex items-center gap-2">
+                  <input
+                    id="hasAC"
+                    type="checkbox"
+                    checked={form.hasAC}
+                    onChange={(e) => setForm((p) => ({ ...p, hasAC: e.target.checked }))}
+                  />
+                  <Label htmlFor="hasAC" className="text-sm text-muted-foreground">This gym has air conditioning</Label>
+                </div>
               </div>
               <div className="space-y-2">
                 <Label>Gym photo (required)</Label>
@@ -424,6 +458,20 @@ export default function OwnerGymPage() {
                   placeholder="2990"
                 />
               </div>
+              <div className="space-y-2 md:col-span-2">
+                <div className="flex items-start gap-2">
+                  <input
+                    id="ownerConsent"
+                    type="checkbox"
+                    checked={form.ownerConsent}
+                    onChange={(e) => setForm((p) => ({ ...p, ownerConsent: e.target.checked }))}
+                    required
+                  />
+                  <Label htmlFor="ownerConsent" className="text-sm text-muted-foreground">
+                    I confirm I have the owner’s consent to list this gym on FITDEX and accept all platform terms.
+                  </Label>
+                </div>
+              </div>
             </div>
             <Button type="submit" disabled={saving || uploading}>
               {saving || uploading ? <Loader2 className="h-4 w-4 animate-spin" /> : "Add gym"}
@@ -431,6 +479,50 @@ export default function OwnerGymPage() {
           </form>
         </CardContent>
       </Card>
+
+      {primaryGym && !primaryGym.ownerConsentAt && (
+        <Card className="glass-card border-amber-500/30 bg-amber-500/10">
+          <CardHeader>
+            <CardTitle>Owner consent required</CardTitle>
+            <CardDescription>This gym will not go live until consent is recorded.</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="flex items-start gap-2">
+              <input
+                id="ownerConsentExisting"
+                type="checkbox"
+                checked={form.ownerConsent}
+                onChange={(e) => setForm((p) => ({ ...p, ownerConsent: e.target.checked }))}
+              />
+              <Label htmlFor="ownerConsentExisting" className="text-sm text-muted-foreground">
+                I confirm I have the owner’s consent to list {primaryGym.name} on FITDEX.
+              </Label>
+            </div>
+            <Button
+              size="sm"
+              disabled={!form.ownerConsent || consentSaving}
+              onClick={async () => {
+                setConsentSaving(true);
+                const result = await fetchJson<{ gym?: any; error?: string }>("/api/owner/gym", {
+                  method: "PATCH",
+                  headers: { "Content-Type": "application/json" },
+                  body: JSON.stringify({ gymId: primaryGym.id, ownerConsent: true }),
+                  retries: 1,
+                });
+                if (result.ok && result.data?.gym) {
+                  setGyms((prev) => prev.map((g) => (g.id === primaryGym.id ? result.data?.gym : g)));
+                  toast({ title: "Consent saved", description: "Your gym can now go live." });
+                } else {
+                  toast({ title: "Failed to save", description: result.error ?? "Please try again", variant: "destructive" });
+                }
+                setConsentSaving(false);
+              }}
+            >
+              {consentSaving ? <Loader2 className="h-4 w-4 animate-spin" /> : "Record consent"}
+            </Button>
+          </CardContent>
+        </Card>
+      )}
 
       {gyms.length > 0 && (
         <Card className="glass-card">
@@ -443,10 +535,10 @@ export default function OwnerGymPage() {
                 <div>
                   <p className="font-medium">{g.name}</p>
                   <p className="text-sm text-muted-foreground">{g.address}</p>
-                  {g.featuredUntil && new Date(g.featuredUntil).getTime() > Date.now() && (
+                  {(g.featuredEndAt ?? g.featuredUntil) && new Date(g.featuredEndAt ?? g.featuredUntil).getTime() > Date.now() && (
                     <div className="mt-1 inline-flex items-center gap-1 text-xs text-primary">
                       <Sparkles className="h-3 w-3" />
-                      Featured until {new Date(g.featuredUntil).toLocaleDateString()}
+                      Featured until {new Date(g.featuredEndAt ?? g.featuredUntil).toLocaleDateString()}
                     </div>
                   )}
                   {g.verifiedUntil && new Date(g.verifiedUntil).getTime() > Date.now() && (

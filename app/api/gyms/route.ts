@@ -5,6 +5,7 @@ import { authOptions } from "@/lib/auth";
 import { jsonError, safeJson } from "@/lib/api";
 import { computeDiscount } from "@/lib/discounts";
 import { logServerError } from "@/lib/logger";
+import { getGymTierRank, isGymFeatured } from "@/lib/gym-utils";
 
 function haversine(
   lat1: number,
@@ -32,7 +33,11 @@ export async function GET(req: Request) {
     const lat = searchParams.get("lat");
     const lng = searchParams.get("lng");
     const gyms = await prisma.gym.findMany({
-      where: { verificationStatus: { not: "REJECTED" } },
+      where: {
+        verificationStatus: { not: "REJECTED" },
+        ownerConsentAt: { not: null },
+        suspendedAt: null,
+      },
       include: {
         owner: { select: { id: true, name: true } },
       },
@@ -60,7 +65,13 @@ export async function GET(req: Request) {
       welcomeDiscountValue: g.welcomeDiscountValue,
       ownerId: g.ownerId,
       featuredUntil: g.featuredUntil,
+      isFeatured: g.isFeatured,
+      featuredStartAt: g.featuredStartAt,
+      featuredEndAt: g.featuredEndAt,
       verifiedUntil: g.verifiedUntil,
+      gymTier: g.gymTier,
+      hasAC: g.hasAC,
+      amenities: g.amenities,
       createdAt: g.createdAt,
     }));
     const now = Date.now();
@@ -74,19 +85,31 @@ export async function GET(req: Request) {
             distance: haversine(numLat, numLng, g.latitude, g.longitude),
           }))
           .sort((a, b) => {
-            const aFeatured = a.featuredUntil ? new Date(a.featuredUntil).getTime() > now : false;
-            const bFeatured = b.featuredUntil ? new Date(b.featuredUntil).getTime() > now : false;
+            const tierDelta = getGymTierRank(a.gymTier) - getGymTierRank(b.gymTier);
+            if (tierDelta !== 0) return tierDelta;
+            const distDelta = (a.distance ?? Infinity) - (b.distance ?? Infinity);
+            if (distDelta !== 0) return distDelta;
+            const aFeatured = isGymFeatured(a);
+            const bFeatured = isGymFeatured(b);
             if (aFeatured !== bFeatured) return aFeatured ? -1 : 1;
-            return (a.distance ?? 0) - (b.distance ?? 0);
+            return (a.monthlyPrice ?? 0) - (b.monthlyPrice ?? 0);
           });
       }
     } else {
       list = list.sort((a, b) => {
-        const aFeatured = a.featuredUntil ? new Date(a.featuredUntil).getTime() > now : false;
-        const bFeatured = b.featuredUntil ? new Date(b.featuredUntil).getTime() > now : false;
+        const tierDelta = getGymTierRank(a.gymTier) - getGymTierRank(b.gymTier);
+        if (tierDelta !== 0) return tierDelta;
+        const aFeatured = isGymFeatured(a);
+        const bFeatured = isGymFeatured(b);
         if (aFeatured !== bFeatured) return aFeatured ? -1 : 1;
-        return new Date(b.createdAt ?? 0).getTime() - new Date(a.createdAt ?? 0).getTime();
+        return (a.monthlyPrice ?? 0) - (b.monthlyPrice ?? 0);
       });
+    }
+
+    const MIN_RESULTS_WITHOUT_EDGE = 10;
+    const nonEdge = list.filter((g) => getGymTierRank(g.gymTier) < 2);
+    if (nonEdge.length >= MIN_RESULTS_WITHOUT_EDGE) {
+      list = list.filter((g) => getGymTierRank(g.gymTier) < 2);
     }
     return NextResponse.json(
       { gyms: list },

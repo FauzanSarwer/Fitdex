@@ -2,10 +2,11 @@ import { NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
-import { forwardGeocode } from "@/lib/location";
+import { forwardGeocode, reverseGeocode } from "@/lib/location";
 import { requireOwner } from "@/lib/permissions";
 import { jsonError, safeJson } from "@/lib/api";
 import { logServerError } from "@/lib/logger";
+import { normalizeAmenities } from "@/lib/gym-utils";
 
 export async function GET() {
   const session = await getServerSession(authOptions);
@@ -40,6 +41,9 @@ export async function POST(req: Request) {
     address?: string;
     latitude?: number;
     longitude?: number;
+    hasAC?: boolean;
+    amenities?: string[] | string;
+    ownerConsent?: boolean;
     openTime?: string | null;
     closeTime?: string | null;
     openDays?: string | null;
@@ -67,6 +71,9 @@ export async function POST(req: Request) {
     address,
     latitude,
     longitude,
+    hasAC,
+    amenities,
+    ownerConsent,
     openTime,
     closeTime,
     openDays,
@@ -92,9 +99,14 @@ export async function POST(req: Request) {
       400
     );
   }
+  if (!ownerConsent) {
+    return jsonError("Owner consent is required to list a gym", 400);
+  }
   try {
     let lat = latitude;
     let lng = longitude;
+    let city: string | null = null;
+    let state: string | null = null;
     if (lat == null || lng == null) {
       const geo = await forwardGeocode(address.trim());
       if (!geo) {
@@ -103,6 +115,11 @@ export async function POST(req: Request) {
       lat = geo.latitude;
       lng = geo.longitude;
     }
+    if (lat != null && lng != null) {
+      const location = await reverseGeocode(Number(lat), Number(lng));
+      city = location?.city ?? null;
+      state = location?.state ?? null;
+    }
     const gym = await prisma.gym.create({
       data: {
         ownerId: uid,
@@ -110,6 +127,11 @@ export async function POST(req: Request) {
         address: address.trim(),
         latitude: Number(lat),
         longitude: Number(lng),
+        city,
+        state,
+        hasAC: !!hasAC,
+        amenities: normalizeAmenities(amenities),
+        ownerConsentAt: ownerConsent ? new Date() : null,
         openTime: openTime ?? null,
         closeTime: closeTime ?? null,
         openDays: openDays ?? null,
@@ -149,6 +171,9 @@ export async function PATCH(req: Request) {
     address?: string;
     latitude?: number;
     longitude?: number;
+    hasAC?: boolean;
+    amenities?: string[] | string;
+    ownerConsent?: boolean;
     openTime?: string | null;
     closeTime?: string | null;
     openDays?: string | null;
@@ -190,10 +215,21 @@ export async function PATCH(req: Request) {
       if (geo) {
         update.latitude = geo.latitude;
         update.longitude = geo.longitude;
+        const location = await reverseGeocode(geo.latitude, geo.longitude);
+        if (location?.city) update.city = location.city;
+        if (location?.state) update.state = location.state;
       }
     }
     if (data.latitude != null) update.latitude = data.latitude;
     if (data.longitude != null) update.longitude = data.longitude;
+    if (data.latitude != null && data.longitude != null) {
+      const location = await reverseGeocode(data.latitude, data.longitude);
+      if (location?.city) update.city = location.city;
+      if (location?.state) update.state = location.state;
+    }
+    if (data.hasAC !== undefined) update.hasAC = !!data.hasAC;
+    if (data.amenities !== undefined) update.amenities = normalizeAmenities(data.amenities);
+    if (data.ownerConsent === true && !existing.ownerConsentAt) update.ownerConsentAt = new Date();
     if (data.openTime !== undefined) update.openTime = data.openTime;
     if (data.closeTime !== undefined) update.closeTime = data.closeTime;
     if (data.openDays !== undefined) update.openDays = data.openDays;

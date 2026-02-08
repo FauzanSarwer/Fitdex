@@ -9,6 +9,8 @@ import { z } from "zod";
 import { SessionUserSchema } from "./session-user";
 import { createEmailVerificationLinks } from "@/lib/email-verification";
 import { sendVerificationEmail } from "@/lib/email";
+import { hashOtp, normalizePhoneNumber, timingSafeEqual } from "@/lib/otp";
+const prismaAny = prisma as any;
 
 const googleClientId = getOptionalEnv("GOOGLE_CLIENT_ID");
 const googleClientSecret = getOptionalEnv("GOOGLE_CLIENT_SECRET");
@@ -86,6 +88,55 @@ export const authOptions: NextAuthOptions = {
             };
           } catch {}
         }
+        return {
+          id: user.id,
+          email: user.email,
+          name: user.name,
+          image: user.image,
+          role: user.role,
+        };
+      },
+    }),
+    CredentialsProvider({
+      id: "phone-otp",
+      name: "phone-otp",
+      credentials: {
+        phoneNumber: { label: "Phone", type: "text" },
+        otp: { label: "OTP", type: "text" },
+      },
+      async authorize(credentials) {
+        const PhoneSchema = z.object({
+          phoneNumber: z.string().min(8),
+          otp: z.string().min(4).max(6),
+        });
+        const parsed = PhoneSchema.safeParse(credentials);
+        if (!parsed.success) return null;
+        const phoneNumber = normalizePhoneNumber(parsed.data.phoneNumber);
+        if (!phoneNumber) return null;
+
+        const record = await prismaAny.phoneOtp.findUnique({ where: { phoneNumber } });
+        if (!record) return null;
+        if (record.attempts >= 5) {
+          await prismaAny.phoneOtp.delete({ where: { phoneNumber } }).catch(() => undefined);
+          return null;
+        }
+        if (record.expiresAt.getTime() < Date.now()) {
+          await prismaAny.phoneOtp.delete({ where: { phoneNumber } }).catch(() => undefined);
+          return null;
+        }
+        const expected = record.codeHash;
+        const actual = hashOtp(parsed.data.otp.trim());
+        if (!timingSafeEqual(expected, actual)) {
+          await prismaAny.phoneOtp.update({
+            where: { phoneNumber },
+            data: { attempts: record.attempts + 1 },
+          });
+          return null;
+        }
+
+        await prismaAny.phoneOtp.delete({ where: { phoneNumber } }).catch(() => undefined);
+        const user = await prisma.user.findFirst({ where: { phoneNumber } });
+        if (!user) return null;
         return {
           id: user.id,
           email: user.email,

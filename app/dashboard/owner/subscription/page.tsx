@@ -17,6 +17,8 @@ const PLAN_LABELS: Record<string, string> = {
 export default function OwnerSubscriptionPage() {
   const { toast } = useToast();
   const [subscription, setSubscription] = useState<any | null>(null);
+  const [invoices, setInvoices] = useState<any[]>([]);
+  const [invoiceError, setInvoiceError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [processing, setProcessing] = useState<string | null>(null);
   const paymentsEnabled = isPaymentsEnabled();
@@ -26,6 +28,14 @@ export default function OwnerSubscriptionPage() {
     const result = await fetchJson<{ subscription?: any; error?: string }>("/api/owner/subscription", { retries: 1 });
     if (result.ok) {
       setSubscription(result.data?.subscription ?? null);
+    }
+    const invoiceResult = await fetchJson<{ invoices?: any[]; error?: string }>("/api/owner/invoices", { retries: 1 });
+    if (invoiceResult.ok) {
+      setInvoices(invoiceResult.data?.invoices ?? []);
+      setInvoiceError(null);
+    } else {
+      setInvoices([]);
+      setInvoiceError(invoiceResult.error ?? "Invoices unavailable");
     }
     setLoading(false);
   };
@@ -170,6 +180,36 @@ export default function OwnerSubscriptionPage() {
             <Button variant="outline" onClick={cancelSubscription} disabled={processing != null}>
               {processing === "CANCEL" ? <Loader2 className="h-4 w-4 animate-spin" /> : "Cancel subscription"}
             </Button>
+          )}
+        </CardContent>
+      </Card>
+
+      <Card className="glass-card">
+        <CardHeader>
+          <CardTitle>Invoices</CardTitle>
+          <CardDescription>Download your subscription invoices.</CardDescription>
+        </CardHeader>
+        <CardContent>
+          {loading ? (
+            <div className="h-8 w-40 rounded bg-white/10 animate-pulse" />
+          ) : invoiceError ? (
+            <p className="text-sm text-muted-foreground">{invoiceError}</p>
+          ) : invoices.length === 0 ? (
+            <p className="text-sm text-muted-foreground">No invoices yet.</p>
+          ) : (
+            <div className="space-y-2">
+              {invoices.map((inv) => (
+                <div key={inv.id} className="flex items-center justify-between rounded-lg border border-white/10 px-3 py-2 text-sm">
+                  <div>
+                    <div className="font-medium">{inv.invoiceNumber}</div>
+                    <div className="text-xs text-muted-foreground">Issued {new Date(inv.issuedAt).toLocaleDateString()}</div>
+                  </div>
+                  <Button asChild size="sm" variant="outline">
+                    <a href={`/api/owner/invoices/${inv.id}`}>Download PDF</a>
+                  </Button>
+                </div>
+              ))}
+            </div>
           )}
         </CardContent>
       </Card>

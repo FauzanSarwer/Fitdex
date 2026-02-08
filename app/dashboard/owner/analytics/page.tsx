@@ -41,6 +41,11 @@ export default function OwnerAnalyticsPage() {
   const [error, setError] = useState<string | null>(null);
   const [data, setData] = useState<{
     totalRevenue: number;
+    estimatedRevenue: number;
+    totalLeads: number;
+    leadsLast30Days: number;
+    bookingsCurrentWeek: number;
+    bookingsPreviousWeek: number;
     revenueByMonth: Record<string, number>;
     activeMembers: number;
     totalMembers: number;
@@ -54,6 +59,10 @@ export default function OwnerAnalyticsPage() {
     activeDuos: number;
     payments: any[];
   } | null>(null);
+  const [commissionReport, setCommissionReport] = useState<
+    Array<{ month: string; totalBookings: number; totalCommission: number; commissionPercent: number }>
+  >([]);
+  const [reportLoading, setReportLoading] = useState(false);
   const [loading, setLoading] = useState(true);
   const [analyticsLoading, setAnalyticsLoading] = useState(false);
   const hasProAccess = false;
@@ -93,6 +102,7 @@ export default function OwnerAnalyticsPage() {
   useEffect(() => {
     if (!selectedGymId) {
       setData(null);
+      setCommissionReport([]);
       return;
     }
     let active = true;
@@ -113,6 +123,27 @@ export default function OwnerAnalyticsPage() {
       })
       .finally(() => {
         if (active) setAnalyticsLoading(false);
+      });
+
+    setReportLoading(true);
+    fetchJson<{ report?: Array<{ month: string; totalBookings: number; totalCommission: number; commissionPercent: number }>; error?: string }>(
+      `/api/owner/commission-report?gymId=${selectedGymId}`,
+      { retries: 1 }
+    )
+      .then((result) => {
+        if (!active) return;
+        if (!result.ok) {
+          setCommissionReport([]);
+          return;
+        }
+        setCommissionReport(result.data?.report ?? []);
+      })
+      .catch(() => {
+        if (!active) return;
+        setCommissionReport([]);
+      })
+      .finally(() => {
+        if (active) setReportLoading(false);
       });
 
     return () => {
@@ -259,6 +290,19 @@ export default function OwnerAnalyticsPage() {
                 <p className="text-2xl font-bold text-primary">
                   {formatPrice(data.totalRevenue)}
                 </p>
+                <p className="text-xs text-muted-foreground">Captured payments</p>
+              </CardContent>
+            </Card>
+            <Card className="glass-card">
+              <CardHeader className="flex flex-row items-center justify-between pb-2">
+                <CardTitle className="text-sm font-medium">Estimated revenue</CardTitle>
+                <Wallet className="h-4 w-4 text-muted-foreground" />
+              </CardHeader>
+              <CardContent>
+                <p className="text-2xl font-bold text-primary">
+                  {formatPrice(data.estimatedRevenue)}
+                </p>
+                <p className="text-xs text-muted-foreground">Estimated from paid bookings</p>
               </CardContent>
             </Card>
             <Card className="glass-card">
@@ -267,12 +311,89 @@ export default function OwnerAnalyticsPage() {
                 <Users className="h-4 w-4 text-muted-foreground" />
               </CardHeader>
               <CardContent>
-                <p className="text-2xl font-bold">{data.activeMembers}</p>
+                <p className="text-2xl font-bold text-primary">
+                  {data.activeMembers}
+                </p>
+                <p className="text-xs text-muted-foreground">Total memberships: {data.totalMembers}</p>
               </CardContent>
             </Card>
             <Card className="glass-card">
               <CardHeader className="flex flex-row items-center justify-between pb-2">
+                <CardTitle className="text-sm font-medium">Leads</CardTitle>
+                <Sparkles className="h-4 w-4 text-muted-foreground" />
+              </CardHeader>
+              <CardContent>
+                <p className="text-2xl font-bold text-primary">{data.totalLeads}</p>
+                <p className="text-xs text-muted-foreground">Last 30 days: {data.leadsLast30Days}</p>
+              </CardContent>
+            </Card>
+          </div>
+
+          <div className="grid gap-4 md:grid-cols-2">
+            <Card className="glass-card">
+              <CardHeader className="flex flex-row items-center justify-between pb-2">
+                <CardTitle className="text-sm font-medium">Bookings this week</CardTitle>
+                <TrendingUp className="h-4 w-4 text-muted-foreground" />
+              </CardHeader>
+              <CardContent>
+                <p className="text-2xl font-bold text-primary">{data.bookingsCurrentWeek}</p>
+                <p className="text-xs text-muted-foreground">Previous week: {data.bookingsPreviousWeek}</p>
+              </CardContent>
+            </Card>
+            <Card className="glass-card">
+              <CardHeader className="flex flex-row items-center justify-between pb-2">
+                <CardTitle className="text-sm font-medium">Estimated revenue note</CardTitle>
+                <Percent className="h-4 w-4 text-muted-foreground" />
+              </CardHeader>
+              <CardContent>
+                <p className="text-sm text-muted-foreground">
+                  Estimated values are derived from paid booking totals and are not guaranteed revenue.
+                </p>
+              </CardContent>
+            </Card>
+          </div>
+
+          <Card className="glass-card">
+            <CardHeader>
+              <CardTitle>Monthly commission report</CardTitle>
+            </CardHeader>
+            <CardContent>
+              {reportLoading ? (
+                <Skeleton className="h-24" />
+              ) : commissionReport.length === 0 ? (
+                <p className="text-sm text-muted-foreground">No commission data yet.</p>
+              ) : (
+                <div className="overflow-auto">
+                  <table className="w-full text-sm">
+                    <thead className="text-left text-xs text-muted-foreground">
+                      <tr>
+                        <th className="py-2">Month</th>
+                        <th className="py-2">Bookings</th>
+                        <th className="py-2">Commission</th>
+                        <th className="py-2">Commission %</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {commissionReport.map((row) => (
+                        <tr key={row.month} className="border-t border-white/10">
+                          <td className="py-2">{row.month}</td>
+                          <td className="py-2">{row.totalBookings}</td>
+                          <td className="py-2">{formatPrice(row.totalCommission)}</td>
+                          <td className="py-2">{row.commissionPercent}%</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
+          <div className="grid gap-4 md:grid-cols-2">
+            <Card className="glass-card">
+              <CardHeader className="flex flex-row items-center justify-between pb-2">
                 <CardTitle className="text-sm font-medium">Active duos</CardTitle>
+                <Users className="h-4 w-4 text-muted-foreground" />
               </CardHeader>
               <CardContent>
                 <p className="text-2xl font-bold">{data.activeDuos}</p>

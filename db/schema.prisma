@@ -7,6 +7,12 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+enum GymTier {
+  CORE
+  SUPPORTING
+  EDGE
+}
+
 model User {
   id            String    @id @default(cuid())
   name          String?
@@ -53,6 +59,10 @@ model User {
   gymPageViews GymPageView[]
   emailVerificationTokens EmailVerificationToken[]
   ownerSubscriptions OwnerSubscription[]
+  leads        Lead[]
+  whatsappLogs WhatsAppLog[]
+  invoices     Invoice[]
+  subscriptionReminders SubscriptionReminderLog[]
 }
 
 model OwnerSubscription {
@@ -68,6 +78,7 @@ model OwnerSubscription {
   updatedAt          DateTime @updatedAt
 
   owner User @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  reminders SubscriptionReminderLog[]
 
   @@index([ownerId])
   @@index([status])
@@ -144,6 +155,16 @@ model Gym {
   ownerId                String
   verificationStatus     String   @default("UNVERIFIED") // UNVERIFIED | PENDING | VERIFIED | REJECTED
   verificationNotes      String?
+  gymTier                GymTier  @default(SUPPORTING)
+  hasAC                  Boolean  @default(false)
+  amenities              String[] @default([])
+  ownerConsentAt         DateTime?
+  city                   String?
+  state                  String?
+  suspendedAt            DateTime?
+  lastContactedAt        DateTime?
+  responsivenessScore    Int      @default(0)
+  responsivenessOverride Int?
   gstNumber              String?
   gstCertificateUrl      String?
   gstVerifiedAt          DateTime?
@@ -168,6 +189,9 @@ model Gym {
   instagramUrl           String?
   facebookUrl            String?
   youtubeUrl             String?
+  isFeatured             Boolean  @default(false)
+  featuredStartAt        DateTime?
+  featuredEndAt          DateTime?
   featuredUntil          DateTime?
   verifiedUntil          DateTime?
   createdAt              DateTime @default(now())
@@ -184,6 +208,9 @@ model Gym {
   verifiedPurchases VerifiedBadgePurchase[]
   transactions Transaction[]
   pageViews   GymPageView[]
+  leads       Lead[]
+  whatsappLogs WhatsAppLog[]
+  invoices    Invoice[]
 }
 
 model Notification {
@@ -320,6 +347,92 @@ model Invite {
   inviter User @relation("Inviter", fields: [inviterId], references: [id], onDelete: Cascade)
 }
 
+
+model Lead {
+  id           String   @id @default(cuid())
+  gymId        String
+  userId       String?
+  type         String   // BOOK_CTA | ENQUIRY
+  message      String?
+  contactName  String?
+  contactEmail String?
+  contactPhone String?
+  createdAt    DateTime @default(now())
+
+  gym  Gym  @relation(fields: [gymId], references: [id], onDelete: Cascade)
+  user User? @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([gymId, createdAt])
+  @@index([userId])
+}
+
+model PhoneOtp {
+  id          String   @id @default(cuid())
+  phoneNumber String   @unique
+  codeHash    String
+  expiresAt   DateTime
+  sendCount   Int      @default(1)
+  lastSentAt  DateTime @default(now())
+  attempts    Int      @default(0)
+  createdAt   DateTime @default(now())
+
+  @@index([phoneNumber])
+  @@index([expiresAt])
+}
+
+model WhatsAppLog {
+  id        String   @id @default(cuid())
+  eventType String
+  toNumber  String
+  status    String   // SENT | FAILED | SKIPPED
+  error     String?
+  payload   Json?
+  gymId     String?
+  userId    String?
+  createdAt DateTime @default(now())
+
+  gym  Gym?  @relation(fields: [gymId], references: [id], onDelete: SetNull)
+  user User? @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([eventType, createdAt])
+  @@index([gymId])
+  @@index([userId])
+}
+
+model SubscriptionReminderLog {
+  id               String   @id @default(cuid())
+  ownerId          String
+  subscriptionId   String
+  daysBeforeExpiry Int
+  channel          String   // EMAIL | WHATSAPP
+  status           String   // SENT | FAILED | SKIPPED
+  error            String?
+  createdAt        DateTime @default(now())
+
+  owner        User              @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  subscription OwnerSubscription @relation(fields: [subscriptionId], references: [id], onDelete: Cascade)
+
+  @@unique([subscriptionId, daysBeforeExpiry, channel])
+  @@index([ownerId])
+}
+
+model Invoice {
+  id            String   @id @default(cuid())
+  invoiceNumber String   @unique
+  ownerId       String
+  gymId         String?
+  amount        Int
+  gstNumber     String?
+  status        String   @default("ISSUED")
+  issuedAt      DateTime @default(now())
+  createdAt     DateTime @default(now())
+
+  owner User @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  gym   Gym?  @relation(fields: [gymId], references: [id], onDelete: SetNull)
+
+  @@index([ownerId, issuedAt])
+  @@index([gymId])
+}
 model Payment {
   id                 String   @id @default(cuid())
   userId             String

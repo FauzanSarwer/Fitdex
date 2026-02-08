@@ -18,11 +18,13 @@ import {
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
 import { buildGymSlug, formatPrice, parseGymIdFromSlug } from "@/lib/utils";
 import { getGymOpenStatus } from "@/lib/gym-hours";
 import { fetchJson } from "@/lib/client-fetch";
 import { MapView } from "@/components/maps/MapView";
+import { isGymFeatured } from "@/lib/gym-utils";
 
 interface GymData {
   id: string;
@@ -32,6 +34,11 @@ interface GymData {
   longitude: number;
   verificationStatus: string;
   coverImageUrl: string | null;
+  hasAC?: boolean;
+  amenities?: string[];
+  isFeatured?: boolean | null;
+  featuredStartAt?: string | Date | null;
+  featuredEndAt?: string | Date | null;
   openTime?: string | null;
   closeTime?: string | null;
   openDays?: string | null;
@@ -74,6 +81,9 @@ export default function GymProfilePage() {
   const [loading, setLoading] = useState(true);
   const [saved, setSaved] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [enquiry, setEnquiry] = useState({ name: "", email: "", phone: "", message: "" });
+  const [enquirySending, setEnquirySending] = useState(false);
+  const [enquirySent, setEnquirySent] = useState(false);
 
   useEffect(() => {
     let active = true;
@@ -210,6 +220,20 @@ export default function GymProfilePage() {
 
   const isVerified = gym.verificationStatus === "VERIFIED";
   const openDays = gym.openDays ? gym.openDays.split(",") : [];
+  const amenities = (gym.amenities ?? []).filter(Boolean);
+  const featured = isGymFeatured(gym);
+
+  const recordLead = async (type: "BOOK_CTA" | "ENQUIRY") => {
+    try {
+      await fetch(`/api/gyms/${gym.id}/leads`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ type }),
+      });
+    } catch {
+      // no-op
+    }
+  };
 
   return (
     <div className="container mx-auto px-4 py-10">
@@ -233,13 +257,16 @@ export default function GymProfilePage() {
               </div>
             )}
             <div className="absolute top-4 right-4 flex items-center gap-2">
-              {gym.featuredUntil && new Date(gym.featuredUntil).getTime() > Date.now() && (
+              {featured && (
                 <span className="rounded-full bg-primary/20 text-primary px-3 py-1 text-xs animate-pulse">Featured</span>
               )}
               {isVerified ? (
                 <span className="rounded-full bg-emerald-500/20 text-emerald-400 px-3 py-1 text-xs">Verified</span>
               ) : (
                 <span className="rounded-full bg-amber-500/20 text-amber-400 px-3 py-1 text-xs">Unverified</span>
+              )}
+              {gym.hasAC && (
+                <span className="rounded-full bg-sky-500/20 text-sky-300 px-3 py-1 text-xs">AC</span>
               )}
             </div>
           </div>
@@ -285,7 +312,7 @@ export default function GymProfilePage() {
                     </Button>
                   ) : (
                     <Button asChild size="lg">
-                      <Link href={`/dashboard/user/join/${gym.id}`}>
+                      <Link href={`/dashboard/user/join/${gym.id}`} onClick={() => recordLead("BOOK_CTA")}>
                         Join this gym
                         <ArrowRight className="ml-2 h-4 w-4" />
                       </Link>
@@ -393,6 +420,68 @@ export default function GymProfilePage() {
           </CardContent>
         </Card>
 
+        <Card className="glass-card">
+          <CardHeader>
+            <CardTitle>Send an enquiry</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            {enquirySent ? (
+              <p className="text-sm text-emerald-400">Enquiry sent. The gym will get back to you soon.</p>
+            ) : (
+              <>
+                <div className="grid gap-3 md:grid-cols-2">
+                  <Input
+                    placeholder="Your name"
+                    value={enquiry.name}
+                    onChange={(e) => setEnquiry((p) => ({ ...p, name: e.target.value }))}
+                  />
+                  <Input
+                    placeholder="Phone (optional)"
+                    value={enquiry.phone}
+                    onChange={(e) => setEnquiry((p) => ({ ...p, phone: e.target.value }))}
+                  />
+                </div>
+                <Input
+                  placeholder="Email (optional)"
+                  value={enquiry.email}
+                  onChange={(e) => setEnquiry((p) => ({ ...p, email: e.target.value }))}
+                />
+                <Input
+                  placeholder="Message (optional)"
+                  value={enquiry.message}
+                  onChange={(e) => setEnquiry((p) => ({ ...p, message: e.target.value }))}
+                />
+                <Button
+                  size="sm"
+                  disabled={enquirySending || !enquiry.name.trim() || (!enquiry.phone.trim() && !enquiry.email.trim())}
+                  onClick={async () => {
+                    setEnquirySending(true);
+                    try {
+                      const res = await fetch(`/api/gyms/${gym.id}/enquiry`, {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({
+                          name: enquiry.name,
+                          email: enquiry.email,
+                          phone: enquiry.phone,
+                          message: enquiry.message,
+                        }),
+                      });
+                      if (res.ok) {
+                        setEnquirySent(true);
+                      }
+                    } finally {
+                      setEnquirySending(false);
+                    }
+                  }}
+                >
+                  {enquirySending ? "Sending..." : "Send enquiry"}
+                </Button>
+              </>
+            )}
+          </CardContent>
+        </Card>
+
         <div className="grid gap-4 lg:grid-cols-[1.4fr_1fr]">
           <Card className="glass-card overflow-hidden">
             <CardHeader>
@@ -423,6 +512,12 @@ export default function GymProfilePage() {
                 <span className="text-foreground">
                   {openDays.length > 0 ? openDays.join(", ") : "Not listed"}
                 </span>
+                            <div className="flex items-center justify-between">
+                              <span>Amenities</span>
+                              <span className="text-foreground">
+                                {amenities.length > 0 ? amenities.join(", ") : "Not listed"}
+                              </span>
+                            </div>
               </div>
               <div className="flex items-center justify-between">
                 <span>Hours</span>

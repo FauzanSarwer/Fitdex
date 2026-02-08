@@ -37,3 +37,18 @@ export async function sendVerificationEmail(email: string, verifyUrl: string, de
   const text = `Verify your ${appName} email: ${verifyUrl}\n\nNot you? Delete account: ${deleteUrl}`;
   return sendEmail({ to: email, subject, html, text });
 }
+
+export async function sendOwnerRenewalReminderEmail(email: string, gymName: string, daysLeft: number) {
+  const subject = `${appName} subscription expiring in ${daysLeft} days`;
+  const html = `
+    <div style="font-family:Arial,sans-serif;line-height:1.6;color:#111">
+      <h2 style="margin:0 0 12px">${appName} plan expiring soon</h2>
+      <p>Your ${gymName} subscription expires in ${daysLeft} days. Renew early to avoid listing downtime.</p>
+      <p style="margin:24px 0">
+        <a href="${process.env.NEXTAUTH_URL ?? ""}/dashboard/owner/subscription" style="background:#6D28D9;color:#fff;text-decoration:none;padding:10px 16px;border-radius:8px;display:inline-block">Manage subscription</a>
+      </p>
+    </div>
+  `;
+  const text = `Your ${gymName} subscription expires in ${daysLeft} days. Manage subscription at ${process.env.NEXTAUTH_URL ?? ""}/dashboard/owner/subscription`;
+  return sendEmail({ to: email, subject, html, text });
+}

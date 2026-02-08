@@ -2,12 +2,17 @@
 
 import { useEffect, useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { formatPrice } from "@/lib/utils";
 
 type Metrics = {
   pendingGyms: number;
   newGyms24h: number;
   failedPayments24h: number;
   activeSubscriptions: number;
+  payingGymsCount: number;
+  platformMRR: number;
+  areaGymCounts: Array<{ city: string; count: number }>;
+  gymTierCounts?: Record<string, number>;
   updatedAt: string;
 };
 
@@ -72,6 +77,54 @@ export function RealtimeAdminMetrics() {
         </CardHeader>
         <CardContent className="text-3xl font-semibold">
           {metrics?.activeSubscriptions ?? "—"}
+        </CardContent>
+      </Card>
+      <Card className="glass-card">
+        <CardHeader>
+          <CardTitle>Paying gyms</CardTitle>
+        </CardHeader>
+        <CardContent className="text-3xl font-semibold">
+          {metrics?.payingGymsCount ?? "—"}
+        </CardContent>
+      </Card>
+      <Card className="glass-card">
+        <CardHeader>
+          <CardTitle>Platform MRR</CardTitle>
+        </CardHeader>
+        <CardContent className="text-3xl font-semibold">
+          {metrics ? formatPrice(metrics.platformMRR) : "—"}
+        </CardContent>
+      </Card>
+      <Card className="glass-card md:col-span-2 lg:col-span-2">
+        <CardHeader>
+          <CardTitle>Area-wise gym count</CardTitle>
+        </CardHeader>
+        <CardContent className="text-sm text-muted-foreground space-y-1">
+          {metrics?.areaGymCounts?.length
+            ? metrics.areaGymCounts.slice(0, 6).map((row) => (
+                <div key={row.city} className="flex items-center justify-between">
+                  <span>{row.city}</span>
+                  <span className="text-foreground">{row.count}</span>
+                </div>
+              ))
+            : "—"}
+        </CardContent>
+      </Card>
+      <Card className="glass-card md:col-span-2 lg:col-span-2">
+        <CardHeader>
+          <CardTitle>Gym tier distribution</CardTitle>
+        </CardHeader>
+        <CardContent className="text-sm text-muted-foreground space-y-1">
+          {metrics?.gymTierCounts ? (
+            Object.entries(metrics.gymTierCounts).map(([tier, count]) => (
+              <div key={tier} className="flex items-center justify-between">
+                <span>{tier}</span>
+                <span className="text-foreground">{count}</span>
+              </div>
+            ))
+          ) : (
+            "—"
+          )}
         </CardContent>
       </Card>
       {error && (

@@ -32,11 +32,21 @@ export async function POST(req: Request) {
       return jsonError("Gym not found", 404);
     }
     const now = new Date();
-    const isAlreadyFeatured = gym.featuredUntil && gym.featuredUntil > now;
+    const isAlreadyFeatured = (gym.featuredEndAt && gym.featuredEndAt > now) || (gym.featuredUntil && gym.featuredUntil > now);
     if (!isAlreadyFeatured) {
+      const area = gym.city ?? "UNKNOWN";
       const [totalGyms, featuredCount] = await Promise.all([
-        prisma.gym.count({ where: { verificationStatus: { not: "REJECTED" } } }),
-        prisma.gym.count({ where: { featuredUntil: { gt: now }, verificationStatus: { not: "REJECTED" } } }),
+        prisma.gym.count({ where: { verificationStatus: { not: "REJECTED" }, city: area } }),
+        prisma.gym.count({
+          where: {
+            verificationStatus: { not: "REJECTED" },
+            city: area,
+            OR: [
+              { featuredEndAt: { gt: now } },
+              { featuredUntil: { gt: now } },
+            ],
+          },
+        }),
       ]);
       const maxFeatured = Math.max(1, Math.floor(totalGyms * 0.2));
       if (featuredCount >= maxFeatured) {

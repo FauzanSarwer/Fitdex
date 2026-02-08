@@ -89,7 +89,14 @@ export default function PaymentsPage() {
                     {new Date(p.createdAt).toLocaleString()} · {p.paymentStatus ?? p.status}
                   </p>
                 </div>
-                <p className="font-semibold text-primary">{formatPrice(p.totalAmount ?? p.amount)}</p>
+                <div className="flex items-center gap-3">
+                  <p className="font-semibold text-primary">{formatPrice(p.totalAmount ?? p.amount)}</p>
+                  {p.paymentStatus === "PAID" && (
+                    <Button asChild size="sm" variant="outline">
+                      <a href={`/api/user/invoices/${p.id}`}>Invoice PDF</a>
+                    </Button>
+                  )}
+                </div>
               </CardContent>
             </Card>
           ))}

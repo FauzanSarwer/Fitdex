@@ -6,8 +6,13 @@ import { requireOwner } from "@/lib/permissions";
 import { PaymentConfigError, verifyRazorpayPaymentSignature } from "@/lib/razorpay";
 import { jsonError, safeJson } from "@/lib/api";
 import { logServerError } from "@/lib/logger";
+import { generateInvoiceNumber } from "@/lib/invoice";
 
 const SUBSCRIPTION_DAYS = 30;
+const PLAN_PRICES: Record<string, number> = {
+  STARTER: 149900,
+  PRO: 199900,
+};
 
 export async function POST(req: Request) {
   const session = await getServerSession(authOptions);
@@ -70,6 +75,24 @@ export async function POST(req: Request) {
         razorpayPaymentId: paymentId,
       },
     });
+
+    const gym = await prisma.gym.findFirst({
+      where: { ownerId: uid },
+      orderBy: { createdAt: "asc" },
+    });
+    if (PLAN_PRICES[updated.plan] && PLAN_PRICES[updated.plan] >= 149900) {
+      const invoiceNumber = generateInvoiceNumber("OWN");
+      await prisma.invoice.create({
+        data: {
+          invoiceNumber,
+          ownerId: uid,
+          gymId: gym?.id,
+          amount: PLAN_PRICES[updated.plan] ?? 0,
+          gstNumber: gym?.gstNumber ?? null,
+          issuedAt: new Date(),
+        },
+      });
+    }
 
     return NextResponse.json({
       ok: true,

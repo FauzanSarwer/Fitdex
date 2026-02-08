@@ -47,12 +47,21 @@ export async function POST(req: Request) {
 
       const appUrl = resolveAppUrl(req);
       const resetUrl = appUrl ? `${appUrl}/auth/reset?token=${encodeURIComponent(token)}` : "";
+      if (!resetUrl) {
+        return jsonError("Missing reset URL", 500);
+      }
       if (process.env.NODE_ENV !== "production") {
         console.info("[auth] Password reset link:", resetUrl || token);
-        await sendPasswordResetEmail(user.email, resetUrl);
+        const sendResult = await sendPasswordResetEmail(user.email, resetUrl);
+        if (!sendResult.ok) {
+          return jsonError(sendResult.error ?? "Unable to send reset email", 500);
+        }
         return NextResponse.json({ ok: true, resetUrl });
       }
-      await sendPasswordResetEmail(user.email, resetUrl);
+      const sendResult = await sendPasswordResetEmail(user.email, resetUrl);
+      if (!sendResult.ok) {
+        return jsonError(sendResult.error ?? "Unable to send reset email", 500);
+      }
     }
 
     return NextResponse.json({ ok: true });

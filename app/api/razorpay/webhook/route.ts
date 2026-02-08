@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { verifyRazorpayWebhookSignature } from "@/lib/razorpay";
 import { jsonError } from "@/lib/api";
 import { logServerError } from "@/lib/logger";
+import { sendWhatsappNotification } from "@/lib/whatsapp";
 
 export async function POST(req: Request) {
   try {
@@ -65,6 +66,30 @@ export async function POST(req: Request) {
           });
           if (membership) {
             const { gymId, userId } = membership;
+            const [gym, user] = await Promise.all([
+              prisma.gym.findUnique({ where: { id: gymId }, include: { owner: true } }),
+              prisma.user.findUnique({ where: { id: userId } }),
+            ]);
+            if (gym?.owner?.supportWhatsapp) {
+              await sendWhatsappNotification({
+                eventType: "BOOKING_CONFIRMATION",
+                toNumber: gym.owner.supportWhatsapp,
+                gymId,
+                userId,
+                payload: { gymName: gym.name, membershipId: membership.id },
+                message: `New booking confirmed for ${gym.name}.`,
+              });
+            }
+            if (user?.phoneNumber) {
+              await sendWhatsappNotification({
+                eventType: "BOOKING_CONFIRMATION",
+                toNumber: user.phoneNumber,
+                gymId,
+                userId,
+                payload: { gymName: gym?.name ?? "Your gym", membershipId: membership.id },
+                message: `Your booking for ${gym?.name ?? "the gym"} is confirmed. Welcome to FITDEX!`,
+              });
+            }
             const invite = await prisma.invite.findFirst({
               where: {
                 gymId,

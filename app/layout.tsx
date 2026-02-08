@@ -1,6 +1,8 @@
 import type { Metadata } from "next";
 import "./globals.css";
 import { Providers } from "@/components/providers";
+import { SpeedInsights } from '@vercel/speed-insights/next';
+
 
 export const metadata: Metadata = {
   title: "FITDEX — District of Gyms",
@@ -21,6 +23,7 @@ export default function RootLayout({
       </head>
       <body className="font-sans min-h-screen bg-background antialiased">
         <Providers>{children}</Providers>
+                <SpeedInsights />
       </body>
     </html>
   );
