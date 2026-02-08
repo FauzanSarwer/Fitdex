@@ -31,30 +31,31 @@ async function resolveFailedMigration(prisma) {
 }
 
 function isLockTimeout(errorOutput) {
-  return errorOutput.includes("P1002") || errorOutput.toLowerCase().includes("advisory lock");
+  return (
+    errorOutput.includes("P1002") ||
+    errorOutput.toLowerCase().includes("advisory lock") ||
+    errorOutput.toLowerCase().includes("lock timeout")
+  );
 }
 
 async function runMigrateDeployWithRetry(maxAttempts = 3) {
   let lastError;
   for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
-    try {
-      execSync(MIGRATE_CMD, { stdio: "inherit" });
-      return;
-    } catch (error) {
-      const output = [
-        error?.stdout?.toString?.() ?? "",
-        error?.stderr?.toString?.() ?? "",
-        error?.message ?? "",
-      ].join("\n");
-      lastError = error;
-      if (attempt < maxAttempts && isLockTimeout(output)) {
-        const waitMs = 5000 * attempt;
-        console.warn(`[migrate-safe] Advisory lock timeout. Retrying in ${waitMs}ms...`);
-        await sleep(waitMs);
-        continue;
-      }
-      throw error;
+    const result = require("child_process").spawnSync(MIGRATE_CMD, {
+      shell: true,
+      encoding: "utf8",
+    });
+    if (result.status === 0) return;
+
+    const output = [result.stdout ?? "", result.stderr ?? ""].join("\n");
+    lastError = new Error(output || `migrate deploy failed with code ${result.status}`);
+    if (attempt < maxAttempts && isLockTimeout(output)) {
+      const waitMs = 5000 * attempt;
+      console.warn(`[migrate-safe] Advisory lock timeout. Retrying in ${waitMs}ms...`);
+      await sleep(waitMs);
+      continue;
     }
+    throw lastError;
   }
   throw lastError;
 }
