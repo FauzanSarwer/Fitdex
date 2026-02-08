@@ -33,7 +33,7 @@ export async function GET(_req: Request, { params }: { params: Promise<{ transac
     const buffer = await generateInvoicePdfBuffer({
       invoiceNumber,
       issuedAt: now,
-      gymName: tx.gym?.name ?? "FITDEX",
+      gymName: tx.gym?.name ?? "Fitdex",
       gstNumber: null,
       amount: tx.totalAmount,
     });

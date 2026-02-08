@@ -190,7 +190,7 @@ export default function OwnersPage() {
         orderId: orderResult.data.orderId,
         amount: orderResult.data.amount ?? 0,
         currency: orderResult.data.currency ?? "INR",
-        name: "FITDEX",
+        name: "Fitdex",
         onSuccess: async (res) => {
           const verifyResult = await fetchJson<{ subscription?: any; error?: string }>(
             "/api/owner/subscription/verify",
@@ -235,7 +235,7 @@ export default function OwnersPage() {
           For Gym Owners
         </div>
         <h1 className="text-4xl md:text-5xl font-bold tracking-tight">
-          List your gym on FitDex
+          List your gym on Fitdex
         </h1>
         <p className="text-muted-foreground mt-4 text-lg">
           Reach more members, get analytics, and manage everything in one place. Join hundreds of gyms already on the platform.
@@ -249,7 +249,7 @@ export default function OwnersPage() {
         transition={{ delay: 0.1 }}
         className="mb-20"
       >
-        <h2 className="text-2xl font-bold text-center mb-10">Why list on FitDex?</h2>
+        <h2 className="text-2xl font-bold text-center mb-10">Why list on Fitdex?</h2>
         <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-6">
           {BENEFITS.map((b, i) => (
             <Card key={i} className="glass-card border-white/10">

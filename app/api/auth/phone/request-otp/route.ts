@@ -58,7 +58,7 @@ export async function POST(req: Request) {
     const sendResult = await sendWhatsappNotification({
       eventType: "OTP_LOGIN",
       toNumber: phoneNumber,
-      message: `Your FITDEX login OTP is ${code}. It expires in ${OTP_EXPIRY_MIN} minutes.`,
+      message: `Your Fitdex login OTP is ${code}. It expires in ${OTP_EXPIRY_MIN} minutes.`,
     });
 
     if (!sendResult.ok) {

@@ -222,7 +222,7 @@ export function LocationGate({ children }: { children: React.ReactNode }) {
                 Location required
               </CardTitle>
               <CardDescription>
-                FitDex needs your location to show gyms near you. Please enable location access and try again.
+                Fitdex needs your location to show gyms near you. Please enable location access and try again.
               </CardDescription>
             </CardHeader>
             <CardContent>
@@ -256,7 +256,7 @@ export function LocationGate({ children }: { children: React.ReactNode }) {
             <CardHeader>
               <CardTitle className="text-2xl">Currently not serviceable</CardTitle>
               <CardDescription>
-                FitDex is available only in Delhi / Delhi NCR. We’re expanding soon.
+                Fitdex is available only in Delhi / Delhi NCR. We’re expanding soon.
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">

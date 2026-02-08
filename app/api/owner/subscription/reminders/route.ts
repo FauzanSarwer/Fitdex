@@ -82,7 +82,7 @@ export async function POST(req: Request) {
           toNumber: sub.owner.supportWhatsapp,
           userId: sub.ownerId,
           payload: { gymName, daysBeforeExpiry },
-          message: `Reminder: ${gymName} plan expires in ${daysBeforeExpiry} days. Renew on FITDEX to avoid downtime.`,
+          message: `Reminder: ${gymName} plan expires in ${daysBeforeExpiry} days. Renew on Fitdex to avoid downtime.`,
         });
         await prismaAny.subscriptionReminderLog.upsert({
           where: {

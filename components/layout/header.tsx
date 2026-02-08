@@ -5,7 +5,8 @@ import { useState } from "react";
 import { useSession, signOut } from "next-auth/react";
 import { isOwner } from "@/lib/permissions";
 import { motion } from "framer-motion";
-import { Dumbbell, MapPin, User, LayoutDashboard, LogOut } from "lucide-react";
+import Image from "next/image";
+import { MapPin, User, LayoutDashboard, LogOut } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -60,8 +61,15 @@ export function Header() {
       )}
       <div className="container mx-auto flex h-16 items-center justify-between px-4">
         <Link href="/" className="flex items-center gap-2">
-          <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-br from-primary to-accent shadow-glow-sm">
-            <Dumbbell className="h-5 w-5 text-white" />
+          <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-white/10 shadow-glow-sm">
+            <Image
+              src="/fitdex-logo.png"
+              alt="Fitdex"
+              width={24}
+              height={24}
+              className="h-6 w-6"
+              priority
+            />
           </div>
           <span className="text-xl font-bold tracking-tight">Fitdex</span>
         </Link>

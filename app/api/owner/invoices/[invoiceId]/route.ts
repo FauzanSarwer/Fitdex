@@ -29,7 +29,7 @@ export async function GET(_req: Request, { params }: { params: Promise<{ invoice
     });
     if (!invoice) return jsonError("Invoice not found", 404);
 
-    const gymName = invoice.gym?.name ?? "FITDEX";
+    const gymName = invoice.gym?.name ?? "Fitdex";
     const buffer = await generateInvoicePdfBuffer({
       invoiceNumber: invoice.invoiceNumber,
       issuedAt: invoice.issuedAt,

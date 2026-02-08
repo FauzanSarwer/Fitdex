@@ -5,7 +5,7 @@ import { SpeedInsights } from '@vercel/speed-insights/next';
 
 
 export const metadata: Metadata = {
-  title: "FITDEX — District of Gyms",
+  title: "Fitdex — District of Gyms",
   description: "Premium gym discovery and duo accountability in Delhi",
 };
 

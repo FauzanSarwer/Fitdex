@@ -13,6 +13,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { MapPin, Loader2, Sparkles, ShieldCheck } from "lucide-react";
 import { fetchJson } from "@/lib/client-fetch";
 import { isPaymentsEnabled, openRazorpayCheckout } from "@/lib/razorpay-checkout";
+import { AMENITY_OPTIONS } from "@/lib/amenities";
 
 export default function OwnerGymPage() {
   const { toast } = useToast();
@@ -38,7 +39,7 @@ export default function OwnerGymPage() {
     quarterlyPrice: "",
     yearlyPrice: "",
     hasAC: false,
-    amenities: "",
+    amenities: [] as string[],
     ownerConsent: false,
   });
   const [saving, setSaving] = useState(false);
@@ -46,6 +47,7 @@ export default function OwnerGymPage() {
   const [featuring, setFeaturing] = useState<string | null>(null);
   const [verifying, setVerifying] = useState<string | null>(null);
   const [consentSaving, setConsentSaving] = useState(false);
+  const [customAmenity, setCustomAmenity] = useState("");
   const paymentsEnabled = isPaymentsEnabled() || isAdmin;
 
   const primaryGym = gyms[0];
@@ -237,7 +239,7 @@ export default function OwnerGymPage() {
         quarterlyPrice: "",
         yearlyPrice: "",
         hasAC: false,
-        amenities: "",
+        amenities: [],
         ownerConsent: false,
       });
     } catch {
@@ -342,29 +344,75 @@ export default function OwnerGymPage() {
                   required
                 />
               </div>
-              <div className="space-y-2">
-                <Label>Amenities (comma separated)</Label>
-                <Input
-                  value={form.amenities}
-                  onChange={(e) => setForm((p) => ({ ...p, amenities: e.target.value }))}
-                  placeholder="AC, Shower, Parking"
-                />
-              </div>
-              <div className="space-y-2">
-                <Label>AC available</Label>
-                <div className="flex items-center gap-2">
-                  <input
-                    id="hasAC"
-                    type="checkbox"
-                    checked={form.hasAC}
-                    onChange={(e) => setForm((p) => ({ ...p, hasAC: e.target.checked }))}
-                  />
-                  <Label htmlFor="hasAC" className="text-sm text-muted-foreground">This gym has air conditioning</Label>
+                <div className="space-y-2">
+                  <Label>Amenities</Label>
+                  <div className="flex flex-wrap gap-2">
+                    {AMENITY_OPTIONS.map((option) => {
+                      const active = form.amenities.includes(option.value);
+                      return (
+                        <button
+                          key={option.value}
+                          type="button"
+                          onClick={() =>
+                            setForm((p) => {
+                              const next = active
+                                ? p.amenities.filter((item) => item !== option.value)
+                                : [...p.amenities, option.value];
+                              return { ...p, amenities: next };
+                            })
+                          }
+                          className={`rounded-full border px-3 py-1 text-xs transition ${
+                            active
+                              ? "border-primary/40 bg-primary/20 text-primary"
+                              : "border-white/10 text-muted-foreground hover:text-foreground"
+                          }`}
+                        >
+                          <span className="mr-1">{option.emoji}</span>
+                          {option.label}
+                        </button>
+                      );
+                    })}
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Input
+                      value={customAmenity}
+                      onChange={(e) => setCustomAmenity(e.target.value)}
+                      placeholder="Add custom amenity"
+                    />
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={() => {
+                        const trimmed = customAmenity.trim();
+                        if (!trimmed) return;
+                        setForm((p) =>
+                          p.amenities.includes(trimmed)
+                            ? p
+                            : { ...p, amenities: [...p.amenities, trimmed] }
+                        );
+                        setCustomAmenity("");
+                      }}
+                    >
+                      Add
+                    </Button>
+                  </div>
                 </div>
-              </div>
-              <div className="space-y-2">
+                <div className="space-y-2">
+                  <Label>AC available</Label>
+                  <label className="flex items-center gap-3 rounded-lg border border-white/10 px-3 py-2 text-sm text-muted-foreground">
+                    <input
+                      id="hasAC"
+                      type="checkbox"
+                      className="h-4 w-4 rounded border-white/20 bg-transparent accent-primary"
+                      checked={form.hasAC}
+                      onChange={(e) => setForm((p) => ({ ...p, hasAC: e.target.checked }))}
+                    />
+                    This gym has air conditioning
+                  </label>
+                </div>
+                <div className="space-y-2">
                 <Label>Gym images (1 required, max 4)</Label>
-                <div className="grid gap-3">
+                  <div className="grid gap-3 md:grid-cols-2">
                   {form.imageUrls.map((url, index) => (
                     <div key={index} className="rounded-lg border border-white/10 p-3 space-y-2">
                       <div className="flex items-center justify-between text-xs text-muted-foreground">
@@ -536,7 +584,7 @@ export default function OwnerGymPage() {
                     required
                   />
                   <Label htmlFor="ownerConsent" className="text-sm text-muted-foreground">
-                    I confirm I have the owner’s consent to list this gym on FITDEX and accept all platform terms.
+                    I confirm I have the owner’s consent to list this gym on Fitdex and accept all platform terms.
                   </Label>
                 </div>
               </div>
@@ -563,7 +611,7 @@ export default function OwnerGymPage() {
                 onChange={(e) => setForm((p) => ({ ...p, ownerConsent: e.target.checked }))}
               />
               <Label htmlFor="ownerConsentExisting" className="text-sm text-muted-foreground">
-                I confirm I have the owner’s consent to list {primaryGym.name} on FITDEX.
+                I confirm I have the owner’s consent to list {primaryGym.name} on Fitdex.
               </Label>
             </div>
             <Button
@@ -665,7 +713,7 @@ export default function OwnerGymPage() {
                           orderId: result.data?.orderId ?? "",
                           amount: result.data?.amount ?? 0,
                           currency: result.data?.currency ?? "INR",
-                          name: "FITDEX",
+                          name: "Fitdex",
                           onSuccess: async (res) => {
                             const verifyResult = await fetchJson<{
                               featuredUntil?: string;

@@ -37,8 +37,12 @@ export function RealtimeAdminMetrics() {
       }
     };
 
-    load();
-    const timer = setInterval(load, 30000);
+    if (typeof (window as any).requestIdleCallback === "function") {
+      (window as any).requestIdleCallback(load);
+    } else {
+      setTimeout(load, 0);
+    }
+    const timer = setInterval(load, 60000);
     return () => {
       active = false;
       clearInterval(timer);

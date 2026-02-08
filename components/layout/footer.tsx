@@ -4,7 +4,7 @@ import Link from "next/link";
 import { motion } from "framer-motion";
 import { useSession } from "next-auth/react";
 import { isOwner } from "@/lib/permissions";
-import { Dumbbell } from "lucide-react";
+import Image from "next/image";
 import { Button } from "@/components/ui/button";
 
 export function Footer() {
@@ -23,8 +23,14 @@ export function Footer() {
           className="grid gap-8 md:grid-cols-[1.2fr_1fr_1fr] md:items-start"
         >
           <div className="flex items-center gap-3">
-            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-primary to-accent shadow-glow-sm">
-              <Dumbbell className="h-5 w-5 text-white" />
+            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-white/10 shadow-glow-sm">
+              <Image
+                src="/fitdex-logo.png"
+                alt="Fitdex"
+                width={28}
+                height={28}
+                className="h-7 w-7"
+              />
             </div>
             <div>
               <div className="text-lg font-semibold">Fitdex</div>
@@ -70,7 +76,7 @@ export function Footer() {
           </div>
         </motion.div>
         <div className="mt-8 text-xs text-muted-foreground">
-          © {new Date().getFullYear()} FitDex. All rights reserved.
+          © {new Date().getFullYear()} Fitdex. All rights reserved.
         </div>
       </div>
     </footer>

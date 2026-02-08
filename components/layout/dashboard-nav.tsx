@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { motion } from "framer-motion";
+import Image from "next/image";
 import {
   LayoutDashboard,
   CreditCard,
@@ -12,7 +13,6 @@ import {
   Settings,
   BarChart3,
   Percent,
-  Dumbbell,
   Compass,
   ShieldCheck,
   Bell,
@@ -91,8 +91,15 @@ export function DashboardNav({
       <header className="fixed top-0 left-0 right-0 z-40 glass border-b border-white/10 md:pl-56">
         <div className="flex h-16 items-center gap-4 px-4">
           <Link href="/" className="flex items-center gap-2">
-            <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-br from-primary to-accent shadow-glow-sm">
-              <Dumbbell className="h-5 w-5 text-white" />
+            <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-white/10 shadow-glow-sm">
+              <Image
+                src="/fitdex-logo.png"
+                alt="Fitdex"
+                width={24}
+                height={24}
+                className="h-6 w-6"
+                priority
+              />
             </div>
             <span className="text-lg font-bold">Fitdex</span>
           </Link>

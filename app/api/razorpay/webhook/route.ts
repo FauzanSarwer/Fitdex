@@ -87,7 +87,7 @@ export async function POST(req: Request) {
                 gymId,
                 userId,
                 payload: { gymName: gym?.name ?? "Your gym", membershipId: membership.id },
-                message: `Your booking for ${gym?.name ?? "the gym"} is confirmed. Welcome to FITDEX!`,
+                message: `Your booking for ${gym?.name ?? "the gym"} is confirmed. Welcome to Fitdex!`,
               });
             }
             const invite = await prisma.invite.findFirst({

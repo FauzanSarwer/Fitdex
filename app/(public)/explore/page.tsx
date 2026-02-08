@@ -23,6 +23,7 @@ import { getGymTierRank, isGymFeatured } from "@/lib/gym-utils";
 import { Skeleton } from "@/components/ui/skeleton";
 import { getGymOpenStatus } from "@/lib/gym-hours";
 import { fetchJson } from "@/lib/client-fetch";
+import { getAmenityEmoji } from "@/lib/amenities";
 
 type ViewMode = "map" | "list";
 
@@ -107,6 +108,18 @@ export default function ExplorePage() {
   const [onlyVerified, setOnlyVerified] = useState(false);
   const { status } = useSession();
   const [savedIds, setSavedIds] = useState<Set<string>>(new Set());
+  const [expandedAddresses, setExpandedAddresses] = useState<Record<string, boolean>>({});
+
+  const mapCenter = useMemo(() => {
+    if (userLat != null && userLng != null) {
+      return { latitude: userLat, longitude: userLng, showUserMarker: true };
+    }
+    const fallback = gyms.find((g) => Number.isFinite(g.latitude) && Number.isFinite(g.longitude));
+    if (fallback) {
+      return { latitude: fallback.latitude, longitude: fallback.longitude, showUserMarker: false };
+    }
+    return { latitude: 28.6139, longitude: 77.209, showUserMarker: false };
+  }, [userLat, userLng, gyms]);
 
   const loadGyms = async (url: string) => {
     setError(null);
@@ -582,15 +595,15 @@ export default function ExplorePage() {
         </div>
       </div>
 
-      {view === "map" && userLat != null && userLng != null && (
+      {view === "map" && (
         <motion.div
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           className="mb-6 h-[360px]"
         >
           <MapView
-            latitude={userLat}
-            longitude={userLng}
+            latitude={mapCenter.latitude}
+            longitude={mapCenter.longitude}
             gyms={gyms.map((g) => ({
               id: g.id,
               name: g.name,
@@ -599,6 +612,7 @@ export default function ExplorePage() {
               url: `/explore/${buildGymSlug(g.name, g.id)}`,
             }))}
             className="w-full h-full"
+            showUserMarker={mapCenter.showUserMarker}
           />
         </motion.div>
       )}
@@ -627,6 +641,8 @@ export default function ExplorePage() {
           {filteredGyms.map((gym, i) => {
             const isFeatured = isGymFeatured(gym);
             const amenities = (gym.amenities ?? []).filter(Boolean).slice(0, 3);
+            const isExpanded = !!expandedAddresses[gym.id];
+            const addressTooLong = (gym.address ?? "").length > 80;
             const images = (gym.imageUrls ?? []).length > 0
               ? (gym.imageUrls ?? [])
               : gym.coverImageUrl
@@ -691,9 +707,36 @@ export default function ExplorePage() {
                     </div>
                   </div>
                   <p className="text-sm text-muted-foreground flex items-center gap-1">
-                    <MapPin className="h-3 w-3" />
-                    {gym.address}
+                    <MapPin className="h-4 w-4" />
+                    <span
+                      style={
+                        isExpanded
+                          ? undefined
+                          : {
+                              display: "-webkit-box",
+                              WebkitLineClamp: 2,
+                              WebkitBoxOrient: "vertical",
+                              overflow: "hidden",
+                            }
+                      }
+                    >
+                      {gym.address}
+                    </span>
                   </p>
+                  {addressTooLong && (
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setExpandedAddresses((prev) => ({
+                          ...prev,
+                          [gym.id]: !prev[gym.id],
+                        }))
+                      }
+                      className="text-xs text-primary hover:underline mt-1"
+                    >
+                      {isExpanded ? "See less" : "See more..."}
+                    </button>
+                  )}
                   <p className={`text-xs mt-1 ${getGymOpenStatus({ ...gym, useIst: true }).isOpen ? "text-emerald-400" : "text-muted-foreground"}`}>
                     {getGymOpenStatus({ ...gym, useIst: true }).label}
                   </p>
@@ -704,6 +747,7 @@ export default function ExplorePage() {
                           key={item}
                           className="text-[10px] uppercase tracking-wide border border-white/10 px-2 py-0.5 rounded-full text-muted-foreground"
                         >
+                          <span className="mr-1">{getAmenityEmoji(item)}</span>
                           {item}
                         </span>
                       ))}
@@ -713,7 +757,7 @@ export default function ExplorePage() {
                 <CardContent className="flex items-center justify-between">
                   <div>
                     <p className="text-sm text-muted-foreground">
-                      From {formatPrice(gym.monthlyPrice)}/mo
+                      From <span className="font-semibold text-foreground">{formatPrice(gym.monthlyPrice)}</span>/mo
                     </p>
                     {gym.distance != null && (
                       <p className="text-xs text-muted-foreground mt-0.5">

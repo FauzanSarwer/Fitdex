@@ -297,7 +297,7 @@ export default function DuoPage() {
                     onClick={() => {
                       const link = `${window.location.origin}/invite/${lastInviteCode}`;
                       const gymName = gyms.find((g) => g.id === inviteGymId)?.name ?? "a gym";
-                      const text = `Join me at ${gymName} on FitDex and unlock partner discount. Invite link: ${link}`;
+                      const text = `Join me at ${gymName} on Fitdex and unlock partner discount. Invite link: ${link}`;
                       window.open(`https://wa.me/?text=${encodeURIComponent(text)}`, "_blank");
                     }}
                   >

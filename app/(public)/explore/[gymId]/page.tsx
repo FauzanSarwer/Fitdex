@@ -25,6 +25,7 @@ import { getGymOpenStatus } from "@/lib/gym-hours";
 import { fetchJson } from "@/lib/client-fetch";
 import { MapView } from "@/components/maps/MapView";
 import { isGymFeatured } from "@/lib/gym-utils";
+import { getAmenityEmoji } from "@/lib/amenities";
 
 interface GymData {
   id: string;
@@ -276,7 +277,7 @@ export default function GymProfilePage() {
             <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
               <div>
                 <h1 className="text-3xl font-bold">{gym.name}</h1>
-                <p className="text-sm text-muted-foreground flex items-center gap-1">
+                <p className="text-sm text-muted-foreground flex items-center gap-2">
                   <MapPin className="h-4 w-4" />
                   {gym.address}
                 </p>
@@ -415,10 +416,36 @@ export default function GymProfilePage() {
           <CardHeader>
             <CardTitle>Discounts & perks</CardTitle>
           </CardHeader>
-          <CardContent className="grid gap-3 md:grid-cols-2 text-sm text-muted-foreground">
-            <div>Welcome discount: up to {formatDiscount(gym.welcomeDiscountType, gym.welcomeDiscountValue)}</div>
-            <div>Yearly discount: up to {formatDiscount(gym.yearlyDiscountType, gym.yearlyDiscountValue)}</div>
-            <div>Quarterly discount: up to {formatDiscount(gym.quarterlyDiscountType, gym.quarterlyDiscountValue)}</div>
+          <CardContent className="grid gap-3 md:grid-cols-2 text-sm">
+            <div className="rounded-lg border border-emerald-500/30 bg-emerald-500/10 px-3 py-2 text-emerald-100">
+              Welcome discount: up to <span className="font-semibold text-emerald-50">{formatDiscount(gym.welcomeDiscountType, gym.welcomeDiscountValue)}</span>
+            </div>
+            <div className="rounded-lg border border-primary/30 bg-primary/10 px-3 py-2 text-primary/90">
+              Yearly discount: up to <span className="font-semibold text-primary">{formatDiscount(gym.yearlyDiscountType, gym.yearlyDiscountValue)}</span>
+            </div>
+            <div className="rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-muted-foreground">
+              Quarterly discount: up to <span className="font-semibold text-foreground">{formatDiscount(gym.quarterlyDiscountType, gym.quarterlyDiscountValue)}</span>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card className="glass-card">
+          <CardHeader>
+            <CardTitle>Amenities</CardTitle>
+          </CardHeader>
+          <CardContent>
+            {amenities.length > 0 ? (
+              <div className="grid gap-2 sm:grid-cols-2">
+                {amenities.map((item) => (
+                  <div key={item} className="flex items-center gap-2 rounded-lg border border-white/10 px-3 py-2 text-sm text-foreground/90">
+                    <span>{getAmenityEmoji(item)}</span>
+                    <span>{item}</span>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <p className="text-sm text-muted-foreground">Amenities not listed yet.</p>
+            )}
           </CardContent>
         </Card>
 
@@ -509,17 +536,25 @@ export default function GymProfilePage() {
               <CardTitle>Quick facts</CardTitle>
             </CardHeader>
             <CardContent className="space-y-3 text-sm text-muted-foreground">
-              <div className="flex items-center justify-between">
+              <div className="flex items-start justify-between gap-4">
                 <span>Open days</span>
+                <div className="flex flex-wrap justify-end gap-1">
+                  {openDays.length > 0 ? (
+                    openDays.map((day) => (
+                      <span key={day} className="rounded-full border border-white/10 px-2 py-0.5 text-xs text-foreground/90">
+                        {day}
+                      </span>
+                    ))
+                  ) : (
+                    <span className="text-foreground">Not listed</span>
+                  )}
+                </div>
+              </div>
+              <div className="flex items-center justify-between">
+                <span>Amenities</span>
                 <span className="text-foreground">
-                  {openDays.length > 0 ? openDays.join(", ") : "Not listed"}
+                  {amenities.length > 0 ? `${amenities.slice(0, 4).join(", ")}${amenities.length > 4 ? " +" + (amenities.length - 4) : ""}` : "Not listed"}
                 </span>
-                            <div className="flex items-center justify-between">
-                              <span>Amenities</span>
-                              <span className="text-foreground">
-                                {amenities.length > 0 ? amenities.join(", ") : "Not listed"}
-                              </span>
-                            </div>
               </div>
               <div className="flex items-center justify-between">
                 <span>Hours</span>
@@ -529,7 +564,7 @@ export default function GymProfilePage() {
               </div>
               <div className="flex items-center justify-between">
                 <span>Starting price</span>
-                <span className="text-foreground">{formatPrice(gym.monthlyPrice)}/mo</span>
+                <span className="text-primary font-semibold">{formatPrice(gym.monthlyPrice)}/mo</span>
               </div>
               <div className="flex items-center justify-between">
                 <span>Duo savings</span>
