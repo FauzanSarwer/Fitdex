@@ -55,6 +55,13 @@ interface Gym {
 
 type SortOption = "price_asc" | "price_desc" | "distance" | "newest";
 
+const SORT_LABELS: Record<SortOption, string> = {
+  price_asc: "Price: low → high",
+  price_desc: "Price: high → low",
+  distance: "Nearby first",
+  newest: "Newest",
+};
+
 const SERVICEABLE_CITIES = [
   "Delhi",
   "New Delhi",
@@ -349,13 +356,7 @@ export default function ExplorePage() {
       filters.push({ label: `Within ${maxDistance} km`, onClear: () => setMaxDistance("") });
     }
     if (sortBy !== "distance") {
-      const labels: Record<SortOption, string> = {
-        price_asc: "Price: low → high",
-        price_desc: "Price: high → low",
-        distance: "Nearby first",
-        newest: "Newest",
-      };
-      filters.push({ label: labels[sortBy], onClear: () => setSortBy("distance") });
+      filters.push({ label: SORT_LABELS[sortBy], onClear: () => setSortBy("distance") });
     }
     if (onlyFeatured) {
       filters.push({ label: "Featured only", onClear: () => setOnlyFeatured(false) });
@@ -365,6 +366,13 @@ export default function ExplorePage() {
     }
     return filters;
   }, [maxDistance, maxPrice, query, sortBy, onlyFeatured, onlyVerified]);
+
+  const filterCount =
+    (query.trim() ? 1 : 0) +
+    (Number(maxPrice) > 0 ? 1 : 0) +
+    (Number(maxDistance) > 0 ? 1 : 0) +
+    (onlyFeatured ? 1 : 0) +
+    (onlyVerified ? 1 : 0);
 
   if (error) {
     return (
@@ -418,11 +426,24 @@ export default function ExplorePage() {
             <div className="max-w-2xl space-y-3">
               <p className="text-xs uppercase tracking-[0.3em] text-muted-foreground">Fitdex Explore</p>
               <h1 className="text-2xl md:text-4xl font-semibold text-foreground">
-                Discover premium gyms near you, with transparent pricing and verified listings.
+                Find a gym you can trust with <span className="text-primary">verified profiles</span> and
+                <span className="text-primary"> clear pricing</span>.
               </h1>
               <p className="text-sm text-muted-foreground">
-                Compare facilities, check timings, and reach out instantly. Sorted by distance when location is available.
+                See what's open now, compare amenities, and spot <span className="text-foreground">duo-friendly</span> savings where
+                available. Sorted by distance when location is on.
               </p>
+              <div className="flex flex-wrap gap-2 pt-1">
+                <span className="rounded-full border border-primary/30 bg-primary/10 px-3 py-1 text-xs text-primary">
+                  Verified listings
+                </span>
+                <span className="rounded-full border border-emerald-400/30 bg-emerald-400/10 px-3 py-1 text-xs text-emerald-300">
+                  Transparent pricing
+                </span>
+                <span className="rounded-full border border-sky-400/30 bg-sky-400/10 px-3 py-1 text-xs text-sky-200">
+                  Duo savings where available
+                </span>
+              </div>
             </div>
             <div className="flex flex-wrap gap-2">
               {SERVICEABLE_CITIES.map((city) => (
@@ -435,6 +456,31 @@ export default function ExplorePage() {
               ))}
             </div>
           </div>
+        </section>
+        <section className="mb-8 grid gap-4 md:grid-cols-3">
+          {[
+            {
+              title: "Filter with confidence",
+              body: "Use price, distance, and verified filters to narrow fast.",
+            },
+            {
+              title: "Compare transparently",
+              body: "See pricing, amenities, and open status in one glance.",
+            },
+            {
+              title: "Save together",
+              body: "Look for duo badges to unlock partner discounts.",
+            },
+          ].map((item) => (
+            <Card key={item.title} className="glass-card border border-white/10">
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm font-semibold">{item.title}</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <p className="text-xs text-muted-foreground">{item.body}</p>
+              </CardContent>
+            </Card>
+          ))}
         </section>
         <div className="flex flex-col gap-4 mb-6">
         <div className="flex items-center justify-between">
@@ -466,6 +512,9 @@ export default function ExplorePage() {
         <div className="flex flex-wrap items-center justify-between gap-3">
           <p className="text-sm text-muted-foreground">
             {loading ? "Loading gyms..." : `${filteredGyms.length} gyms available`}
+          </p>
+          <p className="text-xs text-muted-foreground">
+            Sorted by <span className="text-foreground">{SORT_LABELS[sortBy]}</span>
           </p>
           {activeFilters.length > 0 && (
             <div className="flex flex-wrap items-center gap-2">
@@ -511,7 +560,7 @@ export default function ExplorePage() {
               <DropdownMenuTrigger asChild>
                 <Button variant="outline" className="gap-2">
                   <ArrowDownUp className="h-4 w-4" />
-                  Sort by
+                  Sort: {SORT_LABELS[sortBy]}
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end" className="w-56">
@@ -528,9 +577,14 @@ export default function ExplorePage() {
 
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <Button variant="outline" className="gap-2">
+                <Button variant={filterCount > 0 ? "secondary" : "outline"} className="gap-2">
                   <SlidersHorizontal className="h-4 w-4" />
                   Filters
+                  {filterCount > 0 && (
+                    <span className="ml-1 rounded-full bg-primary/20 px-2 py-0.5 text-[10px] text-primary">
+                      {filterCount}
+                    </span>
+                  )}
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end" className="w-72 p-3">
@@ -620,23 +674,36 @@ export default function ExplorePage() {
           ))}
         </div>
       ) : filteredGyms.length === 0 ? (
-        <Card className="glass-card p-12 text-center">
+        <Card className="glass-card p-12 text-center space-y-3">
           <p className="text-muted-foreground">
             {loadFailed
-              ? "No gyms yet. Please check back soon."
+              ? "We're still onboarding gyms in this area."
               : query || maxPrice || maxDistance || onlyFeatured || onlyVerified
-                ? "No gyms found. Try adjusting filters."
+                ? "No matches yet. Try expanding distance or removing a filter."
                 : "No gyms yet."}
           </p>
-          <Button className="mt-4" onClick={() => window.location.reload()}>
-            Retry
-          </Button>
+          <div className="flex flex-col sm:flex-row items-center justify-center gap-2">
+            <Button variant="secondary" onClick={() => {
+              setQuery("");
+              setMaxPrice("");
+              setMaxDistance("");
+              setSortBy("distance");
+              setOnlyFeatured(false);
+              setOnlyVerified(false);
+            }}>
+              Clear filters
+            </Button>
+            <Button className="mt-0 sm:mt-0" onClick={() => window.location.reload()}>
+              Retry
+            </Button>
+          </div>
         </Card>
       ) : (
         <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
           {filteredGyms.map((gym) => {
             const isFeatured = isGymFeatured(gym);
             const amenities = (gym.amenities ?? []).filter(Boolean).slice(0, 3);
+            const hasDuo = gym.partnerDiscountPercent > 0;
             const isExpanded = !!expandedAddresses[gym.id];
             const addressTooLong = (gym.address ?? "").length > 80;
             const images = (gym.imageUrls ?? []).length > 0
@@ -648,7 +715,7 @@ export default function ExplorePage() {
             <div key={gym.id}>
               <Card
                 className={cn(
-                    "glass-card overflow-hidden hover:border-primary/30 transition-all duration-300 hover:-translate-y-1 min-h-[320px]",
+                    "glass-card overflow-hidden hover:border-primary/30 transition-all duration-300 hover:-translate-y-1 hover:shadow-2xl min-h-[320px]",
                   isFeatured && "border-primary/40 shadow-[0_0_24px_rgba(99,102,241,0.25)]"
                 )}
               >
@@ -670,11 +737,20 @@ export default function ExplorePage() {
                       )}
                       {gym.verificationStatus === "VERIFIED" ? (
                         <span className="text-[10px] uppercase tracking-wide bg-emerald-500/20 text-emerald-400 px-2 py-0.5 rounded-full">
-                          Verified
+                          Fitdex verified
+                        </span>
+                      ) : gym.verificationStatus === "PENDING" ? (
+                        <span className="text-[10px] uppercase tracking-wide bg-amber-500/20 text-amber-300 px-2 py-0.5 rounded-full">
+                          Verification in review
                         </span>
                       ) : (
-                        <span className="text-[10px] uppercase tracking-wide bg-amber-500/20 text-amber-400 px-2 py-0.5 rounded-full">
-                          Unverified
+                        <span className="text-[10px] uppercase tracking-wide bg-slate-500/20 text-slate-300 px-2 py-0.5 rounded-full">
+                          Listed
+                        </span>
+                      )}
+                      {hasDuo && (
+                        <span className="text-[10px] uppercase tracking-wide bg-indigo-500/20 text-indigo-200 px-2 py-0.5 rounded-full">
+                          Duo save {gym.partnerDiscountPercent}%
                         </span>
                       )}
                       {gym.hasAC && (
@@ -750,6 +826,11 @@ export default function ExplorePage() {
                     <p className="text-sm text-muted-foreground">
                       From <span className="font-semibold text-foreground">{formatPrice(gym.monthlyPrice)}</span>/mo
                     </p>
+                    {hasDuo && (
+                      <p className="text-xs text-indigo-200 mt-0.5">
+                        Duo discount {gym.partnerDiscountPercent}% available
+                      </p>
+                    )}
                     {gym.distance != null && (
                       <p className="text-xs text-muted-foreground mt-0.5">
                         {(gym.distance / 1000).toFixed(1)} km away
@@ -758,7 +839,7 @@ export default function ExplorePage() {
                   </div>
                   <Button asChild size="sm">
                     <Link href={`/explore/${buildGymSlug(gym.name, gym.id)}`}>
-                      Explore
+                      View details
                       <ArrowRight className="ml-2 h-3 w-3" />
                     </Link>
                   </Button>
