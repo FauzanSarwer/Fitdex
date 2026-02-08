@@ -2,7 +2,12 @@
 CREATE SCHEMA IF NOT EXISTS "public";
 
 -- CreateEnum
-CREATE TYPE "GymTier" AS ENUM ('CORE', 'SUPPORTING', 'EDGE');
+DO $$
+BEGIN
+    CREATE TYPE "GymTier" AS ENUM ('CORE', 'SUPPORTING', 'EDGE');
+EXCEPTION
+    WHEN duplicate_object THEN null;
+END $$;
 
 -- DropForeignKey
 ALTER TABLE "shadow"."Account" DROP CONSTRAINT "Account_userId_fkey";
