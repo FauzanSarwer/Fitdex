@@ -13,11 +13,15 @@ function getTransport() {
   if (!host || !user || !pass) return null;
   const port = Number(portRaw || 587);
   const secure = (getOptionalEnv("SMTP_SECURE") ?? "").toLowerCase() === "true" || port === 465;
+  const requireTLS = (getOptionalEnv("SMTP_REQUIRE_TLS") ?? "").toLowerCase() === "true";
+  const rejectUnauthorized = (getOptionalEnv("SMTP_TLS_REJECT_UNAUTHORIZED") ?? "true").toLowerCase() === "true";
   cachedTransport = nodemailer.createTransport({
     host,
     port,
     secure,
     auth: { user, pass },
+    requireTLS,
+    tls: { rejectUnauthorized },
   });
   return cachedTransport;
 }
@@ -50,6 +54,10 @@ export async function sendEmail({
     return { ok: true as const };
   } catch (error) {
     logServerError(error as Error, { route: "smtp" });
-    return { ok: false as const, error: "Send failed" };
+    const message = error instanceof Error ? error.message : "Send failed";
+    const response = (error as { response?: string })?.response;
+    const code = (error as { code?: string })?.code;
+    const detail = [message, response, code].filter(Boolean).join(" | ");
+    return { ok: false as const, error: detail || "Send failed" };
   }
 }
