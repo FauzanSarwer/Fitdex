@@ -7,7 +7,7 @@ export default function sitemap(): MetadataRoute.Sitemap {
     getOptionalEnv("NEXTAUTH_URL") ||
     "http://localhost:3000";
 
-  const routes = ["/", "/explore", "/pricing", "/auth/login", "/auth/register"];
+  const routes = ["/", "/explore", "/auth/login", "/auth/register"];
 
   return routes.map((route) => ({
     url: `${baseUrl}${route}`,

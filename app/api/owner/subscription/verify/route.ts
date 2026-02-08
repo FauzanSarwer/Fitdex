@@ -20,6 +20,14 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
   const uid = (session!.user as { id: string }).id;
+  const role = (session!.user as { role?: string }).role;
+  if (role === "ADMIN") {
+    const adminSub = await prisma.ownerSubscription.findFirst({
+      where: { ownerId: uid, status: "ACTIVE" },
+      orderBy: { createdAt: "desc" },
+    });
+    return NextResponse.json({ ok: true, subscription: adminSub });
+  }
   const parsed = await safeJson<{
     orderId?: string;
     paymentId?: string;

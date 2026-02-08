@@ -13,9 +13,7 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
   const parsed = await safeJson<{ resend?: boolean }>(req);
-  if (!parsed.ok) {
-    return jsonError("Invalid JSON body", 400);
-  }
+  const _payload = parsed.ok ? parsed.data : {};
   const uid = (session.user as { id: string }).id;
   try {
     const user = await prisma.user.findUnique({

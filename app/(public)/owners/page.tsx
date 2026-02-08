@@ -10,6 +10,7 @@ import {
   Users,
   Zap,
   Check,
+  X,
   Dumbbell,
 } from "lucide-react";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
@@ -49,19 +50,39 @@ type OwnerPlanType = "STARTER" | "PRO" | "FEATURED";
 
 const PLANS: Array<{
   name: string;
-  planType: OwnerPlanType;
+  planType: OwnerPlanType | "FREE";
   price: number;
   period: string;
-  features: string[];
+  features: Array<{ label: string; available: boolean }>;
   cta: string;
   popular?: boolean;
 }> = [
+  {
+    name: "Free",
+    planType: "FREE",
+    price: 0,
+    period: "month",
+    features: [
+      { label: "Gym listing on map", available: true },
+      { label: "Membership management", available: false },
+      { label: "Analytics dashboard", available: false },
+      { label: "Priority support", available: false },
+      { label: "Discount & promo management", available: false },
+    ],
+    cta: "Free",
+  },
   {
     name: "Starter",
     planType: "STARTER",
     price: 1499,
     period: "month",
-    features: ["Analytics dashboard", "Priority support", "Gym listing on map", "Membership management"],
+    features: [
+      { label: "Gym listing on map", available: true },
+      { label: "Membership management", available: true },
+      { label: "Analytics dashboard", available: true },
+      { label: "Priority support", available: true },
+      { label: "Discount & promo management", available: false },
+    ],
     cta: "Get started",
   },
   {
@@ -70,11 +91,11 @@ const PLANS: Array<{
     price: 1999,
     period: "month",
     features: [
-      "Everything in Starter",
-      "Featured gym placement",
-      "Discount & promo management",
-      "Member insights & reports",
-      "Dedicated account manager",
+      { label: "Everything in Starter", available: true },
+      { label: "Featured gym placement", available: true },
+      { label: "Discount & promo management", available: true },
+      { label: "Member insights & reports", available: true },
+      { label: "Dedicated account manager", available: true },
     ],
     popular: true,
     cta: "Go Pro",
@@ -84,7 +105,11 @@ const PLANS: Array<{
     planType: "FEATURED",
     price: 99,
     period: "3 days",
-    features: ["Featured badge", "Top placement in Explore", "Boosted discovery for new members"],
+    features: [
+      { label: "Featured badge", available: true },
+      { label: "Top placement in Explore", available: true },
+      { label: "Boosted discovery for new members", available: true },
+    ],
     cta: "Boost for 3 days",
   },
 ];
@@ -92,11 +117,13 @@ const PLANS: Array<{
 export default function OwnersPage() {
   const { data: session, status } = useSession();
   const owner = status === "authenticated" && isOwner(session);
+  const role = (session?.user as { role?: string })?.role;
+  const isAdmin = role === "ADMIN";
   const { toast } = useToast();
   const [subscription, setSubscription] = useState<any | null>(null);
   const [loadingSub, setLoadingSub] = useState(false);
   const [processingPlan, setProcessingPlan] = useState<string | null>(null);
-  const paymentsEnabled = isPaymentsEnabled();
+  const paymentsEnabled = isPaymentsEnabled() || isAdmin;
 
   useEffect(() => {
     if (!owner) return;
@@ -126,13 +153,32 @@ export default function OwnersPage() {
     }
     setProcessingPlan(plan);
     try {
+      if (isAdmin) {
+        const adminResult = await fetchJson<{ subscription?: any; error?: string }>(
+          "/api/owner/subscription/order",
+          {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ plan }),
+            retries: 1,
+          }
+        );
+        if (adminResult.ok) {
+          const refreshed = await fetchJson<{ subscription?: any }>("/api/owner/subscription", { retries: 1 });
+          setSubscription(refreshed.ok ? refreshed.data?.subscription ?? null : subscription);
+          toast({ title: "Admin access", description: "Plan activated for testing." });
+        } else {
+          toast({ title: "Error", description: adminResult.error ?? "Failed to activate", variant: "destructive" });
+        }
+        setProcessingPlan(null);
+        return;
+      }
       const orderResult = await fetchJson<{ orderId?: string; amount?: number; currency?: string; error?: string }>(
         "/api/owner/subscription/order",
         {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ plan }),
-          retries: 1,
         }
       );
       if (!orderResult.ok || !orderResult.data?.orderId) {
@@ -257,12 +303,20 @@ export default function OwnersPage() {
                 <ul className="space-y-3 flex-1">
                   {plan.features.map((f, j) => (
                     <li key={j} className="flex items-center gap-2 text-sm">
-                      <Check className="h-4 w-4 text-primary shrink-0" />
-                      {f}
+                      {f.available ? (
+                        <Check className="h-4 w-4 text-primary shrink-0" />
+                      ) : (
+                        <X className="h-4 w-4 text-muted-foreground shrink-0" />
+                      )}
+                      <span className={f.available ? "text-foreground" : "text-muted-foreground"}>{f.label}</span>
                     </li>
                   ))}
                 </ul>
-                {owner ? (
+                {plan.planType === "FREE" ? (
+                  <Button className="w-full mt-auto" size="lg" variant="outline" disabled>
+                    Free plan
+                  </Button>
+                ) : owner ? (
                   plan.planType === "FEATURED" ? (
                     <Button asChild className="w-full mt-auto" size="lg" variant={plan.popular ? "default" : "outline"}>
                       <Link href="/dashboard/owner/explore">Boost a gym</Link>

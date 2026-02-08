@@ -13,12 +13,13 @@ const PLAN_PRICES: Record<string, number> = {
 };
 
 export async function POST(req: Request) {
-  if (process.env.PAYMENTS_ENABLED !== "true") {
-    return jsonError("PAYMENTS_DISABLED", 503);
-  }
   const session = await getServerSession(authOptions);
   if (!requireOwner(session)) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+  const role = (session!.user as { role?: string }).role;
+  if (role !== "ADMIN" && process.env.PAYMENTS_ENABLED !== "true") {
+    return jsonError("PAYMENTS_DISABLED", 503);
   }
   const uid = (session!.user as { id: string }).id;
   const parsed = await safeJson<{ plan?: string }>(req);
@@ -30,6 +31,26 @@ export async function POST(req: Request) {
     return jsonError("Invalid plan", 400);
   }
   try {
+    if (role === "ADMIN") {
+      const subscription = await prisma.ownerSubscription.create({
+        data: {
+          ownerId: uid,
+          plan,
+          status: "ACTIVE",
+          startsAt: new Date(),
+          expiresAt: new Date("2999-12-31"),
+          razorpayOrderId: `admin_${plan}_${uid}_${Date.now()}`,
+        },
+      });
+      return NextResponse.json({
+        orderId: subscription.razorpayOrderId,
+        amount: 0,
+        currency: "INR",
+        subscriptionId: subscription.id,
+        plan,
+        adminAccess: true,
+      });
+    }
     const amount = PLAN_PRICES[plan];
     const receipt = `owner_${plan}_${uid}_${Date.now()}`;
     const order = await createRazorpayOrder(amount, receipt, {

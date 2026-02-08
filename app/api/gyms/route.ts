@@ -35,7 +35,6 @@ export async function GET(req: Request) {
     const gyms = await prisma.gym.findMany({
       where: {
         verificationStatus: { not: "REJECTED" },
-        ownerConsentAt: { not: null },
         suspendedAt: null,
       },
       include: {
@@ -50,6 +49,7 @@ export async function GET(req: Request) {
       longitude: g.longitude,
       verificationStatus: g.verificationStatus,
       coverImageUrl: g.coverImageUrl,
+      imageUrls: g.imageUrls,
       openTime: g.openTime,
       closeTime: g.closeTime,
       openDays: g.openDays,

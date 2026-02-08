@@ -20,6 +20,7 @@ export function Header() {
   const owner = status === "authenticated" && isOwner(session);
   const showOwnerCta = status !== "loading" && !session;
   const showOwnerExplore = status === "authenticated" && owner;
+  const showPricing = status === "authenticated" && owner;
   const emailVerified = !!(session?.user as { emailVerified?: boolean })?.emailVerified;
   const [sendingVerification, setSendingVerification] = useState(false);
   const [verificationSent, setVerificationSent] = useState(false);
@@ -72,12 +73,14 @@ export function Header() {
             <MapPin className="h-4 w-4" />
             Explore
           </Link>
-          <Link
-            href="/pricing"
-            className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors"
-          >
-            Pricing
-          </Link>
+          {showPricing && (
+            <Link
+              href="/pricing"
+              className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors"
+            >
+              Pricing
+            </Link>
+          )}
           <Link
             href="/owners"
             className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors"

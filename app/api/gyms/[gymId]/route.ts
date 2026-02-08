@@ -27,7 +27,7 @@ export async function GET(
     if (!gym) {
       return NextResponse.json({ error: "Gym not found" }, { status: 404 });
     }
-    if (gym.verificationStatus === "REJECTED" || gym.suspendedAt || !gym.ownerConsentAt) {
+    if (gym.verificationStatus === "REJECTED" || gym.suspendedAt) {
       return NextResponse.json({ error: "Gym not available" }, { status: 403 });
     }
     const monthly = gym.monthlyPrice;
@@ -52,6 +52,7 @@ export async function GET(
         longitude: gym.longitude,
         verificationStatus: gym.verificationStatus,
         coverImageUrl: gym.coverImageUrl,
+        imageUrls: gym.imageUrls,
         openTime: gym.openTime,
         closeTime: gym.closeTime,
         openDays: gym.openDays,

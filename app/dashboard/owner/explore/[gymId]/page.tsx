@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { motion } from "framer-motion";
+import { useSession } from "next-auth/react";
 import { ArrowLeft, Clock, Loader2, MapPin, ShieldCheck, Sparkles, Users } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -22,6 +23,7 @@ interface GymData {
   address: string;
   verificationStatus: string;
   coverImageUrl: string | null;
+  imageUrls?: string[] | null;
   openTime?: string | null;
   closeTime?: string | null;
   openDays?: string | null;
@@ -52,17 +54,20 @@ export default function OwnerGymProfilePage() {
   const params = useParams();
   const gymId = params.gymId as string;
   const { toast } = useToast();
+  const { data: session } = useSession();
+  const role = (session?.user as { role?: string })?.role;
+  const isAdmin = role === "ADMIN";
   const [gym, setGym] = useState<GymData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [featuring, setFeaturing] = useState(false);
-  const paymentsEnabled = isPaymentsEnabled();
+  const paymentsEnabled = isPaymentsEnabled() || isAdmin;
   const [editForm, setEditForm] = useState({
     name: "",
     address: "",
-    coverImageUrl: "",
+    imageUrls: ["", "", "", ""] as string[],
     instagramUrl: "",
     facebookUrl: "",
     youtubeUrl: "",
@@ -98,10 +103,12 @@ export default function OwnerGymProfilePage() {
           return;
         }
         setGym(found);
+        const seedImages = (found.imageUrls ?? (found.coverImageUrl ? [found.coverImageUrl] : [])).slice(0, 4);
+        const paddedImages = [...seedImages, "", "", "", ""].slice(0, 4);
         setEditForm({
           name: found.name ?? "",
           address: found.address ?? "",
-          coverImageUrl: found.coverImageUrl ?? "",
+          imageUrls: paddedImages,
           instagramUrl: found.instagramUrl ?? "",
           facebookUrl: found.facebookUrl ?? "",
           youtubeUrl: found.youtubeUrl ?? "",
@@ -166,8 +173,90 @@ export default function OwnerGymProfilePage() {
     return type === "PERCENT" ? `${value}%` : formatPrice(value);
   };
 
+  const uploadImage = async (file: File, index: number) => {
+    if (!file.type.startsWith("image/")) {
+      toast({ title: "Invalid file", description: "Only image files are allowed.", variant: "destructive" });
+      return;
+    }
+    if (file.size > MAX_UPLOAD_BYTES) {
+      toast({ title: "File too large", description: "Image must be 2MB or less.", variant: "destructive" });
+      return;
+    }
+    setUploading(true);
+    try {
+      const sigResult = await fetchJson<{
+        signature?: string;
+        timestamp?: number;
+        cloudName?: string;
+        apiKey?: string;
+        folder?: string;
+        error?: string;
+      }>("/api/uploads/signature", { retries: 1 });
+      if (!sigResult.ok || !sigResult.data?.signature || !sigResult.data.cloudName) {
+        toast({ title: "Upload failed", description: sigResult.error ?? "Missing upload config", variant: "destructive" });
+        setUploading(false);
+        return;
+      }
+      if (!sigResult.data.apiKey || !sigResult.data.timestamp) {
+        toast({ title: "Upload failed", description: "Upload configuration incomplete.", variant: "destructive" });
+        setUploading(false);
+        return;
+      }
+      const formData = new FormData();
+      formData.append("file", file);
+      formData.append("api_key", sigResult.data.apiKey ?? "");
+      formData.append("timestamp", String(sigResult.data.timestamp));
+      formData.append("signature", sigResult.data.signature);
+      if (sigResult.data.folder) formData.append("folder", sigResult.data.folder);
+      const uploadRes = await fetch(
+        `https://api.cloudinary.com/v1_1/${sigResult.data.cloudName}/image/upload`,
+        { method: "POST", body: formData }
+      );
+      const uploadJson = await uploadRes.json();
+      if (!uploadRes.ok || !uploadJson.secure_url) {
+        toast({
+          title: "Upload failed",
+          description: uploadJson?.error?.message ?? "Could not upload image",
+          variant: "destructive",
+        });
+        setUploading(false);
+        return;
+      }
+      setEditForm((p) => {
+        const next = [...p.imageUrls];
+        next[index] = uploadJson.secure_url;
+        return { ...p, imageUrls: next };
+      });
+    } catch {
+      toast({ title: "Upload failed", variant: "destructive" });
+    }
+    setUploading(false);
+  };
+
+  const moveImage = (from: number, to: number) => {
+    setEditForm((p) => {
+      const next = [...p.imageUrls];
+      const target = next[from];
+      next[from] = next[to];
+      next[to] = target;
+      return { ...p, imageUrls: next };
+    });
+  };
+
+  const clearImage = (index: number) => {
+    setEditForm((p) => {
+      const next = [...p.imageUrls];
+      next[index] = "";
+      return { ...p, imageUrls: next };
+    });
+  };
+
   const handleSave = async () => {
     if (!gym?.id) return;
+    if (!editForm.imageUrls[0]) {
+      toast({ title: "Add a primary image", description: "At least one gym image is required.", variant: "destructive" });
+      return;
+    }
     setSaving(true);
     try {
       const result = await fetchJson<{ gym?: GymData; error?: string }>("/api/owner/gym", {
@@ -177,7 +266,7 @@ export default function OwnerGymProfilePage() {
           gymId: gym.id,
           name: editForm.name,
           address: editForm.address,
-          coverImageUrl: editForm.coverImageUrl,
+          imageUrls: editForm.imageUrls,
           instagramUrl: editForm.instagramUrl,
           facebookUrl: editForm.facebookUrl,
           youtubeUrl: editForm.youtubeUrl,
@@ -269,6 +358,7 @@ export default function OwnerGymProfilePage() {
                     amount: number;
                     currency?: string;
                     orderId: string;
+                    featuredUntil?: string;
                     error?: string;
                   }>("/api/owner/gym/feature", {
                     method: "POST",
@@ -282,6 +372,12 @@ export default function OwnerGymProfilePage() {
                       description: result.error ?? "Failed to start payment",
                       variant: "destructive",
                     });
+                    setFeaturing(false);
+                    return;
+                  }
+                  if (isAdmin && result.data?.featuredUntil) {
+                    toast({ title: "Boost activated", description: "Admin access applied." });
+                    setGym((prev) => (prev ? { ...prev, featuredUntil: result.data?.featuredUntil } : prev));
                     setFeaturing(false);
                     return;
                   }
@@ -474,71 +570,50 @@ export default function OwnerGymProfilePage() {
                 <Input value={editForm.address} onChange={(e) => setEditForm((p) => ({ ...p, address: e.target.value }))} />
               </div>
               <div className="space-y-2">
-                <Label>Cover photo</Label>
-                <Input
-                  type="file"
-                  accept="image/*"
-                  onChange={async (e) => {
-                    const file = e.target.files?.[0];
-                    if (!file) return;
-                    if (!file.type.startsWith("image/")) {
-                      toast({ title: "Invalid file", description: "Only image files are allowed.", variant: "destructive" });
-                      return;
-                    }
-                    if (file.size > MAX_UPLOAD_BYTES) {
-                      toast({ title: "File too large", description: "Image must be 2MB or less.", variant: "destructive" });
-                      return;
-                    }
-                    setUploading(true);
-                    try {
-                      const sigResult = await fetchJson<{
-                        signature?: string;
-                        timestamp?: number;
-                        cloudName?: string;
-                        apiKey?: string;
-                        folder?: string;
-                        error?: string;
-                      }>("/api/uploads/signature", { retries: 1 });
-                      if (!sigResult.ok || !sigResult.data?.signature || !sigResult.data.cloudName) {
-                        toast({ title: "Upload failed", description: sigResult.error ?? "Missing upload config", variant: "destructive" });
-                        setUploading(false);
-                        return;
-                      }
-                      if (!sigResult.data.apiKey || !sigResult.data.timestamp) {
-                        toast({ title: "Upload failed", description: "Upload configuration incomplete.", variant: "destructive" });
-                        setUploading(false);
-                        return;
-                      }
-                      const formData = new FormData();
-                      formData.append("file", file);
-                      formData.append("api_key", sigResult.data.apiKey ?? "");
-                      formData.append("timestamp", String(sigResult.data.timestamp));
-                      formData.append("signature", sigResult.data.signature);
-                      if (sigResult.data.folder) formData.append("folder", sigResult.data.folder);
-                      const uploadRes = await fetch(
-                        `https://api.cloudinary.com/v1_1/${sigResult.data.cloudName}/image/upload`,
-                        { method: "POST", body: formData }
-                      );
-                      const uploadJson = await uploadRes.json();
-                      if (!uploadRes.ok || !uploadJson.secure_url) {
-                        toast({
-                          title: "Upload failed",
-                          description: uploadJson?.error?.message ?? "Could not upload image",
-                          variant: "destructive",
-                        });
-                        setUploading(false);
-                        return;
-                      }
-                      setEditForm((p) => ({ ...p, coverImageUrl: uploadJson.secure_url }));
-                    } catch {
-                      toast({ title: "Upload failed", variant: "destructive" });
-                    }
-                    setUploading(false);
-                  }}
-                />
-                {editForm.coverImageUrl && (
-                  <img src={editForm.coverImageUrl} alt="Gym" className="h-28 w-full rounded-lg object-cover" />
-                )}
+                <Label>Gym images (1 required, max 4)</Label>
+                <div className="grid gap-3">
+                  {editForm.imageUrls.map((url, index) => (
+                    <div key={index} className="rounded-lg border border-white/10 p-3 space-y-2">
+                      <div className="flex items-center justify-between text-xs text-muted-foreground">
+                        <span>Priority {index + 1}</span>
+                        <div className="flex items-center gap-2">
+                          <Button
+                            type="button"
+                            size="sm"
+                            variant="outline"
+                            disabled={index === 0}
+                            onClick={() => moveImage(index, index - 1)}
+                          >
+                            Up
+                          </Button>
+                          <Button
+                            type="button"
+                            size="sm"
+                            variant="outline"
+                            disabled={index === editForm.imageUrls.length - 1}
+                            onClick={() => moveImage(index, index + 1)}
+                          >
+                            Down
+                          </Button>
+                          {url && (
+                            <Button type="button" size="sm" variant="ghost" onClick={() => clearImage(index)}>
+                              Remove
+                            </Button>
+                          )}
+                        </div>
+                      </div>
+                      <Input
+                        type="file"
+                        accept="image/*"
+                        onChange={(e) => {
+                          const file = e.target.files?.[0];
+                          if (file) uploadImage(file, index);
+                        }}
+                      />
+                      {url && <img src={url} alt={`Gym ${index + 1}`} className="h-28 w-full rounded-lg object-cover" />}
+                    </div>
+                  ))}
+                </div>
                 {uploading && <p className="text-xs text-muted-foreground">Uploading…</p>}
               </div>
               <div className="grid gap-4 md:grid-cols-3">

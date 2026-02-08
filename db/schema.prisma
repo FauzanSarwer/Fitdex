@@ -186,6 +186,7 @@ model Gym {
   welcomeDiscountType    String   @default("PERCENT") // PERCENT | FLAT
   welcomeDiscountValue   Int      @default(10)        // percent or paise (if FLAT)
   coverImageUrl          String?  // optional gym photo
+  imageUrls              String[] @default([])
   instagramUrl           String?
   facebookUrl            String?
   youtubeUrl             String?

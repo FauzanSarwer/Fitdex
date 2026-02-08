@@ -17,7 +17,9 @@ export default function DuoPage() {
   const { data: session } = useSession();
   const emailVerified = !!(session?.user as { emailVerified?: boolean })?.emailVerified;
   const [duos, setDuos] = useState<any[]>([]);
+  const [invites, setInvites] = useState<any[]>([]);
   const [memberships, setMemberships] = useState<any[]>([]);
+  const [gyms, setGyms] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [inviteEmail, setInviteEmail] = useState("");
@@ -30,19 +32,25 @@ export default function DuoPage() {
   useEffect(() => {
     let active = true;
     Promise.all([
-      fetchJson<{ duos?: any[]; error?: string }>("/api/duos", { retries: 1 }),
+      fetchJson<{ duos?: any[]; invites?: any[]; error?: string }>("/api/duos", { retries: 1 }),
       fetchJson<{ memberships?: any[]; error?: string }>("/api/memberships", { retries: 1 }),
+      fetchJson<{ gyms?: any[]; error?: string }>("/api/gyms", { retries: 1 }),
     ])
-      .then(([d, m]) => {
+      .then(([d, m, g]) => {
         if (!active) return;
         if (!d.ok || !m.ok) {
           setError("Failed to load duo data");
           toast({ title: "Error", description: "Failed to load duo data", variant: "destructive" });
         }
         setDuos(d.ok ? d.data?.duos ?? [] : []);
+        setInvites(d.ok ? d.data?.invites ?? [] : []);
         setMemberships(m.ok ? m.data?.memberships ?? [] : []);
+        setGyms(g.ok ? g.data?.gyms ?? [] : []);
         const activeMembership = (m.ok ? m.data?.memberships ?? [] : []).find((x: any) => x.active);
         if (activeMembership) setInviteGymId(activeMembership.gymId);
+        if (!activeMembership && g.ok && (g.data?.gyms ?? []).length > 0) {
+          setInviteGymId((g.data?.gyms ?? [])[0]?.id ?? "");
+        }
         setLoading(false);
       })
       .catch(() => {
@@ -58,6 +66,12 @@ export default function DuoPage() {
 
   const activeMembership = memberships.find((m) => m.active);
   const activeDuo = duos.find((d) => d.active);
+  const inviteStatuses = invites.map((invite) => {
+    const createdAt = new Date(invite.createdAt ?? Date.now()).getTime();
+    const isExpired = Date.now() - createdAt > 1000 * 60 * 60 * 24 * 7;
+    const status = invite.accepted ? "Accepted" : isExpired ? "Rejected" : "Invited";
+    return { ...invite, status };
+  });
 
   async function sendInvite() {
     if (!emailVerified) {
@@ -65,15 +79,16 @@ export default function DuoPage() {
       return;
     }
     if (!inviteGymId) {
-      toast({ title: "No gym", description: "You need an active membership first.", variant: "destructive" });
+      toast({ title: "Select a gym", description: "Choose a gym to invite a partner.", variant: "destructive" });
       return;
     }
     setSending(true);
     try {
+      const joinTogether = !activeMembership;
       const result = await fetchJson<{ code?: string; email?: string; error?: string }>("/api/duos", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ gymId: inviteGymId, email: inviteEmail || undefined }),
+        body: JSON.stringify({ gymId: inviteGymId, email: inviteEmail || undefined, joinTogether }),
         retries: 1,
       });
       if (!result.ok) {
@@ -173,15 +188,60 @@ export default function DuoPage() {
         </Card>
       )}
 
-      {activeMembership && !activeDuo && (
+      {inviteStatuses.length > 0 && (
+        <Card className="glass-card">
+          <CardHeader>
+            <CardTitle>Duo invite status</CardTitle>
+            <CardDescription>Track your recent invites.</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            {inviteStatuses.slice(0, 5).map((invite) => (
+              <div key={invite.id} className="flex items-center justify-between text-sm">
+                <div>
+                  <div className="font-medium">{invite.gym?.name ?? "Gym"}</div>
+                  <div className="text-xs text-muted-foreground">Code {invite.code}</div>
+                </div>
+                <span
+                  className={
+                    invite.status === "Accepted"
+                      ? "rounded-full bg-emerald-500/15 text-emerald-300 px-3 py-1 text-xs"
+                      : invite.status === "Rejected"
+                        ? "rounded-full bg-rose-500/15 text-rose-300 px-3 py-1 text-xs"
+                        : "rounded-full bg-amber-500/15 text-amber-300 px-3 py-1 text-xs"
+                  }
+                >
+                  {invite.status}
+                </span>
+              </div>
+            ))}
+          </CardContent>
+        </Card>
+      )}
+
+      {!activeDuo && (
         <Card className="glass-card">
           <CardHeader>
             <CardTitle>Invite partner (discount on next renewal)</CardTitle>
             <CardDescription>
-              Invite someone to join your gym. They get the discount when they join. Your partner discount applies on your next renewal cycle. Discount % is set by the gym owner.
+              Invite someone before or after you join. They get the discount when they join. Your partner discount applies on your next renewal cycle.
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
+            <div className="space-y-2">
+              <Label>Choose a gym</Label>
+              <select
+                className="w-full rounded-md border border-white/10 bg-transparent px-3 py-2 text-sm"
+                value={inviteGymId}
+                onChange={(e) => setInviteGymId(e.target.value)}
+              >
+                <option value="">Select a gym</option>
+                {gyms.map((gym) => (
+                  <option key={gym.id} value={gym.id}>
+                    {gym.name}
+                  </option>
+                ))}
+              </select>
+            </div>
             <div className="space-y-2">
               <Label>Partner email (optional)</Label>
               <div className="flex gap-2">
@@ -205,7 +265,7 @@ export default function DuoPage() {
                   fetchJson<{ code?: string }>("/api/duos", {
                     method: "POST",
                     headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({ gymId: inviteGymId, joinTogether: true }),
+                    body: JSON.stringify({ gymId: inviteGymId, joinTogether: !activeMembership }),
                     retries: 1,
                   }).then((result) => {
                     if (result.ok && result.data?.code) {
@@ -236,7 +296,8 @@ export default function DuoPage() {
                     variant="outline"
                     onClick={() => {
                       const link = `${window.location.origin}/invite/${lastInviteCode}`;
-                      const text = `Join me at FitDex and unlock partner discount: ${link}`;
+                      const gymName = gyms.find((g) => g.id === inviteGymId)?.name ?? "a gym";
+                      const text = `Join me at ${gymName} on FitDex and unlock partner discount. Invite link: ${link}`;
                       window.open(`https://wa.me/?text=${encodeURIComponent(text)}`, "_blank");
                     }}
                   >

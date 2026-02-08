@@ -14,7 +14,9 @@ export async function GET() {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
   const emailVerified = !!(session!.user as { emailVerified?: boolean }).emailVerified;
-  if (!emailVerified) {
+  const role = (session!.user as { role?: string }).role;
+  const isAdmin = role === "ADMIN";
+  if (!emailVerified && !isAdmin) {
     return jsonError("Please verify your email to continue", 403);
   }
   const uid = (session!.user as { id: string }).id;

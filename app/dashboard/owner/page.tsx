@@ -28,6 +28,8 @@ type Transaction = {
 
 export default function OwnerDashboardPage() {
   const { data: session } = useSession();
+  const role = (session?.user as { role?: string })?.role;
+  const isAdmin = role === "ADMIN";
   const { toast } = useToast();
   const MAX_UPLOAD_BYTES = 2 * 1024 * 1024;
   const [gyms, setGyms] = useState<any[]>([]);
@@ -49,7 +51,7 @@ export default function OwnerDashboardPage() {
   const [invoiceLookup, setInvoiceLookup] = useState<any | null>(null);
   const [invoiceLookupError, setInvoiceLookupError] = useState<string | null>(null);
   const [invoiceLookupLoading, setInvoiceLookupLoading] = useState(false);
-  const paymentsEnabled = isPaymentsEnabled();
+  const paymentsEnabled = isPaymentsEnabled() || isAdmin;
 
   useEffect(() => {
     let active = true;
@@ -451,6 +453,7 @@ export default function OwnerDashboardPage() {
                           amount: number;
                           currency?: string;
                           orderId: string;
+                          featuredUntil?: string;
                           error?: string;
                         }>("/api/owner/gym/feature", {
                           method: "POST",
@@ -464,6 +467,16 @@ export default function OwnerDashboardPage() {
                             description: result.error ?? "Failed to start payment",
                             variant: "destructive",
                           });
+                          setFeaturing(null);
+                          return;
+                        }
+                        if (isAdmin && result.data?.featuredUntil) {
+                          toast({ title: "Boost activated", description: "Admin access applied." });
+                          setGyms((prev) =>
+                            prev.map((g) =>
+                              g.id === gym.id ? { ...g, featuredUntil: result.data?.featuredUntil } : g
+                            )
+                          );
                           setFeaturing(null);
                           return;
                         }

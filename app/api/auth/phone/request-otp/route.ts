@@ -62,6 +62,9 @@ export async function POST(req: Request) {
     });
 
     if (!sendResult.ok) {
+      if (sendResult.error === "WHATSAPP_NOT_CONFIGURED" && process.env.NODE_ENV !== "production") {
+        return NextResponse.json({ ok: true, devOtp: code });
+      }
       await prismaAny.phoneOtp.delete({ where: { phoneNumber } }).catch(() => undefined);
       return jsonError("OTP service unavailable", 503);
     }

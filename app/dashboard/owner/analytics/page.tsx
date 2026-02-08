@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { useSession } from "next-auth/react";
 import { useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { motion } from "framer-motion";
@@ -36,6 +37,9 @@ import {
 
 export default function OwnerAnalyticsPage() {
   const searchParams = useSearchParams();
+  const { data: session } = useSession();
+  const role = (session?.user as { role?: string })?.role;
+  const isAdmin = role === "ADMIN";
   const [gyms, setGyms] = useState<any[]>([]);
   const [selectedGymId, setSelectedGymId] = useState<string>("");
   const [error, setError] = useState<string | null>(null);
@@ -65,7 +69,7 @@ export default function OwnerAnalyticsPage() {
   const [reportLoading, setReportLoading] = useState(false);
   const [loading, setLoading] = useState(true);
   const [analyticsLoading, setAnalyticsLoading] = useState(false);
-  const hasProAccess = false;
+  const hasProAccess = isAdmin;
 
   useEffect(() => {
     let active = true;

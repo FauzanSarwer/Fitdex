@@ -13,7 +13,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 
 function LoginForm() {
   const searchParams = useSearchParams();
-  const rawCallbackUrl = searchParams.get("callbackUrl") ?? "/dashboard/user";
+  const rawCallbackUrl = searchParams.get("callbackUrl") ?? "/dashboard";
   const emailParam = searchParams.get("email") ?? "";
   const errorParam = searchParams.get("error") ?? "";
   const [providers, setProviders] = useState<Record<string, { id: string }> | null>(null);
@@ -24,12 +24,13 @@ function LoginForm() {
   const [otp, setOtp] = useState("");
   const [otpSent, setOtpSent] = useState(false);
   const [otpLoading, setOtpLoading] = useState(false);
+  const [devOtp, setDevOtp] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const passwordRef = useRef<HTMLInputElement | null>(null);
 
   const callbackUrl = (() => {
-    if (!rawCallbackUrl) return "/dashboard/user";
+    if (!rawCallbackUrl) return "/dashboard";
     if (rawCallbackUrl.startsWith("/")) return rawCallbackUrl;
     try {
       const url = new URL(rawCallbackUrl);
@@ -37,7 +38,7 @@ function LoginForm() {
         return `${url.pathname}${url.search}${url.hash}`;
       }
     } catch {}
-    return "/dashboard/user";
+    return "/dashboard";
   })();
 
   useEffect(() => {
@@ -107,6 +108,7 @@ function LoginForm() {
   async function requestOtp() {
     setError("");
     setOtpLoading(true);
+    setDevOtp(null);
     try {
       const res = await fetch("/api/auth/phone/request-otp", {
         method: "POST",
@@ -118,6 +120,10 @@ function LoginForm() {
         setError(data?.error ?? "Failed to send OTP");
         setOtpLoading(false);
         return;
+      }
+      const data = await res.json().catch(() => ({}));
+      if (data?.devOtp) {
+        setDevOtp(data.devOtp);
       }
       setOtpSent(true);
     } catch {
@@ -227,6 +233,9 @@ function LoginForm() {
               value={phoneNumber}
               onChange={(e) => setPhoneNumber(e.target.value)}
             />
+            {devOtp && (
+              <p className="text-xs text-amber-300">Dev OTP: {devOtp}</p>
+            )}
             {otpSent && (
               <Input
                 id="otp"

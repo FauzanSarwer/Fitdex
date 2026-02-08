@@ -34,6 +34,7 @@ interface GymData {
   longitude: number;
   verificationStatus: string;
   coverImageUrl: string | null;
+  imageUrls?: string[] | null;
   hasAC?: boolean;
   amenities?: string[];
   isFeatured?: boolean | null;
@@ -221,6 +222,7 @@ export default function GymProfilePage() {
   const isVerified = gym.verificationStatus === "VERIFIED";
   const openDays = gym.openDays ? gym.openDays.split(",") : [];
   const amenities = (gym.amenities ?? []).filter(Boolean);
+  const heroImage = (gym.imageUrls && gym.imageUrls.length > 0 ? gym.imageUrls[0] : gym.coverImageUrl) ?? null;
   const featured = isGymFeatured(gym);
 
   const recordLead = async (type: "BOOK_CTA" | "ENQUIRY") => {
@@ -244,9 +246,9 @@ export default function GymProfilePage() {
       >
         <Card className="glass-card overflow-hidden border-primary/20">
           <div className="relative h-60 bg-gradient-to-br from-primary/30 via-primary/10 to-accent/20 flex items-center justify-center">
-            {gym.coverImageUrl ? (
+            {heroImage ? (
               <img
-                src={gym.coverImageUrl}
+                src={heroImage}
                 alt={gym.name}
                 className="absolute inset-0 h-full w-full object-cover"
               />

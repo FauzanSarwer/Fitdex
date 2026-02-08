@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { motion } from "framer-motion";
+import { useSession } from "next-auth/react";
 import { Loader2, MapPin, Image as ImageIcon } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -15,12 +16,15 @@ import { useToast } from "@/hooks/use-toast";
 
 export default function OwnerExplorePage() {
   const { toast } = useToast();
+  const { data: session } = useSession();
+  const role = (session?.user as { role?: string })?.role;
+  const isAdmin = role === "ADMIN";
   const [gyms, setGyms] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [featuring, setFeaturing] = useState<string | null>(null);
   const [upsellGym, setUpsellGym] = useState<any | null>(null);
-  const paymentsEnabled = isPaymentsEnabled();
+  const paymentsEnabled = isPaymentsEnabled() || isAdmin;
 
   useEffect(() => {
     let active = true;
@@ -195,6 +199,7 @@ export default function OwnerExplorePage() {
                               amount: number;
                               currency?: string;
                               orderId: string;
+                              featuredUntil?: string;
                               error?: string;
                             }>("/api/owner/gym/feature", {
                               method: "POST",
@@ -208,6 +213,16 @@ export default function OwnerExplorePage() {
                                 description: result.error ?? "Failed to start payment",
                                 variant: "destructive",
                               });
+                              setFeaturing(null);
+                              return;
+                            }
+                            if (isAdmin && result.data?.featuredUntil) {
+                              toast({ title: "Boost activated", description: "Admin access applied." });
+                              setGyms((prev) =>
+                                prev.map((g) =>
+                                  g.id === gym.id ? { ...g, featuredUntil: result.data?.featuredUntil } : g
+                                )
+                              );
                               setFeaturing(null);
                               return;
                             }

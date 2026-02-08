@@ -12,7 +12,7 @@ interface MapViewProps {
   showUserMarker?: boolean;
 }
 
-export function MapView({ latitude, longitude, gyms = [], className, zoom = 13, showUserMarker = true }: MapViewProps) {
+export function MapView({ latitude, longitude, gyms = [], className, zoom = 13, showUserMarker = false }: MapViewProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<any>(null);
   const markersRef = useRef<any>(null);
@@ -57,8 +57,8 @@ export function MapView({ latitude, longitude, gyms = [], className, zoom = 13, 
     // Create map
     const map = L.map(containerRef.current).setView([latitude, longitude], zoom);
 
-    // Add dark tiles
-    L.tileLayer("https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png", {
+    // Add lighter tiles for better label contrast
+    L.tileLayer("https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png", {
       maxZoom: 19,
       attribution: '© OpenStreetMap contributors © CARTO',
     }).addTo(map);

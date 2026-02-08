@@ -12,6 +12,22 @@ export async function GET() {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
   const uid = (session!.user as { id: string }).id;
+  const role = (session!.user as { role?: string }).role;
+  if (role === "ADMIN") {
+    return NextResponse.json({
+      subscription: {
+        id: `admin_${uid}`,
+        ownerId: uid,
+        plan: "PRO",
+        status: "ACTIVE",
+        startsAt: new Date(0),
+        expiresAt: new Date("2999-12-31"),
+        createdAt: new Date(0),
+        updatedAt: new Date(),
+        adminAccess: true,
+      },
+    });
+  }
   try {
     const now = new Date();
     const active = await prisma.ownerSubscription.findFirst({

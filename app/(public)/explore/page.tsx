@@ -42,6 +42,7 @@ interface Gym {
   distance?: number;
   createdAt?: string | Date;
   coverImageUrl?: string | null;
+  imageUrls?: string[] | null;
   featuredUntil?: string | Date | null;
   verifiedUntil?: string | Date | null;
   isFeatured?: boolean | null;
@@ -620,7 +621,11 @@ export default function ExplorePage() {
           {filteredGyms.map((gym, i) => {
             const isFeatured = isGymFeatured(gym);
             const amenities = (gym.amenities ?? []).filter(Boolean).slice(0, 3);
-            const images = gym.coverImageUrl ? [gym.coverImageUrl] : [];
+            const images = (gym.imageUrls ?? []).length > 0
+              ? (gym.imageUrls ?? [])
+              : gym.coverImageUrl
+                ? [gym.coverImageUrl]
+                : [];
             return (
             <motion.div
               key={gym.id}

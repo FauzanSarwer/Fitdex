@@ -8,20 +8,25 @@ import { CreditCard, Loader2 } from "lucide-react";
 import { fetchJson } from "@/lib/client-fetch";
 import { isPaymentsEnabled, openRazorpayCheckout } from "@/lib/razorpay-checkout";
 import { useToast } from "@/hooks/use-toast";
+import { useSession } from "next-auth/react";
 
 const PLAN_LABELS: Record<string, string> = {
+  FREE: "Free",
   STARTER: "Starter",
   PRO: "Pro",
 };
 
 export default function OwnerSubscriptionPage() {
   const { toast } = useToast();
+  const { data: session } = useSession();
+  const role = (session?.user as { role?: string })?.role;
+  const isAdmin = role === "ADMIN";
   const [subscription, setSubscription] = useState<any | null>(null);
   const [invoices, setInvoices] = useState<any[]>([]);
   const [invoiceError, setInvoiceError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [processing, setProcessing] = useState<string | null>(null);
-  const paymentsEnabled = isPaymentsEnabled();
+  const paymentsEnabled = isPaymentsEnabled() && !isAdmin;
 
   const loadSubscription = async () => {
     setLoading(true);
@@ -118,8 +123,8 @@ export default function OwnerSubscriptionPage() {
   };
 
   const active = subscription && subscription.status === "ACTIVE" && new Date(subscription.expiresAt).getTime() > Date.now();
-  const plan = subscription?.plan as "STARTER" | "PRO" | undefined;
-  const planLabel = plan ? PLAN_LABELS[plan] ?? plan : "No plan";
+  const plan = subscription?.plan as "FREE" | "STARTER" | "PRO" | undefined;
+  const planLabel = plan ? PLAN_LABELS[plan] ?? plan : "Free";
 
   return (
     <div className="p-6 space-y-6">
@@ -148,6 +153,9 @@ export default function OwnerSubscriptionPage() {
                   <div>
                     {subscription.status === "CANCELED" ? "Ends on" : "Renews on"} {new Date(subscription.expiresAt).toLocaleDateString()}
                   </div>
+                  {isAdmin && (
+                    <div className="text-emerald-300">Admin access enabled (no payment required).</div>
+                  )}
                 </div>
               ) : (
                 <div className="text-sm text-muted-foreground">No active subscription yet.</div>
@@ -166,17 +174,17 @@ export default function OwnerSubscriptionPage() {
           <Button
             variant="secondary"
             onClick={() => startCheckout("STARTER")}
-            disabled={processing != null || plan === "STARTER" && active}
+            disabled={processing != null || isAdmin || (plan === "STARTER" && active)}
           >
             {processing === "STARTER" ? <Loader2 className="h-4 w-4 animate-spin" /> : "Buy Starter"}
           </Button>
           <Button
             onClick={() => startCheckout("PRO")}
-            disabled={processing != null || plan === "PRO" && active}
+            disabled={processing != null || isAdmin || (plan === "PRO" && active)}
           >
             {processing === "PRO" ? <Loader2 className="h-4 w-4 animate-spin" /> : "Upgrade to Pro"}
           </Button>
-          {active && subscription?.status !== "CANCELED" && (
+          {active && subscription?.status !== "CANCELED" && !isAdmin && (
             <Button variant="outline" onClick={cancelSubscription} disabled={processing != null}>
               {processing === "CANCEL" ? <Loader2 className="h-4 w-4 animate-spin" /> : "Cancel subscription"}
             </Button>

@@ -59,6 +59,7 @@ export async function POST(req: Request) {
     welcomeDiscountType?: "PERCENT" | "FLAT";
     welcomeDiscountValue?: number;
     coverImageUrl?: string | null;
+    imageUrls?: string[] | string | null;
     instagramUrl?: string | null;
     facebookUrl?: string | null;
     youtubeUrl?: string | null;
@@ -89,13 +90,22 @@ export async function POST(req: Request) {
     welcomeDiscountType,
     welcomeDiscountValue,
     coverImageUrl,
+    imageUrls,
     instagramUrl,
     facebookUrl,
     youtubeUrl,
   } = parsed.data;
-  if (!name || !address || monthlyPrice == null || yearlyPrice == null || !coverImageUrl) {
+  const normalizedImages = Array.isArray(imageUrls)
+    ? imageUrls.map((url) => url?.trim()).filter(Boolean)
+    : typeof imageUrls === "string"
+      ? imageUrls.split(",").map((url) => url.trim()).filter(Boolean)
+      : coverImageUrl
+        ? [coverImageUrl.trim()]
+        : [];
+  const imageList = normalizedImages.slice(0, 4);
+  if (!name || !address || monthlyPrice == null || yearlyPrice == null || imageList.length === 0) {
     return jsonError(
-      "name, address, coverImageUrl, monthlyPrice, yearlyPrice required",
+      "name, address, imageUrls, monthlyPrice, yearlyPrice required",
       400
     );
   }
@@ -146,7 +156,8 @@ export async function POST(req: Request) {
         yearlyDiscountValue: Number(yearlyDiscountValue ?? 15),
         welcomeDiscountType: welcomeDiscountType ?? "PERCENT",
         welcomeDiscountValue: Number(welcomeDiscountValue ?? 10),
-        coverImageUrl: coverImageUrl?.trim() || null,
+        coverImageUrl: imageList[0] ?? null,
+        imageUrls: imageList,
         instagramUrl: instagramUrl?.trim() || null,
         facebookUrl: facebookUrl?.trim() || null,
         youtubeUrl: youtubeUrl?.trim() || null,
@@ -189,6 +200,7 @@ export async function PATCH(req: Request) {
     welcomeDiscountType?: "PERCENT" | "FLAT";
     welcomeDiscountValue?: number;
     coverImageUrl?: string | null;
+    imageUrls?: string[] | string | null;
     instagramUrl?: string | null;
     facebookUrl?: string | null;
     youtubeUrl?: string | null;
@@ -244,7 +256,21 @@ export async function PATCH(req: Request) {
     if (data.yearlyDiscountValue != null) update.yearlyDiscountValue = data.yearlyDiscountValue;
     if (data.welcomeDiscountType != null) update.welcomeDiscountType = data.welcomeDiscountType;
     if (data.welcomeDiscountValue != null) update.welcomeDiscountValue = data.welcomeDiscountValue;
-    if (data.coverImageUrl !== undefined) update.coverImageUrl = data.coverImageUrl;
+    if (data.imageUrls !== undefined) {
+      const normalizedImages = Array.isArray(data.imageUrls)
+        ? data.imageUrls.map((url) => url?.trim()).filter(Boolean)
+        : typeof data.imageUrls === "string"
+          ? data.imageUrls.split(",").map((url) => url.trim()).filter(Boolean)
+          : [];
+      const imageList = normalizedImages.slice(0, 4);
+      if (imageList.length === 0) {
+        return jsonError("At least one image is required", 400);
+      }
+      update.imageUrls = imageList;
+      update.coverImageUrl = imageList[0] ?? null;
+    } else if (data.coverImageUrl !== undefined) {
+      update.coverImageUrl = data.coverImageUrl;
+    }
     if (data.instagramUrl !== undefined) update.instagramUrl = data.instagramUrl?.trim() || null;
     if (data.facebookUrl !== undefined) update.facebookUrl = data.facebookUrl?.trim() || null;
     if (data.youtubeUrl !== undefined) update.youtubeUrl = data.youtubeUrl?.trim() || null;

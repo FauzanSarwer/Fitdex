@@ -11,6 +11,7 @@ export function Footer() {
   const { data: session, status } = useSession();
   const showOwnerCta = status !== "loading" && !session;
   const showOwnerExplore = status === "authenticated" && isOwner(session);
+  const showPricing = status === "authenticated" && isOwner(session);
 
   return (
     <footer className="mt-auto border-t border-white/10 bg-white/5 backdrop-blur">
@@ -36,9 +37,11 @@ export function Footer() {
               <Link href="/explore" className="text-muted-foreground hover:text-foreground transition-colors">
                 Explore gyms
               </Link>
-              <Link href="/pricing" className="text-muted-foreground hover:text-foreground transition-colors">
-                Membership pricing
-              </Link>
+              {showPricing && (
+                <Link href="/pricing" className="text-muted-foreground hover:text-foreground transition-colors">
+                  Membership pricing
+                </Link>
+              )}
               {showOwnerExplore && (
                 <Link href="/dashboard/owner/explore" className="text-muted-foreground hover:text-foreground transition-colors">
                   Owner Explore

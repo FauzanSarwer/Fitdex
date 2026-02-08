@@ -10,14 +10,15 @@ import { logServerError } from "@/lib/logger";
 const VERIFIED_PRICE_PAISE = 9900; // ₹99
 
 export async function POST(req: Request) {
-  if (process.env.PAYMENTS_ENABLED !== "true") {
-    return jsonError("PAYMENTS_DISABLED", 503);
-  }
   const session = await getServerSession(authOptions);
   if (!requireOwner(session)) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
   const uid = (session!.user as { id: string }).id;
+  const role = (session!.user as { role?: string }).role;
+  if (role !== "ADMIN" && process.env.PAYMENTS_ENABLED !== "true") {
+    return jsonError("PAYMENTS_DISABLED", 503);
+  }
   const parsed = await safeJson<{ gymId?: string }>(req);
   if (!parsed.ok) {
     return jsonError("Invalid JSON body", 400);
@@ -30,6 +31,22 @@ export async function POST(req: Request) {
     const gym = await prisma.gym.findFirst({ where: { id: gymId, ownerId: uid } });
     if (!gym) {
       return jsonError("Gym not found", 404);
+    }
+    if (role === "ADMIN") {
+      const now = new Date();
+      const verifiedUntil = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000);
+      const updated = await prisma.gym.update({
+        where: { id: gymId },
+        data: { verifiedUntil },
+      });
+      return NextResponse.json({
+        orderId: `admin_verify_${gymId}_${Date.now()}`,
+        amount: 0,
+        currency: "INR",
+        gymId,
+        verifiedUntil: updated.verifiedUntil,
+        adminAccess: true,
+      });
     }
     const receipt = `verify_${gymId}_${Date.now()}`;
     const order = await createRazorpayOrder(VERIFIED_PRICE_PAISE, receipt, {
