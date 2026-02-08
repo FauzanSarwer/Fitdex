@@ -80,23 +80,40 @@ export default function OwnerExplorePage() {
   }
 
   return (
-    <div className="p-6 space-y-6">
+    <div className="p-5 space-y-5">
       <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}>
         <h1 className="text-2xl font-bold flex items-center gap-2">
           <MapPin className="h-6 w-6" />
           {title}
         </h1>
         <p className="text-muted-foreground text-sm">
-          Manage your gyms and review competitors. Open your gym to edit it and see owner-only analytics.
+          Turn competitor signals into growth moves. Use Explore to tune pricing, sharpen positioning, and boost visibility.
         </p>
       </motion.div>
+
+      <Card className="glass-card">
+        <CardContent className="grid gap-4 p-4 text-sm text-muted-foreground md:grid-cols-3">
+          <div>
+            <p className="text-xs uppercase tracking-[0.2em] text-foreground">Why it matters</p>
+            <p>Competitor activity shows where demand is moving, so you can act early.</p>
+          </div>
+          <div>
+            <p className="text-xs uppercase tracking-[0.2em] text-foreground">What to watch</p>
+            <p>Pricing, visibility, and page interest help you decide when to adjust offers.</p>
+          </div>
+          <div>
+            <p className="text-xs uppercase tracking-[0.2em] text-foreground">Your next move</p>
+            <p>Match standout pricing, refresh your listing, or boost placement.</p>
+          </div>
+        </CardContent>
+      </Card>
 
       {gyms.length === 0 ? (
         <Card className="glass-card p-12 text-center">
           <p className="text-muted-foreground">No gyms found.</p>
         </Card>
       ) : (
-        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+        <div className="grid gap-4 [grid-template-columns:repeat(auto-fit,minmax(260px,1fr))]">
           {gyms.map((gym) => {
             const isOwner = gym.isOwner;
             const isVerified = gym.verificationStatus === "VERIFIED";
@@ -130,8 +147,24 @@ export default function OwnerExplorePage() {
                 </CardHeader>
                 <CardContent className="space-y-3">
                   {isOwner && gym.stats ? (
-                    <div className="grid grid-cols-2 gap-3 text-xs text-muted-foreground">
-                      <div className="rounded-lg border border-white/10 px-3 py-2">
+                    <div className="space-y-2">
+                      <div className="grid grid-cols-2 gap-3 text-xs text-muted-foreground">
+                        <div className="rounded-lg border border-white/10 px-3 py-2">
+                          <div className="text-sm font-semibold text-foreground">{gym.stats.membersJoined}</div>
+                          Members joined
+                        </div>
+                        <div className="rounded-lg border border-white/10 px-3 py-2">
+                          <div className="text-sm font-semibold text-foreground">{gym.stats.pageViews}</div>
+                          Page visits
+                        </div>
+                      </div>
+                      <p className="text-[11px] text-muted-foreground">
+                        Use these baselines to spot gaps versus nearby gyms and refine your offers.
+                      </p>
+                    </div>
+                  ) : isOwner ? (
+                    <div className="relative overflow-hidden rounded-lg border border-white/10 px-3 py-3 text-xs text-muted-foreground">
+                      <div className="grid grid-cols-2 gap-3 blur-[3px]">
                         <div className="text-sm font-semibold text-foreground">{gym.stats.membersJoined}</div>
                         Members joined
                       </div>
@@ -139,23 +172,19 @@ export default function OwnerExplorePage() {
                         <div className="text-sm font-semibold text-foreground">{gym.stats.pageViews}</div>
                         Page visits
                       </div>
-                    </div>
-                  ) : isOwner ? (
-                    <div className="rounded-lg border border-white/10 px-3 py-2 text-xs text-muted-foreground flex items-center justify-between gap-2">
-                      <span>Premium analytics available on paid plans.</span>
-                      <Button size="sm" variant="outline" onClick={() => setUpsellGym(gym)}>
-                        Unlock
-                      </Button>
-                    </div>
-                  ) : (
-                    <div className="rounded-lg border border-white/10 px-3 py-2 text-xs text-muted-foreground space-y-2">
-                      <div className="flex items-center justify-between">
-                        <span>Competitor analytics</span>
+                      <div className="absolute inset-0 flex items-center justify-between gap-3 bg-background/70 px-3 backdrop-blur-sm">
+                        <div>
+                          <p className="text-xs font-semibold text-foreground">Premium analytics</p>
+                          <p className="text-[11px] text-muted-foreground">Benchmark vs nearby gyms and spot demand shifts.</p>
+                        </div>
                         <Button size="sm" variant="outline" onClick={() => setUpsellGym(gym)}>
-                          Unlock
+                          Unlock insights
                         </Button>
                       </div>
-                      <div className="grid grid-cols-2 gap-3">
+                    </div>
+                  ) : (
+                    <div className="relative overflow-hidden rounded-lg border border-white/10 px-3 py-3 text-xs text-muted-foreground">
+                      <div className="grid grid-cols-2 gap-3 blur-[3px]">
                         <div className="rounded-lg border border-white/10 px-3 py-2">
                           <div className="text-sm font-semibold text-foreground">XXX</div>
                           Monthly sales
@@ -164,6 +193,15 @@ export default function OwnerExplorePage() {
                           <div className="text-sm font-semibold text-foreground">XXX</div>
                           Page visits
                         </div>
+                      </div>
+                      <div className="absolute inset-0 flex items-center justify-between gap-3 bg-background/70 px-3 backdrop-blur-sm">
+                        <div>
+                          <p className="text-xs font-semibold text-foreground">Competitor insights</p>
+                          <p className="text-[11px] text-muted-foreground">See how you stack up on pricing and demand.</p>
+                        </div>
+                        <Button size="sm" variant="outline" onClick={() => setUpsellGym(gym)}>
+                          Unlock insights
+                        </Button>
                       </div>
                     </div>
                   )}
@@ -176,6 +214,15 @@ export default function OwnerExplorePage() {
                     ) : (
                       <Button size="sm" variant="outline" asChild>
                         <Link href={`/explore/${buildGymSlug(gym.name, gym.id)}`}>View profile</Link>
+                      </Button>
+                    )}
+                    {isOwner ? (
+                      <Button size="sm" variant="ghost" asChild>
+                        <Link href={`/dashboard/owner/explore/${gym.id}`}>Match pricing</Link>
+                      </Button>
+                    ) : (
+                      <Button size="sm" variant="ghost" onClick={() => setUpsellGym(gym)}>
+                        Compare pricing
                       </Button>
                     )}
                     {isOwner ? (
