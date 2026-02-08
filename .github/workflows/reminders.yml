@@ -1,0 +1,12 @@
+name: owner-reminders
+on:
+schedule:
+- cron: "0 9 * * *"
+jobs:
+run:
+runs-on: ubuntu-latest
+steps:
+- name: Call reminders endpoint
+run: curl -sS "$CRON_URL"
+env:
+CRON_URL: ${{ secrets.CRON_URL }}
