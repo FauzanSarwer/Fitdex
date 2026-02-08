@@ -1,6 +1,7 @@
+import * as React from "react";
 import { cn } from "@/lib/utils";
 
-function Skeleton({
+function SkeletonBase({
   className,
   ...props
 }: React.HTMLAttributes<HTMLDivElement>) {
@@ -11,5 +12,8 @@ function Skeleton({
     />
   );
 }
+
+const Skeleton = React.memo(SkeletonBase);
+Skeleton.displayName = "Skeleton";
 
 export { Skeleton };

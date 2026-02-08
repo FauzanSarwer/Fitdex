@@ -23,7 +23,25 @@ export async function GET() {
   try {
     const memberships = await prisma.membership.findMany({
       where: { userId: uid },
-      include: { gym: true },
+      select: {
+        id: true,
+        gymId: true,
+        active: true,
+        planType: true,
+        basePrice: true,
+        finalPrice: true,
+        startedAt: true,
+        expiresAt: true,
+        gym: {
+          select: {
+            id: true,
+            name: true,
+            address: true,
+            latitude: true,
+            longitude: true,
+          },
+        },
+      },
       orderBy: { startedAt: "desc" },
     });
     return NextResponse.json({ memberships });
@@ -170,7 +188,25 @@ export async function POST(req: Request) {
         active: false,
         expiresAt,
       },
-      include: { gym: true },
+      select: {
+        id: true,
+        gymId: true,
+        active: true,
+        planType: true,
+        basePrice: true,
+        finalPrice: true,
+        startedAt: true,
+        expiresAt: true,
+        gym: {
+          select: {
+            id: true,
+            name: true,
+            address: true,
+            latitude: true,
+            longitude: true,
+          },
+        },
+      },
     });
 
     // Post-creation: update invite (duo is created in Razorpay verify when both have active membership)

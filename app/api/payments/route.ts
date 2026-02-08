@@ -15,7 +15,13 @@ export async function GET() {
   try {
     const transactions = await prisma.transaction.findMany({
       where: { userId: uid },
-      include: { gym: { select: { id: true, name: true } } },
+      select: {
+        id: true,
+        createdAt: true,
+        paymentStatus: true,
+        totalAmount: true,
+        gym: { select: { id: true, name: true } },
+      },
       orderBy: { createdAt: "desc" },
     });
     return NextResponse.json({ payments: transactions });

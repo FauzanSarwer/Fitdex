@@ -28,7 +28,12 @@ export async function GET(req: Request) {
     }
     const memberships = await prisma.membership.findMany({
       where: { gymId, active: true },
-      include: { user: { select: { id: true, name: true, email: true } } },
+      select: {
+        id: true,
+        planType: true,
+        active: true,
+        user: { select: { id: true, name: true, email: true } },
+      },
     });
     return NextResponse.json({ members: memberships });
   } catch (error) {

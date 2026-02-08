@@ -16,7 +16,11 @@ export default async function AdminNotificationsPage() {
   const notifications = await prisma.notification.findMany({
     take: 100,
     orderBy: { createdAt: "desc" },
-    include: {
+    select: {
+      id: true,
+      title: true,
+      body: true,
+      createdAt: true,
       user: { select: { name: true, email: true } },
     },
   });

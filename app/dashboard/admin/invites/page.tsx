@@ -16,7 +16,11 @@ export default async function AdminInvitesPage() {
   const invites = await prisma.invite.findMany({
     take: 100,
     orderBy: { createdAt: "desc" },
-    include: {
+    select: {
+      id: true,
+      email: true,
+      accepted: true,
+      createdAt: true,
       gym: { select: { name: true } },
       inviter: { select: { name: true, email: true } },
     },

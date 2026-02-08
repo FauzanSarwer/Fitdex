@@ -27,6 +27,16 @@ export async function GET(req: Request) {
     const codes = await prisma.discountCode.findMany({
       where: { gymId },
       orderBy: { createdAt: "desc" },
+      select: {
+        id: true,
+        code: true,
+        discountType: true,
+        discountValue: true,
+        maxUses: true,
+        usedCount: true,
+        validUntil: true,
+        createdAt: true,
+      },
     });
     return NextResponse.json({ codes });
   } catch (error) {

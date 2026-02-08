@@ -33,7 +33,12 @@ export async function POST(req: Request) {
         status: "ACTIVE",
         expiresAt: { gte: now, lte: target },
       },
-      include: { owner: true },
+      select: {
+        id: true,
+        ownerId: true,
+        expiresAt: true,
+        owner: { select: { email: true, supportWhatsapp: true } },
+      },
     });
 
     for (const sub of expiring) {

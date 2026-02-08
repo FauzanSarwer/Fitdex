@@ -2,7 +2,6 @@
 
 import { useEffect, useState } from "react";
 import { useSession, signOut } from "next-auth/react";
-import { motion } from "framer-motion";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -98,13 +97,13 @@ export default function AdminSettingsPage() {
 
   return (
     <div className="p-6 space-y-6">
-      <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}>
+      <div>
         <h1 className="text-2xl font-bold flex items-center gap-2">
           <ShieldCheck className="h-6 w-6" />
           Admin settings
         </h1>
         <p className="text-muted-foreground text-sm">Account preferences for administrative access.</p>
-      </motion.div>
+      </div>
 
       <Card className="glass-card">
         <CardHeader>

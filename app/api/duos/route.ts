@@ -21,16 +21,24 @@ export async function GET() {
   try {
     const duos = await prisma.duo.findMany({
       where: { OR: [{ userOneId: uid }, { userTwoId: uid }] },
-      include: {
-        gym: true,
-        userOne: { select: { id: true, name: true, email: true } },
-        userTwo: { select: { id: true, name: true, email: true } },
+      select: {
+        id: true,
+        active: true,
+        gym: { select: { id: true, name: true } },
+        userOne: { select: { id: true, name: true } },
+        userTwo: { select: { id: true, name: true } },
       },
     });
     const invites = await prisma.invite.findMany({
       where: { inviterId: uid },
       orderBy: { createdAt: "desc" },
-      include: { gym: { select: { id: true, name: true } } },
+      select: {
+        id: true,
+        code: true,
+        accepted: true,
+        createdAt: true,
+        gym: { select: { id: true, name: true } },
+      },
     });
     return NextResponse.json({ duos, invites });
   } catch (error) {

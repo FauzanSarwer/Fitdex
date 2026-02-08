@@ -14,6 +14,7 @@ export async function safeJson<T = unknown>(req: Request): Promise<JsonResult<T>
   }
 }
 
-export function jsonError(message: string, status = 400) {
-  return NextResponse.json({ error: message }, { status });
+export function jsonError(message: string, status = 400, extras?: Record<string, unknown>) {
+  const safeMessage = typeof message === "string" && message.trim().length > 0 ? message : "Request failed";
+  return NextResponse.json({ error: safeMessage, ...extras }, { status });
 }

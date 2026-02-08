@@ -26,7 +26,11 @@ export async function GET() {
         active: true,
         expiresAt: { gte: now, lte: upcoming },
       },
-      include: { gym: true },
+      select: {
+        id: true,
+        expiresAt: true,
+        gym: { select: { name: true } },
+      },
     });
 
     const dayMs = 1000 * 60 * 60 * 24;
@@ -86,6 +90,10 @@ export async function GET() {
         ownerId: uid,
         verificationStatus: { not: "VERIFIED" },
       },
+      select: {
+        id: true,
+        name: true,
+      },
     });
 
     await Promise.all(
@@ -114,6 +122,12 @@ export async function GET() {
       where: { userId: uid, read: false },
       orderBy: { createdAt: "desc" },
       take: 20,
+      select: {
+        id: true,
+        title: true,
+        body: true,
+        createdAt: true,
+      },
     });
 
     return NextResponse.json({ notifications });

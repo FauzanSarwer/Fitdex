@@ -16,10 +16,14 @@ export default async function AdminVerificationQueuePage() {
 
   const gyms = await prisma.gym.findMany({
     where: { verificationStatus: "PENDING" },
-    include: {
+    select: {
+      id: true,
+      name: true,
+      address: true,
+      updatedAt: true,
+      verificationNotes: true,
       owner: {
         select: {
-          id: true,
           name: true,
           email: true,
         },

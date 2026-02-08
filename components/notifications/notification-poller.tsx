@@ -27,6 +27,7 @@ export function NotificationPoller() {
 
     const fetchNotifications = async () => {
       if (fetchingRef.current) return;
+      if (typeof document !== "undefined" && document.hidden) return;
       fetchingRef.current = true;
       try {
         const result = await fetchJson<{ notifications?: NotificationItem[] }>("/api/notifications", { retries: 1 });
@@ -55,7 +56,11 @@ export function NotificationPoller() {
       }
     };
 
-    fetchNotifications();
+    if (typeof (window as any).requestIdleCallback === "function") {
+      (window as any).requestIdleCallback(fetchNotifications);
+    } else {
+      setTimeout(fetchNotifications, 0);
+    }
     const interval = window.setInterval(fetchNotifications, 60000);
     return () => window.clearInterval(interval);
   }, [status, toast]);

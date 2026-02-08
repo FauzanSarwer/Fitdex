@@ -23,6 +23,11 @@ export async function GET() {
       where: { ownerId: uid },
       orderBy: { issuedAt: "desc" },
       take: 50,
+      select: {
+        id: true,
+        invoiceNumber: true,
+        issuedAt: true,
+      },
     });
     return NextResponse.json({ invoices });
   } catch (error) {

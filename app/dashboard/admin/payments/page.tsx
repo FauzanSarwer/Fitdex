@@ -17,7 +17,12 @@ export default async function AdminPaymentsPage() {
   const payments = await prisma.payment.findMany({
     take: 100,
     orderBy: { createdAt: "desc" },
-    include: {
+    select: {
+      id: true,
+      amount: true,
+      status: true,
+      razorpayOrderId: true,
+      createdAt: true,
       user: { select: { name: true, email: true } },
       gym: { select: { name: true } },
     },

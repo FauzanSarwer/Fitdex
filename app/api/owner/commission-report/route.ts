@@ -25,6 +25,11 @@ export async function GET(req: Request) {
     const transactions = await prisma.transaction.findMany({
       where: { gymId, paymentStatus: "PAID" },
       orderBy: { createdAt: "asc" },
+      select: {
+        createdAt: true,
+        totalAmount: true,
+        platformCommissionAmount: true,
+      },
     });
 
     const byMonth: Record<string, { bookings: number; totalAmount: number; commission: number }> = {};

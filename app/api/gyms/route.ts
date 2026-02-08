@@ -37,7 +37,38 @@ export async function GET(req: Request) {
         verificationStatus: { not: "REJECTED" },
         suspendedAt: null,
       },
-      include: {
+      select: {
+        id: true,
+        name: true,
+        address: true,
+        latitude: true,
+        longitude: true,
+        verificationStatus: true,
+        coverImageUrl: true,
+        imageUrls: true,
+        openTime: true,
+        closeTime: true,
+        openDays: true,
+        dayPassPrice: true,
+        monthlyPrice: true,
+        yearlyPrice: true,
+        partnerDiscountPercent: true,
+        yearlyDiscountType: true,
+        yearlyDiscountValue: true,
+        quarterlyDiscountType: true,
+        quarterlyDiscountValue: true,
+        welcomeDiscountType: true,
+        welcomeDiscountValue: true,
+        ownerId: true,
+        featuredUntil: true,
+        isFeatured: true,
+        featuredStartAt: true,
+        featuredEndAt: true,
+        verifiedUntil: true,
+        gymTier: true,
+        hasAC: true,
+        amenities: true,
+        createdAt: true,
         owner: { select: { id: true, name: true } },
       },
     });
@@ -152,9 +183,25 @@ export async function POST(req: Request) {
     // Fetch gym details
     const gym = await prisma.gym.findUnique({
       where: { id: gymId },
-      include: {
-        owner: { select: { id: true, name: true } }
-      }
+      select: {
+        id: true,
+        name: true,
+        address: true,
+        latitude: true,
+        longitude: true,
+        dayPassPrice: true,
+        monthlyPrice: true,
+        yearlyPrice: true,
+        quarterlyPrice: true,
+        partnerDiscountPercent: true,
+        quarterlyDiscountType: true,
+        quarterlyDiscountValue: true,
+        yearlyDiscountType: true,
+        yearlyDiscountValue: true,
+        welcomeDiscountType: true,
+        welcomeDiscountValue: true,
+        owner: { select: { id: true, name: true } },
+      },
     });
 
     if (!gym) {

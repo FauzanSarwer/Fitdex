@@ -29,7 +29,22 @@ export async function fetchJson<T>(
     const timeout = setTimeout(() => controller.abort(), timeoutMs);
     try {
       const res = await fetch(input, { ...fetchOptions, signal: controller.signal });
-      const data = (await res.json().catch(() => null)) as T | null;
+      const contentType = res.headers.get("content-type") ?? "";
+      const rawText = await res.text().catch(() => "");
+      let data: T | null = null;
+      let rawError: string | undefined;
+
+      if (rawText) {
+        if (contentType.includes("application/json")) {
+          try {
+            data = JSON.parse(rawText) as T;
+          } catch {
+            rawError = rawText;
+          }
+        } else {
+          rawError = rawText;
+        }
+      }
       clearTimeout(timeout);
 
       if (res.ok) {
@@ -45,13 +60,19 @@ export async function fetchJson<T>(
         ok: false,
         status: res.status,
         data,
-        error: (data as { error?: string })?.error ?? "Request failed",
+        error:
+          (data as { error?: string })?.error ??
+          rawError?.slice(0, 300) ??
+          (res.statusText || "Request failed"),
       };
     } catch (error) {
       clearTimeout(timeout);
       if (attempt < retries) {
         await sleep(retryDelayMs * (attempt + 1));
         continue;
+      }
+      if (error instanceof DOMException && error.name === "AbortError") {
+        return { ok: false, status: 0, data: null, error: "Request timed out" };
       }
       return {
         ok: false,

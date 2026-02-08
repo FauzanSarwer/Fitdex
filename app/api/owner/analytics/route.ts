@@ -29,22 +29,43 @@ export async function GET(req: Request) {
     const payments = await prisma.payment.findMany({
       where: { gymId, status: "CAPTURED" },
       orderBy: { createdAt: "asc" },
+      select: {
+        amount: true,
+        createdAt: true,
+      },
     });
     const allPayments = await prisma.payment.findMany({
       where: { gymId },
       orderBy: { createdAt: "asc" },
+      select: {
+        status: true,
+      },
     });
     const memberships = await prisma.membership.findMany({
       where: { gymId },
       orderBy: { startedAt: "asc" },
+      select: {
+        active: true,
+        planType: true,
+        finalPrice: true,
+        startedAt: true,
+      },
     });
     const leads = await prisma.lead.findMany({
       where: { gymId },
       orderBy: { createdAt: "asc" },
+      select: {
+        createdAt: true,
+      },
     });
     const paidTransactions = await prisma.transaction.findMany({
       where: { gymId, paymentStatus: "PAID" },
       orderBy: { createdAt: "asc" },
+      select: {
+        totalAmount: true,
+        platformCommissionAmount: true,
+        createdAt: true,
+      },
     });
     const totalRevenue = payments.reduce((s, p) => s + p.amount, 0);
     const estimatedRevenue = paidTransactions.reduce((s, t) => s + t.totalAmount, 0);

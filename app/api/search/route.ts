@@ -56,7 +56,8 @@ export async function GET(req: Request) {
           ],
         },
         take: 6,
-        include: {
+        select: {
+          id: true,
           gym: { select: { id: true, name: true } },
           user: { select: { id: true, name: true, email: true } },
         },

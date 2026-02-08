@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useEffect, useMemo, useRef } from "react";
 import { cn } from "@/lib/utils";
 
 interface MapViewProps {
@@ -16,30 +16,49 @@ export function MapView({ latitude, longitude, gyms = [], className, zoom = 13, 
   const containerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<any>(null);
   const markersRef = useRef<any>(null);
+  const lastMarkersKeyRef = useRef<string>("");
+
+  const gymsKey = useMemo(() => {
+    if (!gyms.length) return "";
+    return gyms.map((g) => `${g.id}:${g.latitude}:${g.longitude}`).join("|");
+  }, [gyms]);
+
+  const centerKey = useMemo(() => `${latitude}:${longitude}:${zoom}:${showUserMarker ? 1 : 0}`, [latitude, longitude, zoom, showUserMarker]);
+
+  const loadLeaflet = () => {
+    if (typeof window === "undefined") return Promise.resolve(null);
+    if ((window as any).__fitdexLeafletPromise) return (window as any).__fitdexLeafletPromise;
+
+    (window as any).__fitdexLeafletPromise = new Promise<void>((resolve) => {
+      if ((window as any).L) {
+        resolve();
+        return;
+      }
+
+      const cssLink = document.createElement("link");
+      cssLink.rel = "stylesheet";
+      cssLink.href = "https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css";
+      document.head.appendChild(cssLink);
+
+      const script = document.createElement("script");
+      script.src = "https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js";
+      script.async = true;
+      script.onload = () => resolve();
+      document.head.appendChild(script);
+    });
+
+    return (window as any).__fitdexLeafletPromise as Promise<void>;
+  };
 
   useEffect(() => {
-    // Load Leaflet CSS and JS
     if (typeof window === "undefined") return;
-    
-    // Check if Leaflet is already loaded
-    if ((window as any).L) {
+    let cancelled = false;
+    loadLeaflet().then(() => {
+      if (cancelled) return;
       initMap();
-      return;
-    }
-
-    // Load Leaflet CSS
-    const cssLink = document.createElement("link");
-    cssLink.rel = "stylesheet";
-    cssLink.href = "https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css";
-    document.head.appendChild(cssLink);
-
-    // Load Leaflet JS
-    const script = document.createElement("script");
-    script.src = "https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js";
-    script.async = true;
-    script.onload = initMap;
-    document.head.appendChild(script);
+    });
     return () => {
+      cancelled = true;
       if (mapRef.current) {
         mapRef.current.remove();
         mapRef.current = null;
@@ -55,7 +74,10 @@ export function MapView({ latitude, longitude, gyms = [], className, zoom = 13, 
     if (!L) return;
 
     // Create map
-    const map = L.map(containerRef.current).setView([latitude, longitude], zoom);
+    const map = L.map(containerRef.current, {
+      zoomControl: false,
+      preferCanvas: true,
+    }).setView([latitude, longitude], zoom);
 
     // Add lighter tiles for better label contrast
     L.tileLayer("https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png", {
@@ -67,12 +89,16 @@ export function MapView({ latitude, longitude, gyms = [], className, zoom = 13, 
     updateMarkers();
 
     mapRef.current = map;
+    setTimeout(() => map.invalidateSize(), 0);
   };
 
   const updateMarkers = () => {
     if (!mapRef.current || !markersRef.current) return;
     const L = (window as any).L;
     if (!L) return;
+    const key = `${centerKey}|${gymsKey}`;
+    if (key === lastMarkersKeyRef.current) return;
+    lastMarkersKeyRef.current = key;
     markersRef.current.clearLayers();
 
     if (showUserMarker) {
@@ -121,7 +147,7 @@ export function MapView({ latitude, longitude, gyms = [], className, zoom = 13, 
     // Update map view when coordinates change
     mapRef.current.setView([latitude, longitude], zoom);
     updateMarkers();
-  }, [latitude, longitude, zoom, gyms]);
+  }, [centerKey, gymsKey]);
 
   return (
     <div

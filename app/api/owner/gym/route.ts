@@ -2,27 +2,49 @@ import { NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import type { Prisma } from "@prisma/client";
 import { forwardGeocode, reverseGeocode } from "@/lib/location";
 import { requireOwner } from "@/lib/permissions";
 import { jsonError, safeJson } from "@/lib/api";
 import { logServerError } from "@/lib/logger";
 import { normalizeAmenities } from "@/lib/gym-utils";
 
-export async function GET() {
+export async function GET(req: Request) {
   const session = await getServerSession(authOptions);
   if (!requireOwner(session)) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
   const uid = (session!.user as { id: string }).id;
+  const { searchParams } = new URL(req.url);
+  const compact = searchParams.get("compact") === "1";
   try {
-    const gyms = await prisma.gym.findMany({
-      where: { ownerId: uid },
-      include: {
-        _count: {
-          select: { memberships: true, duos: true },
-        },
-      },
-    });
+    const query: Prisma.GymFindManyArgs = compact
+      ? {
+          where: { ownerId: uid },
+          select: {
+            id: true,
+            name: true,
+            verificationStatus: true,
+            gstNumber: true,
+            gstCertificateUrl: true,
+            partnerDiscountPercent: true,
+            quarterlyDiscountType: true,
+            quarterlyDiscountValue: true,
+            yearlyDiscountType: true,
+            yearlyDiscountValue: true,
+            welcomeDiscountType: true,
+            welcomeDiscountValue: true,
+          },
+        }
+      : {
+          where: { ownerId: uid },
+          include: {
+            _count: {
+              select: { memberships: true, duos: true },
+            },
+          },
+        };
+    const gyms = await prisma.gym.findMany(query);
     return NextResponse.json({ gyms });
   } catch (error) {
     logServerError(error as Error, { route: "/api/owner/gym", userId: uid });

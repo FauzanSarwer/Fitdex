@@ -1,9 +1,8 @@
 "use client";
 
-import { useMemo, useState, useEffect } from "react";
+import { useMemo, useState, useEffect, useDeferredValue } from "react";
 import Link from "next/link";
 import { useSession } from "next-auth/react";
-import { motion } from "framer-motion";
 import { MapPin, List, LayoutGrid, Search, ArrowRight, Heart, SlidersHorizontal, ArrowDownUp } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -65,13 +64,47 @@ const SERVICEABLE_CITIES = [
   "Faridabad",
 ];
 
+const normalize = (value: string) => value.toLowerCase().replace(/[^a-z0-9]/g, "");
+
+const levenshtein = (a: string, b: string) => {
+  const m = a.length;
+  const n = b.length;
+  if (!m) return n;
+  if (!n) return m;
+  const dp = Array.from({ length: m + 1 }, () => new Array(n + 1).fill(0));
+  for (let i = 0; i <= m; i += 1) dp[i][0] = i;
+  for (let j = 0; j <= n; j += 1) dp[0][j] = j;
+  for (let i = 1; i <= m; i += 1) {
+    for (let j = 1; j <= n; j += 1) {
+      const cost = a[i - 1] === b[j - 1] ? 0 : 1;
+      dp[i][j] = Math.min(
+        dp[i - 1][j] + 1,
+        dp[i][j - 1] + 1,
+        dp[i - 1][j - 1] + cost
+      );
+    }
+  }
+  return dp[m][n];
+};
+
+const fuzzyMatch = (name: string, q: string) => {
+  const n = normalize(name);
+  const query = normalize(q);
+  if (!query) return true;
+  if (n.includes(query)) return true;
+  if (query.length < 3) return false;
+  const distance = levenshtein(n, query);
+  const threshold = Math.max(2, Math.floor(query.length * 0.3));
+  return distance <= threshold;
+};
+
 function GymImageCarousel({ images, name }: { images: string[]; name: string }) {
   const [index, setIndex] = useState(0);
   if (images.length === 0) return null;
   const active = images[index] ?? images[0];
   return (
     <div className="relative h-full w-full">
-      <img src={active} alt={name} className="h-full w-full object-cover" />
+      <img src={active} alt={name} className="h-full w-full object-cover" loading="lazy" decoding="async" />
       {images.length > 1 && (
         <div className="absolute bottom-2 left-1/2 -translate-x-1/2 flex items-center gap-1">
           {images.map((_, i) => (
@@ -109,6 +142,9 @@ export default function ExplorePage() {
   const { status } = useSession();
   const [savedIds, setSavedIds] = useState<Set<string>>(new Set());
   const [expandedAddresses, setExpandedAddresses] = useState<Record<string, boolean>>({});
+  const deferredQuery = useDeferredValue(query);
+  const deferredMaxPrice = useDeferredValue(maxPrice);
+  const deferredMaxDistance = useDeferredValue(maxDistance);
 
   const mapCenter = useMemo(() => {
     if (userLat != null && userLng != null) {
@@ -253,49 +289,17 @@ export default function ExplorePage() {
     }
   }
 
-  const normalize = (value: string) => value.toLowerCase().replace(/[^a-z0-9]/g, "");
-  const levenshtein = (a: string, b: string) => {
-    const m = a.length;
-    const n = b.length;
-    if (!m) return n;
-    if (!n) return m;
-    const dp = Array.from({ length: m + 1 }, () => new Array(n + 1).fill(0));
-    for (let i = 0; i <= m; i += 1) dp[i][0] = i;
-    for (let j = 0; j <= n; j += 1) dp[0][j] = j;
-    for (let i = 1; i <= m; i += 1) {
-      for (let j = 1; j <= n; j += 1) {
-        const cost = a[i - 1] === b[j - 1] ? 0 : 1;
-        dp[i][j] = Math.min(
-          dp[i - 1][j] + 1,
-          dp[i][j - 1] + 1,
-          dp[i - 1][j - 1] + cost
-        );
-      }
-    }
-    return dp[m][n];
-  };
-  const fuzzyMatch = (name: string, q: string) => {
-    const n = normalize(name);
-    const query = normalize(q);
-    if (!query) return true;
-    if (n.includes(query)) return true;
-    if (query.length < 3) return false;
-    const distance = levenshtein(n, query);
-    const threshold = Math.max(2, Math.floor(query.length * 0.3));
-    return distance <= threshold;
-  };
-
   const filteredGyms = useMemo(() => {
     let list = [...gyms];
-    const q = query.trim().toLowerCase();
+    const q = deferredQuery.trim().toLowerCase();
     if (q) {
       list = list.filter((g) => fuzzyMatch(g.name, q));
     }
-    const priceCap = Number(maxPrice);
+    const priceCap = Number(deferredMaxPrice);
     if (Number.isFinite(priceCap) && priceCap > 0) {
       list = list.filter((g) => g.monthlyPrice <= priceCap);
     }
-    const distCap = Number(maxDistance);
+    const distCap = Number(deferredMaxDistance);
     if (Number.isFinite(distCap) && distCap > 0) {
       list = list.filter((g) => (g.distance ?? Infinity) <= distCap * 1000);
     }
@@ -331,7 +335,7 @@ export default function ExplorePage() {
         list.sort((a, b) => tierSort(a, b) || (a.distance ?? Infinity) - (b.distance ?? Infinity) || featuredSort(a, b) || a.monthlyPrice - b.monthlyPrice);
     }
     return list;
-  }, [gyms, maxDistance, maxPrice, query, sortBy, onlyFeatured, onlyVerified]);
+  }, [gyms, deferredMaxDistance, deferredMaxPrice, deferredQuery, sortBy, onlyFeatured, onlyVerified]);
 
   const activeFilters = useMemo(() => {
     const filters: { label: string; onClear: () => void }[] = [];
@@ -409,11 +413,7 @@ export default function ExplorePage() {
         </div>
       )}
       <div className={locationGate ? "pointer-events-none blur-sm" : ""}>
-        <motion.section
-          initial={{ opacity: 0, y: 12 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="mb-8 rounded-3xl border border-white/10 bg-white/5 p-6 md:p-8 shadow-glow-sm"
-        >
+        <section className="mb-8 rounded-3xl border border-white/10 bg-white/5 p-6 md:p-8 shadow-glow-sm">
           <div className="flex flex-col gap-6 md:flex-row md:items-end md:justify-between">
             <div className="max-w-2xl space-y-3">
               <p className="text-xs uppercase tracking-[0.3em] text-muted-foreground">Fitdex Explore</p>
@@ -435,7 +435,7 @@ export default function ExplorePage() {
               ))}
             </div>
           </div>
-        </motion.section>
+        </section>
         <div className="flex flex-col gap-4 mb-6">
         <div className="flex items-center justify-between">
           <h2 className="text-xl font-semibold flex items-center gap-2 text-foreground">
@@ -596,11 +596,7 @@ export default function ExplorePage() {
       </div>
 
       {view === "map" && (
-        <motion.div
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          className="mb-6 h-[360px]"
-        >
+        <div className="mb-6 h-[360px]">
           <MapView
             latitude={mapCenter.latitude}
             longitude={mapCenter.longitude}
@@ -614,7 +610,7 @@ export default function ExplorePage() {
             className="w-full h-full"
             showUserMarker={mapCenter.showUserMarker}
           />
-        </motion.div>
+        </div>
       )}
 
       {loading ? (
@@ -638,7 +634,7 @@ export default function ExplorePage() {
         </Card>
       ) : (
         <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-          {filteredGyms.map((gym, i) => {
+          {filteredGyms.map((gym) => {
             const isFeatured = isGymFeatured(gym);
             const amenities = (gym.amenities ?? []).filter(Boolean).slice(0, 3);
             const isExpanded = !!expandedAddresses[gym.id];
@@ -649,12 +645,7 @@ export default function ExplorePage() {
                 ? [gym.coverImageUrl]
                 : [];
             return (
-            <motion.div
-              key={gym.id}
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: i * 0.05 }}
-            >
+            <div key={gym.id}>
               <Card
                 className={cn(
                     "glass-card overflow-hidden hover:border-primary/30 transition-all duration-300 hover:-translate-y-1 min-h-[320px]",
@@ -706,8 +697,8 @@ export default function ExplorePage() {
                       </Link>
                     </div>
                   </div>
-                  <p className="text-sm text-muted-foreground flex items-center gap-1">
-                    <MapPin className="h-4 w-4" />
+                  <p className="text-sm text-muted-foreground flex items-center gap-2">
+                    <MapPin className="h-5 w-5" />
                     <span
                       style={
                         isExpanded
@@ -732,7 +723,7 @@ export default function ExplorePage() {
                           [gym.id]: !prev[gym.id],
                         }))
                       }
-                      className="text-xs text-primary hover:underline mt-1"
+                      className="text-xs text-muted-foreground hover:text-foreground hover:underline mt-1 self-start"
                     >
                       {isExpanded ? "See less" : "See more..."}
                     </button>
@@ -773,7 +764,7 @@ export default function ExplorePage() {
                   </Button>
                 </CardContent>
               </Card>
-            </motion.div>
+            </div>
             );
           })}
         </div>

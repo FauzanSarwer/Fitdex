@@ -2,7 +2,6 @@
 
 import { Suspense, useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
-import { motion } from "framer-motion";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import Link from "next/link";
@@ -35,7 +34,7 @@ function VerifyEmailContent() {
 
   return (
     <div className="container mx-auto px-4 py-16">
-      <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="max-w-xl mx-auto">
+      <div className="max-w-xl mx-auto">
         <Card className="glass-card">
           <CardHeader>
             <CardTitle>{status === "success" ? "All set" : status === "error" ? "Action failed" : "Processing"}</CardTitle>
@@ -52,7 +51,7 @@ function VerifyEmailContent() {
             </div>
           </CardContent>
         </Card>
-      </motion.div>
+      </div>
     </div>
   );
 }

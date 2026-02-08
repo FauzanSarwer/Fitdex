@@ -32,9 +32,29 @@ export async function GET(req: Request) {
     if (!gym) {
       return jsonError("Gym not found", 404);
     }
-    const payments = await prisma.payment.findMany({ where: { gymId }, orderBy: { createdAt: "desc" } });
-    const memberships = await prisma.membership.findMany({ where: { gymId }, orderBy: { startedAt: "desc" } });
-    const duos = await prisma.duo.findMany({ where: { gymId }, orderBy: { createdAt: "desc" } });
+    const payments = await prisma.payment.findMany({
+      where: { gymId },
+      orderBy: { createdAt: "desc" },
+      select: { id: true, amount: true, status: true, createdAt: true },
+    });
+    const memberships = await prisma.membership.findMany({
+      where: { gymId },
+      orderBy: { startedAt: "desc" },
+      select: {
+        id: true,
+        planType: true,
+        basePrice: true,
+        finalPrice: true,
+        active: true,
+        startedAt: true,
+        expiresAt: true,
+      },
+    });
+    const duos = await prisma.duo.findMany({
+      where: { gymId },
+      orderBy: { createdAt: "desc" },
+      select: { id: true, userOneId: true, userTwoId: true, createdAt: true },
+    });
 
     const totalRevenue = payments.filter((p) => p.status === "CAPTURED").reduce((s, p) => s + p.amount, 0);
 

@@ -15,7 +15,12 @@ export async function GET() {
   try {
     const saved = await prisma.savedGym.findMany({
       where: { userId: uid },
-      include: { gym: true },
+      select: {
+        id: true,
+        gymId: true,
+        createdAt: true,
+        gym: { select: { id: true, name: true, address: true } },
+      },
       orderBy: { createdAt: "desc" },
     });
     return NextResponse.json({ saved });

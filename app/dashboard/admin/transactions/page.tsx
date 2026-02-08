@@ -17,7 +17,14 @@ export default async function AdminTransactionsPage() {
   const transactions = await prisma.transaction.findMany({
     take: 100,
     orderBy: { createdAt: "desc" },
-    include: {
+    select: {
+      id: true,
+      totalAmount: true,
+      platformCommissionAmount: true,
+      gymPayoutAmount: true,
+      paymentStatus: true,
+      settlementStatus: true,
+      createdAt: true,
       user: { select: { name: true, email: true } },
       gym: { select: { name: true } },
     },

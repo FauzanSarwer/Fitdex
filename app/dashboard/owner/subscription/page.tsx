@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { motion } from "framer-motion";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { CreditCard, Loader2 } from "lucide-react";
@@ -30,19 +29,31 @@ export default function OwnerSubscriptionPage() {
 
   const loadSubscription = async () => {
     setLoading(true);
-    const result = await fetchJson<{ subscription?: any; error?: string }>("/api/owner/subscription", { retries: 1 });
-    if (result.ok) {
-      setSubscription(result.data?.subscription ?? null);
+    try {
+      const result = await fetchJson<{ subscription?: any; error?: string }>("/api/owner/subscription", { retries: 1 });
+      if (result.ok) {
+        setSubscription(result.data?.subscription ?? null);
+      }
+    } finally {
+      setLoading(false);
     }
-    const invoiceResult = await fetchJson<{ invoices?: any[]; error?: string }>("/api/owner/invoices", { retries: 1 });
-    if (invoiceResult.ok) {
-      setInvoices(invoiceResult.data?.invoices ?? []);
-      setInvoiceError(null);
+
+    const loadInvoices = async () => {
+      const invoiceResult = await fetchJson<{ invoices?: any[]; error?: string }>("/api/owner/invoices", { retries: 1 });
+      if (invoiceResult.ok) {
+        setInvoices(invoiceResult.data?.invoices ?? []);
+        setInvoiceError(null);
+      } else {
+        setInvoices([]);
+        setInvoiceError(invoiceResult.error ?? "Invoices unavailable");
+      }
+    };
+
+    if (typeof (window as any).requestIdleCallback === "function") {
+      (window as any).requestIdleCallback(loadInvoices);
     } else {
-      setInvoices([]);
-      setInvoiceError(invoiceResult.error ?? "Invoices unavailable");
+      setTimeout(loadInvoices, 0);
     }
-    setLoading(false);
   };
 
   useEffect(() => {
@@ -128,13 +139,13 @@ export default function OwnerSubscriptionPage() {
 
   return (
     <div className="p-6 space-y-6">
-      <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}>
+      <div>
         <h1 className="text-2xl font-bold flex items-center gap-2">
           <CreditCard className="h-6 w-6" />
           Manage subscription
         </h1>
         <p className="text-muted-foreground text-sm">View plan details, renewals, and upgrades.</p>
-      </motion.div>
+      </div>
 
       <Card className="glass-card">
         <CardHeader>

@@ -4,14 +4,18 @@ import { useState, useEffect, Suspense } from "react";
 import Link from "next/link";
 import { useSession } from "next-auth/react";
 import { useSearchParams, useRouter } from "next/navigation";
-import { motion } from "framer-motion";
 import { MapPin, CreditCard, Users, Loader2, Sparkles, Trophy, Bookmark } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { MapView } from "@/components/maps/MapView";
+import dynamic from "next/dynamic";
 import { buildGymSlug, formatPrice } from "@/lib/utils";
 import { Skeleton } from "@/components/ui/skeleton";
 import { fetchJson } from "@/lib/client-fetch";
+
+const MapView = dynamic(() => import("@/components/maps/MapView").then((m) => m.MapView), {
+  ssr: false,
+  loading: () => <div className="h-48 rounded-2xl bg-white/5 animate-pulse" />,
+});
 
 interface Membership {
   id: string;
@@ -56,16 +60,33 @@ function UserDashboardContent() {
         const results = await Promise.allSettled([
           fetchJson<{ memberships?: Membership[] }>("/api/memberships", { retries: 1 }),
           fetchJson<{ duos?: Duo[] }>("/api/duos", { retries: 1 }),
-          fetchJson<{ location?: { latitude?: number; longitude?: number } }>("/api/location", { retries: 1 }),
-          fetchJson<{ saved?: any[] }>("/api/saved-gyms", { retries: 1 }),
         ]);
 
         if (!active) return;
 
         const mem = results[0].status === "fulfilled" ? results[0].value : null;
         const d = results[1].status === "fulfilled" ? results[1].value : null;
-        const loc = results[2].status === "fulfilled" ? results[2].value : null;
-        const saved = results[3].status === "fulfilled" ? results[3].value : null;
+        const loadExtras = async () => {
+          const extra = await Promise.allSettled([
+            fetchJson<{ location?: { latitude?: number; longitude?: number } }>("/api/location", { retries: 1 }),
+            fetchJson<{ saved?: any[] }>("/api/saved-gyms", { retries: 1 }),
+          ]);
+
+          if (!active) return;
+
+          const loc = extra[0].status === "fulfilled" ? extra[0].value : null;
+          const saved = extra[1].status === "fulfilled" ? extra[1].value : null;
+
+          if (loc?.ok && loc?.data?.location?.latitude != null && loc.data.location?.longitude != null) {
+            setLocation({
+              latitude: loc.data.location.latitude,
+              longitude: loc.data.location.longitude,
+            });
+          }
+          if (saved?.ok) {
+            setSavedGyms(saved?.data?.saved ?? []);
+          }
+        };
 
         if (!mem?.ok || !d?.ok) {
           setError("Failed to load your dashboard");
@@ -73,14 +94,10 @@ function UserDashboardContent() {
 
         setMemberships(mem?.data?.memberships ?? []);
         setDuos(d?.data?.duos ?? []);
-        if (loc?.ok && loc?.data?.location?.latitude != null && loc.data.location?.longitude != null) {
-          setLocation({
-            latitude: loc.data.location.latitude,
-            longitude: loc.data.location.longitude,
-          });
-        }
-        if (saved?.ok) {
-          setSavedGyms(saved?.data?.saved ?? []);
+        if (typeof (window as any).requestIdleCallback === "function") {
+          (window as any).requestIdleCallback(loadExtras);
+        } else {
+          setTimeout(loadExtras, 0);
         }
       } catch {
         if (active) setError("Failed to load your dashboard");
@@ -142,11 +159,7 @@ function UserDashboardContent() {
 
   return (
     <div className="p-6 space-y-6">
-      <motion.div
-        initial={{ opacity: 0, y: 10 }}
-        animate={{ opacity: 1, y: 0 }}
-        className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between"
-      >
+      <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
         <div>
           <h1 className="text-2xl font-bold">
             Hi, {displayName}
@@ -164,15 +177,10 @@ function UserDashboardContent() {
             <Link href="/dashboard/user/duo">Invite partner</Link>
           </Button>
         </div>
-      </motion.div>
+      </div>
 
       {location && (
-        <motion.div
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          transition={{ delay: 0.1 }}
-          className="h-48 rounded-2xl overflow-hidden"
-        >
+        <div className="h-48 rounded-2xl overflow-hidden">
           <MapView
             latitude={location.latitude}
             longitude={location.longitude}
@@ -191,7 +199,7 @@ function UserDashboardContent() {
             }
             className="w-full h-full"
           />
-        </motion.div>
+        </div>
       )}
 
       {activeMembership ? (

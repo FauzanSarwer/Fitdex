@@ -3,7 +3,6 @@
 import { Suspense, useEffect, useState } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
-import { motion } from "framer-motion";
 import { Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -52,11 +51,7 @@ function ForgotPasswordForm() {
   }
 
   return (
-    <motion.div
-      initial={{ opacity: 0, y: 10 }}
-      animate={{ opacity: 1, y: 0 }}
-      className="w-full max-w-md"
-    >
+    <div className="w-full max-w-md">
       <Card className="glass-card">
         <CardHeader>
           <CardTitle>Forgot password</CardTitle>
@@ -103,7 +98,7 @@ function ForgotPasswordForm() {
           </p>
         </CardContent>
       </Card>
-    </motion.div>
+    </div>
   );
 }
 

@@ -3,7 +3,6 @@
 import { useState, useEffect } from "react";
 import { useSession } from "next-auth/react";
 import Link from "next/link";
-import { motion } from "framer-motion";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Loader2, MapPin, Sparkles, Users } from "lucide-react";
@@ -55,15 +54,9 @@ export default function OwnerDashboardPage() {
 
   useEffect(() => {
     let active = true;
-    Promise.all([
-      fetchJson<{ gyms?: any[]; error?: string }>("/api/owner/gym", { retries: 1 }),
-      fetchJson<{ transactions?: Transaction[]; error?: string }>("/api/owner/transactions", { retries: 1 }),
-      fetchJson<{ leads?: Array<{ gymId: string; gymName: string; totalLeads: number; leadsLast30Days: number }>; error?: string }>(
-        "/api/owner/leads",
-        { retries: 1 }
-      ),
-    ])
-      .then(([gymResult, txResult, leadsResult]) => {
+
+    fetchJson<{ gyms?: any[]; error?: string }>("/api/owner/gym", { retries: 1 })
+      .then((gymResult) => {
         if (!active) return;
         if (!gymResult.ok) {
           setError(gymResult.error ?? "Failed to load gyms");
@@ -71,26 +64,41 @@ export default function OwnerDashboardPage() {
           return;
         }
         setGyms(gymResult.data?.gyms ?? []);
-        if (txResult.ok) {
-          setTransactions(txResult.data?.transactions ?? []);
-        } else {
-          setTransactions([]);
-        }
-        if (leadsResult.ok) {
-          setLeads(leadsResult.data?.leads ?? []);
-        } else {
-          setLeads([]);
-        }
       })
       .catch(() => {
         if (!active) return;
         setGyms([]);
-        setTransactions([]);
         setError("Failed to load dashboard");
       })
       .finally(() => {
         if (active) setLoading(false);
       });
+
+    const loadExtras = () => {
+      Promise.all([
+        fetchJson<{ transactions?: Transaction[]; error?: string }>("/api/owner/transactions", { retries: 1 }),
+        fetchJson<{ leads?: Array<{ gymId: string; gymName: string; totalLeads: number; leadsLast30Days: number }>; error?: string }>(
+          "/api/owner/leads",
+          { retries: 1 }
+        ),
+      ])
+        .then(([txResult, leadsResult]) => {
+          if (!active) return;
+          setTransactions(txResult.ok ? txResult.data?.transactions ?? [] : []);
+          setLeads(leadsResult.ok ? leadsResult.data?.leads ?? [] : []);
+        })
+        .catch(() => {
+          if (!active) return;
+          setTransactions([]);
+          setLeads([]);
+        });
+    };
+
+    if (typeof (window as any).requestIdleCallback === "function") {
+      (window as any).requestIdleCallback(loadExtras);
+    } else {
+      setTimeout(loadExtras, 0);
+    }
 
     return () => {
       active = false;
@@ -179,16 +187,12 @@ export default function OwnerDashboardPage() {
 
   return (
     <div className="p-6 space-y-6">
-      <motion.div
-        initial={{ opacity: 0, y: 10 }}
-        animate={{ opacity: 1, y: 0 }}
-        className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between"
-      >
+      <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
         <div>
           <h1 className="text-2xl font-bold">Hi, {displayName}</h1>
           <p className="text-muted-foreground text-sm">Owner dashboard overview.</p>
         </div>
-      </motion.div>
+      </div>
 
       {gyms.length > 0 && (
         <div className="grid gap-4 md:grid-cols-2">

@@ -2,7 +2,6 @@
 
 import { useEffect, useState } from "react";
 import { useSession } from "next-auth/react";
-import { motion } from "framer-motion";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -99,16 +98,13 @@ export default function SettingsPage() {
 
   return (
     <div className="p-6 space-y-6">
-      <motion.div
-        initial={{ opacity: 0, y: 10 }}
-        animate={{ opacity: 1, y: 0 }}
-      >
+      <div>
         <h1 className="text-2xl font-bold flex items-center gap-2">
           <User className="h-6 w-6" />
           Settings
         </h1>
         <p className="text-muted-foreground text-sm">Account and preferences.</p>
-      </motion.div>
+      </div>
 
       <Card className="glass-card">
         <CardHeader>

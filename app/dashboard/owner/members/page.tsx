@@ -24,7 +24,7 @@ export default function OwnerMembersPage() {
 
   useEffect(() => {
     let active = true;
-    fetchJson<{ gyms?: any[]; error?: string }>("/api/owner/gym", { retries: 1 })
+    fetchJson<{ gyms?: any[]; error?: string }>("/api/owner/gym?compact=1", { retries: 1 })
       .then((result) => {
         if (!active) return;
         if (!result.ok) {

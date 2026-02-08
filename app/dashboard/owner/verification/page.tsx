@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { motion } from "framer-motion";
 import { ShieldCheck, UploadCloud } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -38,7 +37,7 @@ export default function OwnerVerificationPage() {
     let active = true;
     setLoading(true);
     setError(null);
-    fetchJson<{ gyms?: any[]; error?: string }>("/api/owner/gym", { retries: 1 })
+    fetchJson<{ gyms?: any[]; error?: string }>("/api/owner/gym?compact=1", { retries: 1 })
       .then((result) => {
         if (!active) return;
         if (!result.ok) {
@@ -182,7 +181,7 @@ export default function OwnerVerificationPage() {
 
   return (
     <div className="p-6 space-y-6">
-      <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}>
+      <div>
         <h1 className="text-2xl font-bold flex items-center gap-2">
           <ShieldCheck className="h-6 w-6" />
           Verification
@@ -190,7 +189,7 @@ export default function OwnerVerificationPage() {
         <p className="text-sm text-muted-foreground">
           Complete verification for each gym to unlock payments and member joins.
         </p>
-      </motion.div>
+      </div>
 
       {gyms.length === 0 ? (
         <Card className="glass-card p-10 text-center">

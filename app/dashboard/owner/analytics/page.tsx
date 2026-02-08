@@ -4,7 +4,6 @@ import { useState, useEffect } from "react";
 import { useSession } from "next-auth/react";
 import { useSearchParams } from "next/navigation";
 import Link from "next/link";
-import { motion } from "framer-motion";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import {
@@ -75,7 +74,7 @@ export default function OwnerAnalyticsPage() {
     let active = true;
     setLoading(true);
     setError(null);
-    fetchJson<{ gyms?: any[]; error?: string }>("/api/owner/gym", { retries: 1 })
+    fetchJson<{ gyms?: any[]; error?: string }>("/api/owner/gym?compact=1", { retries: 1 })
       .then((result) => {
         if (!active) return;
         if (!result.ok) {
@@ -129,26 +128,34 @@ export default function OwnerAnalyticsPage() {
         if (active) setAnalyticsLoading(false);
       });
 
-    setReportLoading(true);
-    fetchJson<{ report?: Array<{ month: string; totalBookings: number; totalCommission: number; commissionPercent: number }>; error?: string }>(
-      `/api/owner/commission-report?gymId=${selectedGymId}`,
-      { retries: 1 }
-    )
-      .then((result) => {
-        if (!active) return;
-        if (!result.ok) {
+    const loadCommission = () => {
+      setReportLoading(true);
+      fetchJson<{ report?: Array<{ month: string; totalBookings: number; totalCommission: number; commissionPercent: number }>; error?: string }>(
+        `/api/owner/commission-report?gymId=${selectedGymId}`,
+        { retries: 1 }
+      )
+        .then((result) => {
+          if (!active) return;
+          if (!result.ok) {
+            setCommissionReport([]);
+            return;
+          }
+          setCommissionReport(result.data?.report ?? []);
+        })
+        .catch(() => {
+          if (!active) return;
           setCommissionReport([]);
-          return;
-        }
-        setCommissionReport(result.data?.report ?? []);
-      })
-      .catch(() => {
-        if (!active) return;
-        setCommissionReport([]);
-      })
-      .finally(() => {
-        if (active) setReportLoading(false);
-      });
+        })
+        .finally(() => {
+          if (active) setReportLoading(false);
+        });
+    };
+
+    if (typeof (window as any).requestIdleCallback === "function") {
+      (window as any).requestIdleCallback(loadCommission);
+    } else {
+      setTimeout(loadCommission, 0);
+    }
 
     return () => {
       active = false;
@@ -216,10 +223,7 @@ export default function OwnerAnalyticsPage() {
 
   return (
     <div className="p-6 space-y-6">
-      <motion.div
-        initial={{ opacity: 0, y: 10 }}
-        animate={{ opacity: 1, y: 0 }}
-      >
+      <div>
         <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
           <h1 className="text-2xl font-bold flex items-center gap-2">
             <BarChart3 className="h-6 w-6" />
@@ -232,7 +236,7 @@ export default function OwnerAnalyticsPage() {
           )}
         </div>
         <p className="text-muted-foreground text-sm">Revenue and engagement.</p>
-      </motion.div>
+      </div>
 
       {gyms.length > 0 && (
         <div className="flex items-center gap-2">
@@ -469,7 +473,7 @@ export default function OwnerAnalyticsPage() {
                         contentStyle={{ background: "hsl(var(--card))", border: "1px solid rgba(255,255,255,0.1)" }}
                         formatter={(value) => [`₹${value ?? 0}`, "Revenue"]}
                       />
-                      <Area type="monotone" dataKey="revenue" stroke="hsl(var(--primary))" fill="url(#revenueGradient)" />
+                      <Area type="monotone" dataKey="revenue" stroke="hsl(var(--primary))" fill="url(#revenueGradient)" isAnimationActive={false} />
                     </AreaChart>
                   </ResponsiveContainer>
                 </CardContent>
@@ -490,7 +494,7 @@ export default function OwnerAnalyticsPage() {
                       <Tooltip
                         contentStyle={{ background: "hsl(var(--card))", border: "1px solid rgba(255,255,255,0.1)" }}
                       />
-                      <Line type="monotone" dataKey="members" stroke="hsl(var(--accent))" strokeWidth={2} />
+                      <Line type="monotone" dataKey="members" stroke="hsl(var(--accent))" strokeWidth={2} isAnimationActive={false} />
                     </LineChart>
                   </ResponsiveContainer>
                 </CardContent>
@@ -507,7 +511,7 @@ export default function OwnerAnalyticsPage() {
                 <CardContent className="h-64">
                   <ResponsiveContainer width="100%" height="100%">
                     <PieChart>
-                      <Pie data={planData} dataKey="count" nameKey="plan" innerRadius={60} outerRadius={90}>
+                      <Pie data={planData} dataKey="count" nameKey="plan" innerRadius={60} outerRadius={90} isAnimationActive={false}>
                         {planData.map((_, idx) => (
                           <Cell key={idx} fill={COLORS[idx % COLORS.length]} />
                         ))}
@@ -535,7 +539,7 @@ export default function OwnerAnalyticsPage() {
                       <Tooltip
                         contentStyle={{ background: "hsl(var(--card))", border: "1px solid rgba(255,255,255,0.1)" }}
                       />
-                      <Bar dataKey="count" fill="hsl(var(--primary))" radius={[4, 4, 0, 0]} />
+                      <Bar dataKey="count" fill="hsl(var(--primary))" radius={[4, 4, 0, 0]} isAnimationActive={false} />
                     </BarChart>
                   </ResponsiveContainer>
                 </CardContent>

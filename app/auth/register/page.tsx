@@ -4,7 +4,6 @@ import { useEffect, useState, Suspense } from "react";
 import Link from "next/link";
 import { getProviders, signIn } from "next-auth/react";
 import { useSearchParams } from "next/navigation";
-import { motion } from "framer-motion";
 import { Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -47,7 +46,15 @@ function RegisterForm() {
   })();
 
   useEffect(() => {
-    getProviders().then(setProviders).catch(() => setProviders(null));
+    if (typeof (window as any).requestIdleCallback === "function") {
+      (window as any).requestIdleCallback(() => {
+        getProviders().then(setProviders).catch(() => setProviders(null));
+      });
+    } else {
+      setTimeout(() => {
+        getProviders().then(setProviders).catch(() => setProviders(null));
+      }, 0);
+    }
   }, []);
 
   function resolveAuthError(code?: string) {
@@ -115,11 +122,7 @@ function RegisterForm() {
   }
 
   return (
-    <motion.div
-      initial={{ opacity: 0, y: 10 }}
-      animate={{ opacity: 1, y: 0 }}
-      className="w-full max-w-md"
-    >
+    <div className="w-full max-w-md">
       <Card className="glass-card">
         <CardHeader>
           <CardTitle>Create account</CardTitle>
@@ -219,7 +222,7 @@ function RegisterForm() {
           </p>
         </CardContent>
       </Card>
-    </motion.div>
+    </div>
   );
 }
 
