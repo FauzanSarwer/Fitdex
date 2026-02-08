@@ -1,7 +1,6 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { useSession } from "next-auth/react";
 import { useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -15,18 +14,11 @@ import {
 } from "@/components/ui/select";
 import { formatPrice } from "@/lib/utils";
 import { Skeleton } from "@/components/ui/skeleton";
-import { BarChart3, TrendingUp, Users, Sparkles, Wallet, Percent } from "lucide-react";
+import { BarChart3 } from "lucide-react";
 import { fetchJson } from "@/lib/client-fetch";
 import {
-  BarChart,
-  Bar,
-  LineChart,
-  Line,
   AreaChart,
   Area,
-  PieChart,
-  Pie,
-  Cell,
   XAxis,
   YAxis,
   Tooltip,
@@ -36,9 +28,6 @@ import {
 
 export default function OwnerAnalyticsPage() {
   const searchParams = useSearchParams();
-  const { data: session } = useSession();
-  const role = (session?.user as { role?: string })?.role;
-  const isAdmin = role === "ADMIN";
   const [gyms, setGyms] = useState<any[]>([]);
   const [selectedGymId, setSelectedGymId] = useState<string>("");
   const [error, setError] = useState<string | null>(null);
@@ -68,7 +57,6 @@ export default function OwnerAnalyticsPage() {
   const [reportLoading, setReportLoading] = useState(false);
   const [loading, setLoading] = useState(true);
   const [analyticsLoading, setAnalyticsLoading] = useState(false);
-  const hasProAccess = isAdmin;
 
   useEffect(() => {
     let active = true;
@@ -204,25 +192,11 @@ export default function OwnerAnalyticsPage() {
         .map(([month, value]) => ({ month, members: value }))
         .sort((a, b) => a.month.localeCompare(b.month))
     : [];
-
-  const planData = data?.planDistribution
-    ? Object.entries(data.planDistribution).map(([plan, count]) => ({
-        plan,
-        count,
-      }))
-    : [];
-
-  const statusData = data?.paymentsByStatus
-    ? Object.entries(data.paymentsByStatus).map(([status, count]) => ({
-        status,
-        count,
-      }))
-    : [];
-
-  const COLORS = ["hsl(var(--primary))", "hsl(var(--accent))", "#22c55e", "#f59e0b"];
+  const emptyCopy = "No data yet — go live to start tracking analytics.";
+  const growthSignal = membersData.at(-1)?.members ?? 0;
 
   return (
-    <div className="p-6 space-y-6">
+    <div className="p-6 space-y-10">
       <div>
         <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
           <h1 className="text-2xl font-bold flex items-center gap-2">
@@ -235,7 +209,7 @@ export default function OwnerAnalyticsPage() {
             </Button>
           )}
         </div>
-        <p className="text-muted-foreground text-sm">Revenue and engagement.</p>
+        <p className="text-muted-foreground text-sm">A calm overview of revenue and member performance.</p>
       </div>
 
       {gyms.length > 0 && (
@@ -288,307 +262,272 @@ export default function OwnerAnalyticsPage() {
 
       {!analyticsLoading && data && (
         <>
-          <div className="grid gap-4 md:grid-cols-4">
-            <Card className="glass-card">
-              <CardHeader className="flex flex-row items-center justify-between pb-2">
-                <CardTitle className="text-sm font-medium">Total revenue</CardTitle>
-                <TrendingUp className="h-4 w-4 text-muted-foreground" />
-              </CardHeader>
-              <CardContent>
-                <p className="text-2xl font-bold text-primary">
-                  {formatPrice(data.totalRevenue)}
-                </p>
-                <p className="text-xs text-muted-foreground">Captured payments</p>
-              </CardContent>
-            </Card>
-            <Card className="glass-card">
-              <CardHeader className="flex flex-row items-center justify-between pb-2">
-                <CardTitle className="text-sm font-medium">Estimated revenue</CardTitle>
-                <Wallet className="h-4 w-4 text-muted-foreground" />
-              </CardHeader>
-              <CardContent>
-                <p className="text-2xl font-bold text-primary">
-                  {formatPrice(data.estimatedRevenue)}
-                </p>
-                <p className="text-xs text-muted-foreground">Estimated from paid bookings</p>
-              </CardContent>
-            </Card>
-            <Card className="glass-card">
-              <CardHeader className="flex flex-row items-center justify-between pb-2">
-                <CardTitle className="text-sm font-medium">Active members</CardTitle>
-                <Users className="h-4 w-4 text-muted-foreground" />
-              </CardHeader>
-              <CardContent>
-                <p className="text-2xl font-bold text-primary">
-                  {data.activeMembers}
-                </p>
-                <p className="text-xs text-muted-foreground">Total memberships: {data.totalMembers}</p>
-              </CardContent>
-            </Card>
-            <Card className="glass-card">
-              <CardHeader className="flex flex-row items-center justify-between pb-2">
-                <CardTitle className="text-sm font-medium">Leads</CardTitle>
-                <Sparkles className="h-4 w-4 text-muted-foreground" />
-              </CardHeader>
-              <CardContent>
-                <p className="text-2xl font-bold text-primary">{data.totalLeads}</p>
-                <p className="text-xs text-muted-foreground">Last 30 days: {data.leadsLast30Days}</p>
-              </CardContent>
-            </Card>
-          </div>
-
-          <div className="grid gap-4 md:grid-cols-2">
-            <Card className="glass-card">
-              <CardHeader className="flex flex-row items-center justify-between pb-2">
-                <CardTitle className="text-sm font-medium">Bookings this week</CardTitle>
-                <TrendingUp className="h-4 w-4 text-muted-foreground" />
-              </CardHeader>
-              <CardContent>
-                <p className="text-2xl font-bold text-primary">{data.bookingsCurrentWeek}</p>
-                <p className="text-xs text-muted-foreground">Previous week: {data.bookingsPreviousWeek}</p>
-              </CardContent>
-            </Card>
-            <Card className="glass-card">
-              <CardHeader className="flex flex-row items-center justify-between pb-2">
-                <CardTitle className="text-sm font-medium">Estimated revenue note</CardTitle>
-                <Percent className="h-4 w-4 text-muted-foreground" />
-              </CardHeader>
-              <CardContent>
-                <p className="text-sm text-muted-foreground">
-                  Estimated values are derived from paid booking totals and are not guaranteed revenue.
-                </p>
-              </CardContent>
-            </Card>
-          </div>
-
-          <Card className="glass-card">
-            <CardHeader>
-              <CardTitle>Monthly commission report</CardTitle>
-            </CardHeader>
-            <CardContent>
-              {reportLoading ? (
-                <Skeleton className="h-24" />
-              ) : commissionReport.length === 0 ? (
-                <p className="text-sm text-muted-foreground">No commission data yet.</p>
-              ) : (
-                <div className="overflow-auto">
-                  <table className="w-full text-sm">
-                    <thead className="text-left text-xs text-muted-foreground">
-                      <tr>
-                        <th className="py-2">Month</th>
-                        <th className="py-2">Bookings</th>
-                        <th className="py-2">Commission</th>
-                        <th className="py-2">Commission %</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {commissionReport.map((row) => (
-                        <tr key={row.month} className="border-t border-white/10">
-                          <td className="py-2">{row.month}</td>
-                          <td className="py-2">{row.totalBookings}</td>
-                          <td className="py-2">{formatPrice(row.totalCommission)}</td>
-                          <td className="py-2">{row.commissionPercent}%</td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              )}
-            </CardContent>
-          </Card>
-
-          <div className="grid gap-4 md:grid-cols-2">
-            <Card className="glass-card">
-              <CardHeader className="flex flex-row items-center justify-between pb-2">
-                <CardTitle className="text-sm font-medium">Active duos</CardTitle>
-                <Users className="h-4 w-4 text-muted-foreground" />
-              </CardHeader>
-              <CardContent>
-                <p className="text-2xl font-bold">{data.activeDuos}</p>
-              </CardContent>
-            </Card>
-            <Card className="glass-card">
-              <CardHeader className="flex flex-row items-center justify-between pb-2">
-                <CardTitle className="text-sm font-medium">ARPM</CardTitle>
-                <Wallet className="h-4 w-4 text-muted-foreground" />
-              </CardHeader>
-              <CardContent>
-                <p className="text-2xl font-bold">{formatPrice(data.avgRevenuePerMember)}</p>
-              </CardContent>
-            </Card>
-          </div>
-
-          <div className="grid gap-4 md:grid-cols-3">
-            <Card className="glass-card">
-              <CardHeader className="flex flex-row items-center justify-between pb-2">
-                <CardTitle className="text-sm font-medium">Total members</CardTitle>
-                <Users className="h-4 w-4 text-muted-foreground" />
-              </CardHeader>
-              <CardContent>
-                <p className="text-2xl font-bold">{data.totalMembers}</p>
-                <p className="text-xs text-muted-foreground">Inactive: {data.inactiveMembers}</p>
-              </CardContent>
-            </Card>
-            <Card className="glass-card">
-              <CardHeader className="flex flex-row items-center justify-between pb-2">
-                <CardTitle className="text-sm font-medium">Duo rate</CardTitle>
-                <Percent className="h-4 w-4 text-muted-foreground" />
-              </CardHeader>
-              <CardContent>
-                <p className="text-2xl font-bold">{data.duoRate}%</p>
-                <p className="text-xs text-muted-foreground">Active duos vs active members</p>
-              </CardContent>
-            </Card>
-            <Card className="glass-card">
-              <CardHeader className="flex flex-row items-center justify-between pb-2">
-                <CardTitle className="text-sm font-medium">Growth signal</CardTitle>
-                <Sparkles className="h-4 w-4 text-muted-foreground" />
-              </CardHeader>
-              <CardContent>
-                <p className="text-2xl font-bold">{membersData.at(-1)?.members ?? 0}</p>
-                <p className="text-xs text-muted-foreground">New members this month</p>
-              </CardContent>
-            </Card>
-          </div>
-
-          <div className={`grid gap-4 lg:grid-cols-2 ${hasProAccess ? "" : "blur-sm"}`}>
-            {chartData.length > 0 && (
-              <Card className="glass-card">
+          <section className="space-y-4">
+            <h2 className="text-lg font-semibold">Revenue</h2>
+            <div className="grid gap-4 md:grid-cols-3">
+              <Card className="glass-card md:col-span-2">
                 <CardHeader>
-                  <CardTitle>Revenue by month</CardTitle>
+                  <CardTitle className="text-base">Total revenue</CardTitle>
                 </CardHeader>
-                <CardContent className="h-64">
-                  <ResponsiveContainer width="100%" height="100%">
-                    <AreaChart data={chartData}>
-                      <defs>
-                        <linearGradient id="revenueGradient" x1="0" y1="0" x2="0" y2="1">
-                          <stop offset="5%" stopColor="hsl(var(--primary))" stopOpacity={0.6} />
-                          <stop offset="95%" stopColor="hsl(var(--primary))" stopOpacity={0.05} />
-                        </linearGradient>
-                      </defs>
-                      <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.1)" />
-                      <XAxis dataKey="month" stroke="rgba(255,255,255,0.5)" fontSize={12} />
-                      <YAxis stroke="rgba(255,255,255,0.5)" fontSize={12} tickFormatter={(v) => `₹${v}`} />
-                      <Tooltip
-                        contentStyle={{ background: "hsl(var(--card))", border: "1px solid rgba(255,255,255,0.1)" }}
-                        formatter={(value) => [`₹${value ?? 0}`, "Revenue"]}
-                      />
-                      <Area type="monotone" dataKey="revenue" stroke="hsl(var(--primary))" fill="url(#revenueGradient)" isAnimationActive={false} />
-                    </AreaChart>
-                  </ResponsiveContainer>
+                <CardContent className="space-y-2">
+                  <p className="text-3xl font-semibold text-primary">
+                    {data.totalRevenue > 0 ? formatPrice(data.totalRevenue) : "—"}
+                  </p>
+                  <p className="text-sm text-muted-foreground">
+                    {data.totalRevenue > 0 ? "Captured payments" : emptyCopy}
+                  </p>
                 </CardContent>
               </Card>
-            )}
-
-            {membersData.length > 0 && (
               <Card className="glass-card">
                 <CardHeader>
-                  <CardTitle>New members</CardTitle>
+                  <CardTitle className="text-base">Estimated revenue</CardTitle>
                 </CardHeader>
-                <CardContent className="h-64">
-                  <ResponsiveContainer width="100%" height="100%">
-                    <LineChart data={membersData}>
-                      <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.1)" />
-                      <XAxis dataKey="month" stroke="rgba(255,255,255,0.5)" fontSize={12} />
-                      <YAxis stroke="rgba(255,255,255,0.5)" fontSize={12} />
-                      <Tooltip
-                        contentStyle={{ background: "hsl(var(--card))", border: "1px solid rgba(255,255,255,0.1)" }}
-                      />
-                      <Line type="monotone" dataKey="members" stroke="hsl(var(--accent))" strokeWidth={2} isAnimationActive={false} />
-                    </LineChart>
-                  </ResponsiveContainer>
+                <CardContent className="space-y-2">
+                  <p className="text-2xl font-semibold text-primary">
+                    {data.estimatedRevenue > 0 ? formatPrice(data.estimatedRevenue) : "—"}
+                  </p>
+                  <p className="text-sm text-muted-foreground">
+                    {data.estimatedRevenue > 0 ? "Derived from paid bookings" : emptyCopy}
+                  </p>
                 </CardContent>
               </Card>
-            )}
-          </div>
+            </div>
+          </section>
 
-          <div className={`grid gap-4 lg:grid-cols-2 ${hasProAccess ? "" : "blur-sm"}`}>
-            {planData.length > 0 && (
+          <section className="space-y-4">
+            <h2 className="text-lg font-semibold">Members & Engagement</h2>
+            <div className="grid gap-4 md:grid-cols-3">
+              <Card className="glass-card md:col-span-2">
+                <CardHeader>
+                  <CardTitle className="text-base">Active members</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-2">
+                  <p className="text-3xl font-semibold text-primary">
+                    {data.activeMembers > 0 ? data.activeMembers : "—"}
+                  </p>
+                  <p className="text-sm text-muted-foreground">
+                    {data.activeMembers > 0 ? `Total members: ${data.totalMembers}` : emptyCopy}
+                  </p>
+                </CardContent>
+              </Card>
               <Card className="glass-card">
                 <CardHeader>
-                  <CardTitle>Plan distribution</CardTitle>
+                  <CardTitle className="text-base">Bookings this week</CardTitle>
                 </CardHeader>
-                <CardContent className="h-64">
-                  <ResponsiveContainer width="100%" height="100%">
-                    <PieChart>
-                      <Pie data={planData} dataKey="count" nameKey="plan" innerRadius={60} outerRadius={90} isAnimationActive={false}>
-                        {planData.map((_, idx) => (
-                          <Cell key={idx} fill={COLORS[idx % COLORS.length]} />
-                        ))}
-                      </Pie>
-                      <Tooltip
-                        contentStyle={{ background: "hsl(var(--card))", border: "1px solid rgba(255,255,255,0.1)" }}
-                      />
-                    </PieChart>
-                  </ResponsiveContainer>
+                <CardContent className="space-y-2">
+                  <p className="text-2xl font-semibold text-primary">
+                    {data.bookingsCurrentWeek > 0 ? data.bookingsCurrentWeek : "—"}
+                  </p>
+                  <p className="text-sm text-muted-foreground">
+                    {data.bookingsCurrentWeek > 0 || data.bookingsPreviousWeek > 0
+                      ? `Previous week: ${data.bookingsPreviousWeek}`
+                      : emptyCopy}
+                  </p>
                 </CardContent>
               </Card>
-            )}
-
-            {statusData.length > 0 && (
+            </div>
+            <div className="grid gap-4 md:grid-cols-2">
               <Card className="glass-card">
                 <CardHeader>
-                  <CardTitle>Payment status</CardTitle>
+                  <CardTitle className="text-base">Leads (last 30 days)</CardTitle>
                 </CardHeader>
-                <CardContent className="h-64">
-                  <ResponsiveContainer width="100%" height="100%">
-                    <BarChart data={statusData}>
-                      <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.1)" />
-                      <XAxis dataKey="status" stroke="rgba(255,255,255,0.5)" fontSize={12} />
-                      <YAxis stroke="rgba(255,255,255,0.5)" fontSize={12} />
-                      <Tooltip
-                        contentStyle={{ background: "hsl(var(--card))", border: "1px solid rgba(255,255,255,0.1)" }}
-                      />
-                      <Bar dataKey="count" fill="hsl(var(--primary))" radius={[4, 4, 0, 0]} isAnimationActive={false} />
-                    </BarChart>
-                  </ResponsiveContainer>
+                <CardContent className="space-y-2">
+                  <p className="text-2xl font-semibold text-primary">
+                    {data.leadsLast30Days > 0 ? data.leadsLast30Days : "—"}
+                  </p>
+                  <p className="text-sm text-muted-foreground">
+                    {data.leadsLast30Days > 0 ? `Total leads: ${data.totalLeads}` : emptyCopy}
+                  </p>
                 </CardContent>
               </Card>
-            )}
-          </div>
+              <Card className="glass-card">
+                <CardHeader>
+                  <CardTitle className="text-base">Estimated revenue (context)</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <p className="text-sm text-muted-foreground">
+                    Estimated values are derived from paid booking totals and are not guaranteed revenue.
+                  </p>
+                </CardContent>
+              </Card>
+            </div>
+          </section>
 
-          {!hasProAccess && (
-            <Card className="glass-card border-primary/30">
-              <CardHeader>
-                <CardTitle>Unlock analytics</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <p className="text-sm text-muted-foreground">
-                  Advanced analytics are available on paid plans. Upgrade to view charts, trends, and detailed insights.
-                </p>
-                <div className="flex flex-col sm:flex-row gap-3">
-                  <Button asChild size="lg">
-                    <Link href="/owners">Upgrade ₹1,499</Link>
-                  </Button>
-                  <Button asChild size="lg" variant="outline">
-                    <Link href="/owners">Upgrade ₹1,999</Link>
-                  </Button>
-                </div>
-              </CardContent>
-            </Card>
-          )}
-
-          {data.payments?.length > 0 && (
+          <section className="space-y-4">
+            <h2 className="text-lg font-semibold">Business Health</h2>
             <Card className="glass-card">
-              <CardHeader>
-                <CardTitle>Recent payments</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-2">
-                  {data.payments.slice(0, 10).map((p: any) => (
-                    <div
-                      key={p.id}
-                      className="flex items-center justify-between py-2 border-b border-white/10 last:border-0 text-sm"
-                    >
-                      <span>{new Date(p.createdAt).toLocaleString()}</span>
-                      <span className="text-primary font-medium">{formatPrice(p.amount)}</span>
-                      <span className="text-muted-foreground">{p.status}</span>
+              <CardContent className="space-y-6 pt-6">
+                <div className="grid gap-4 md:grid-cols-3">
+                  <div className="space-y-2">
+                    <div className="text-sm text-muted-foreground">Total members (lifetime)</div>
+                    <div className="text-2xl font-semibold">
+                      {data.totalMembers > 0 ? data.totalMembers : "—"}
                     </div>
-                  ))}
+                    <div className="text-xs text-muted-foreground">
+                      {data.totalMembers > 0 ? `Inactive: ${data.inactiveMembers}` : emptyCopy}
+                    </div>
+                  </div>
+                  <div className="space-y-2">
+                    <div className="text-sm text-muted-foreground">Active duos</div>
+                    <div className="text-2xl font-semibold">
+                      {data.activeDuos > 0 ? data.activeDuos : "—"}
+                    </div>
+                    <div className="text-xs text-muted-foreground">
+                      {data.activeDuos > 0 ? "Pair memberships currently active" : emptyCopy}
+                    </div>
+                  </div>
+                  <div className="space-y-2">
+                    <div className="text-sm text-muted-foreground">Monthly commission report</div>
+                    <div className="text-xs text-muted-foreground">
+                      {commissionReport.length > 0 ? "Latest three months" : emptyCopy}
+                    </div>
+                  </div>
+                </div>
+
+                <div>
+                  {reportLoading ? (
+                    <Skeleton className="h-24" />
+                  ) : commissionReport.length === 0 ? (
+                    <p className="text-sm text-muted-foreground">{emptyCopy}</p>
+                  ) : (
+                    <div className="overflow-auto">
+                      <table className="w-full text-sm">
+                        <thead className="text-left text-xs text-muted-foreground">
+                          <tr>
+                            <th className="py-2">Month</th>
+                            <th className="py-2">Bookings</th>
+                            <th className="py-2">Commission</th>
+                            <th className="py-2">Commission %</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {commissionReport.map((row) => (
+                            <tr key={row.month} className="border-t border-white/10">
+                              <td className="py-2">{row.month}</td>
+                              <td className="py-2">{row.totalBookings}</td>
+                              <td className="py-2">{formatPrice(row.totalCommission)}</td>
+                              <td className="py-2">{row.commissionPercent}%</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
                 </div>
               </CardContent>
             </Card>
-          )}
+          </section>
+
+          <section className="space-y-4">
+            <h2 className="text-lg font-semibold">🔒 Advanced Analytics (Locked)</h2>
+            <div className="relative">
+              <div className="pointer-events-none select-none blur-sm opacity-60 space-y-4">
+                <div className="grid gap-4 md:grid-cols-3">
+                  <Card className="glass-card">
+                    <CardHeader>
+                      <CardTitle className="text-sm">Growth signal</CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="text-2xl font-semibold">{growthSignal}</div>
+                      <div className="text-xs text-muted-foreground">New members this month</div>
+                    </CardContent>
+                  </Card>
+                  <Card className="glass-card">
+                    <CardHeader>
+                      <CardTitle className="text-sm">Duo rate</CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="text-2xl font-semibold">{data.duoRate}%</div>
+                      <div className="text-xs text-muted-foreground">Active duos vs active members</div>
+                    </CardContent>
+                  </Card>
+                  <Card className="glass-card">
+                    <CardHeader>
+                      <CardTitle className="text-sm">ARPM</CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="text-2xl font-semibold">{formatPrice(data.avgRevenuePerMember)}</div>
+                      <div className="text-xs text-muted-foreground">Average revenue per member</div>
+                    </CardContent>
+                  </Card>
+                </div>
+                <div className="grid gap-4 md:grid-cols-3">
+                  <Card className="glass-card">
+                    <CardHeader>
+                      <CardTitle className="text-sm">Retention / churn</CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="text-2xl font-semibold">—</div>
+                      <div className="text-xs text-muted-foreground">Monthly retention overview</div>
+                    </CardContent>
+                  </Card>
+                  <Card className="glass-card">
+                    <CardHeader>
+                      <CardTitle className="text-sm">Conversion funnel</CardTitle>
+                    </CardHeader>
+                    <CardContent className="space-y-2">
+                      <div className="h-2 rounded-full bg-white/10" />
+                      <div className="h-2 w-4/5 rounded-full bg-white/10" />
+                      <div className="h-2 w-3/5 rounded-full bg-white/10" />
+                      <div className="text-xs text-muted-foreground">Views → Leads → Members</div>
+                    </CardContent>
+                  </Card>
+                  <Card className="glass-card md:col-span-1">
+                    <CardHeader>
+                      <CardTitle className="text-sm">Revenue trends over time</CardTitle>
+                    </CardHeader>
+                    <CardContent className="h-40">
+                      {chartData.length > 0 ? (
+                        <ResponsiveContainer width="100%" height="100%">
+                          <AreaChart data={chartData}>
+                            <defs>
+                              <linearGradient id="revenueGradient" x1="0" y1="0" x2="0" y2="1">
+                                <stop offset="5%" stopColor="hsl(var(--primary))" stopOpacity={0.6} />
+                                <stop offset="95%" stopColor="hsl(var(--primary))" stopOpacity={0.05} />
+                              </linearGradient>
+                            </defs>
+                            <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.1)" />
+                            <XAxis dataKey="month" stroke="rgba(255,255,255,0.5)" fontSize={12} />
+                            <YAxis stroke="rgba(255,255,255,0.5)" fontSize={12} tickFormatter={(v) => `₹${v}`} />
+                            <Tooltip
+                              contentStyle={{ background: "hsl(var(--card))", border: "1px solid rgba(255,255,255,0.1)" }}
+                              formatter={(value) => [`₹${value ?? 0}`, "Revenue"]}
+                            />
+                            <Area type="monotone" dataKey="revenue" stroke="hsl(var(--primary))" fill="url(#revenueGradient)" isAnimationActive={false} />
+                          </AreaChart>
+                        </ResponsiveContainer>
+                      ) : (
+                        <div className="flex h-full items-center justify-center text-xs text-muted-foreground">
+                          {emptyCopy}
+                        </div>
+                      )}
+                    </CardContent>
+                  </Card>
+                </div>
+              </div>
+
+              <div className="absolute inset-0 flex items-center justify-center">
+                <Card className="glass-card border-primary/30 max-w-md w-full">
+                  <CardHeader>
+                    <CardTitle>Unlock advanced analytics</CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    <p className="text-sm text-muted-foreground">
+                      Understand growth, retention, and member behaviour with deeper insights.
+                    </p>
+                    <div className="flex flex-col sm:flex-row gap-3">
+                      <Button asChild size="lg">
+                        <Link href="/owners">Upgrade ₹1,499</Link>
+                      </Button>
+                      <Button asChild size="lg" variant="outline">
+                        <Link href="/owners">Upgrade ₹1,999</Link>
+                      </Button>
+                    </div>
+                  </CardContent>
+                </Card>
+              </div>
+            </div>
+          </section>
         </>
       )}
     </div>
