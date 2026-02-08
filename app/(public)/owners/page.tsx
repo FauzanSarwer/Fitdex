@@ -26,23 +26,23 @@ import { useToast } from "@/hooks/use-toast";
 const BENEFITS = [
   {
     icon: MapPin,
-    title: "Reach more members",
-    desc: "Get discovered by thousands of fitness seekers in Delhi NCR through our map-based discovery.",
+    title: "Increase local walk-ins",
+    desc: "Show up where members search so your gym stays top-of-mind and fills more classes.",
   },
   {
     icon: Users,
-    title: "Duo-driven signups",
-    desc: "The duo partner discount brings pairs through your doors—more members, higher retention.",
+    title: "Boost occupancy with duos",
+    desc: "Pair-friendly offers bring members in together and keep them coming back.",
   },
   {
     icon: BarChart3,
-    title: "Analytics & insights",
-    desc: "Track memberships, duos, revenue, and trends—all in one dashboard.",
+    title: "Grow revenue with clarity",
+    desc: "See which plans sell, where members drop off, and what to improve next.",
   },
   {
     icon: Zap,
-    title: "Real payments",
-    desc: "Integrated Razorpay. Members pay online, you get paid. No manual tracking.",
+    title: "Get paid, stay focused",
+    desc: "Collect payments online and reduce manual follow-ups—more time for the floor.",
   },
 ];
 
@@ -53,6 +53,7 @@ const PLANS: Array<{
   planType: OwnerPlanType | "FREE";
   price: number;
   period: string;
+  tagline: string;
   features: Array<{ label: string; available: boolean }>;
   cta: string;
   popular?: boolean;
@@ -62,40 +63,43 @@ const PLANS: Array<{
     planType: "FREE",
     price: 0,
     period: "month",
+    tagline: "Perfect for trying Fitdex visibility.",
     features: [
-      { label: "Gym listing on map", available: true },
+      { label: "Get discovered on the map", available: true },
+      { label: "Basic profile and photos", available: true },
       { label: "Membership management", available: false },
-      { label: "Analytics dashboard", available: false },
-      { label: "Priority support", available: false },
-      { label: "Discount & promo management", available: false },
+      { label: "Growth analytics", available: false },
+      { label: "Discount & promo tools", available: false },
     ],
-    cta: "Free",
+    cta: "List for free",
   },
   {
     name: "Starter",
     planType: "STARTER",
     price: 1499,
     period: "month",
+    tagline: "Start converting views into paid members.",
     features: [
-      { label: "Gym listing on map", available: true },
+      { label: "Full listing + premium placement", available: true },
       { label: "Membership management", available: true },
-      { label: "Analytics dashboard", available: true },
+      { label: "Revenue + occupancy analytics", available: true },
       { label: "Priority support", available: true },
-      { label: "Discount & promo management", available: false },
+      { label: "Discount & promo tools", available: false },
     ],
-    cta: "Get started",
+    cta: "Start Starter",
   },
   {
     name: "Pro",
     planType: "PRO",
     price: 1999,
     period: "month",
+    tagline: "Maximize revenue with full growth tools.",
     features: [
       { label: "Everything in Starter", available: true },
-      { label: "Featured gym placement", available: true },
-      { label: "Discount & promo management", available: true },
-      { label: "Member insights & reports", available: true },
-      { label: "Dedicated account manager", available: true },
+      { label: "Top placement in Explore", available: true },
+      { label: "Discounts, promos, and bundles", available: true },
+      { label: "Member insights & retention reports", available: true },
+      { label: "Dedicated success support", available: true },
     ],
     popular: true,
     cta: "Go Pro",
@@ -105,6 +109,7 @@ const PLANS: Array<{
     planType: "FEATURED",
     price: 99,
     period: "3 days",
+    tagline: "Short boost for launches and promos.",
     features: [
       { label: "Featured badge", available: true },
       { label: "Top placement in Explore", available: true },
@@ -232,13 +237,24 @@ export default function OwnersPage() {
       >
         <div className="inline-flex items-center gap-2 rounded-full border border-primary/30 bg-primary/10 px-4 py-1.5 text-sm text-primary mb-6">
           <Dumbbell className="h-4 w-4" />
-          For Gym Owners
+          For Gym Owners • Start today
         </div>
         <h1 className="text-4xl md:text-5xl font-bold tracking-tight">
-          List your gym on Fitdex
+          Turn searches into memberships
         </h1>
         <p className="text-muted-foreground mt-4 text-lg">
-          Reach more members, get analytics, and manage everything in one place. Join hundreds of gyms already on the platform.
+          Drive higher occupancy and revenue with a listing that converts. Get discovered, manage memberships, and track growth in one place.
+        </p>
+        <div className="mt-8 flex flex-col sm:flex-row items-center justify-center gap-3">
+          <Button asChild size="lg">
+            <Link href="/auth/register?role=owner">Create owner account</Link>
+          </Button>
+          <Button asChild size="lg" variant="outline">
+            <Link href="#pricing">See plans</Link>
+          </Button>
+        </div>
+        <p className="text-xs text-muted-foreground mt-3">
+          Start free, upgrade when you see results.
         </p>
       </motion.div>
 
@@ -249,7 +265,10 @@ export default function OwnersPage() {
         transition={{ delay: 0.1 }}
         className="mb-20"
       >
-        <h2 className="text-2xl font-bold text-center mb-10">Why list on Fitdex?</h2>
+        <h2 className="text-2xl font-bold text-center mb-4">Why list on Fitdex?</h2>
+        <p className="text-center text-sm text-muted-foreground mb-10">
+          Trusted by growing gyms across Delhi NCR.
+        </p>
         <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-6">
           {BENEFITS.map((b, i) => (
             <Card key={i} className="glass-card border-white/10">
@@ -273,10 +292,11 @@ export default function OwnersPage() {
         animate={{ opacity: 1, y: 0 }}
         transition={{ delay: 0.2 }}
         className="mb-20"
+        id="pricing"
       >
         <h2 className="text-2xl font-bold text-center mb-2">Simple pricing</h2>
         <p className="text-muted-foreground text-center mb-10">
-          Choose the plan that fits your gym. No hidden fees.
+          Pick a plan based on outcomes, not features. No hidden fees.
         </p>
         <div className="grid md:grid-cols-3 gap-6 max-w-5xl mx-auto">
           {PLANS.map((plan, i) => (
@@ -292,8 +312,14 @@ export default function OwnersPage() {
                   Popular
                 </div>
               )}
+              {plan.planType === "FEATURED" && (
+                <div className="absolute top-0 left-0 flex items-center gap-1 bg-white/10 text-xs font-medium px-3 py-1 rounded-br-lg">
+                  Add-on
+                </div>
+              )}
               <CardHeader>
                 <h3 className="text-xl font-semibold">{plan.name}</h3>
+                <p className="text-sm text-muted-foreground mt-1">{plan.tagline}</p>
                 <div className="flex items-baseline gap-1 mt-2">
                   <span className="text-3xl font-bold">₹{plan.price.toLocaleString()}</span>
                   <span className="text-muted-foreground">/{plan.period}</span>
@@ -314,7 +340,7 @@ export default function OwnersPage() {
                 </ul>
                 {plan.planType === "FREE" ? (
                   <Button className="w-full mt-auto" size="lg" variant="outline" disabled>
-                    Free plan
+                    {plan.cta}
                   </Button>
                 ) : owner ? (
                   plan.planType === "FEATURED" ? (
@@ -342,13 +368,13 @@ export default function OwnersPage() {
                       onClick={() => startCheckout(plan.planType === "PRO" ? "PRO" : "STARTER")}
                       disabled={processingPlan != null || loadingSub}
                     >
-                      {processingPlan === plan.planType ? <Loader2 className="h-4 w-4 animate-spin" /> : "Buy now"}
+                      {processingPlan === plan.planType ? <Loader2 className="h-4 w-4 animate-spin" /> : plan.cta}
                     </Button>
                   )
                 ) : (
                   <Button asChild className="w-full mt-auto" size="lg" variant={plan.popular ? "default" : "outline"}>
                     <Link href={`/auth/login?callbackUrl=${encodeURIComponent("/dashboard/owner")}`}>
-                      Buy now
+                      {plan.cta}
                     </Link>
                   </Button>
                 )}
@@ -356,6 +382,9 @@ export default function OwnersPage() {
             </Card>
           ))}
         </div>
+        <p className="text-center text-sm text-muted-foreground mt-6">
+          The "Feature your gym" add-on works with any plan when you want a short visibility boost.
+        </p>
         {!owner && (
           <p className="text-center text-sm text-muted-foreground mt-6">
             Already have an account?{" "}
@@ -378,14 +407,14 @@ export default function OwnersPage() {
           <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-primary/20 mx-auto mb-4">
             <Headphones className="h-7 w-7 text-primary" />
           </div>
-          <h2 className="text-xl font-semibold mb-2">Ready to grow your gym?</h2>
+          <h2 className="text-xl font-semibold mb-2">Ready to grow your gym with confidence?</h2>
           <p className="text-muted-foreground mb-6">
             {status === "loading" ? (
               <span className="inline-block h-5 w-48 bg-white/10 rounded animate-pulse" />
             ) : owner ? (
-              "Head to your dashboard to manage your gyms."
+              "Keep momentum going—manage your listings, offers, and growth in one place."
             ) : (
-              "Log in to your owner account or create one to list your gym."
+              "Create your owner account and launch your listing in minutes."
             )}
           </p>
           {status !== "loading" && (
@@ -397,12 +426,12 @@ export default function OwnersPage() {
               ) : (
                 <>
                   <Button asChild size="lg">
+                    <Link href="/auth/register?role=owner">Create owner account</Link>
+                  </Button>
+                  <Button asChild variant="outline" size="lg">
                     <Link href={`/auth/login?callbackUrl=${encodeURIComponent("/dashboard/owner")}`}>
                       Log in to Owner Dashboard
                     </Link>
-                  </Button>
-                  <Button asChild variant="outline" size="lg">
-                    <Link href="/auth/register?role=owner">Create owner account</Link>
                   </Button>
                 </>
               )}
