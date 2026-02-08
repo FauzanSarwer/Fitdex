@@ -53,19 +53,7 @@ A: Click "List Your Gym" on the site, register as an owner, and follow the steps
 
 ## Support
 
-Need help? Have feedback? Reach out via the contact form on the website or email support@fitdex.com.
-
-## Environment Variables
-
-See `.env.example` for all required variables. Key ones:
-
-- `DATABASE_URL` — SQLite database path
-- `NEXTAUTH_SECRET` — NextAuth secret
-- `NEXTAUTH_URL` — App URL
-- `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` — Google OAuth
-- `RAZORPAY_KEY_ID` / `RAZORPAY_KEY_SECRET` — Razorpay keys
-
-
+Need help? Have feedback? Reach out via the contact form on the website or email fauzansarwer@gmail.com.
 
 ---
 
