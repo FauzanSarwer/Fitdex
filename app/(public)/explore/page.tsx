@@ -93,6 +93,7 @@ export default function ExplorePage() {
   const [gyms, setGyms] = useState<Gym[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [loadFailed, setLoadFailed] = useState(false);
   const [userLat, setUserLat] = useState<number | null>(null);
   const [userLng, setUserLng] = useState<number | null>(null);
   const [locationGate, setLocationGate] = useState(true);
@@ -109,16 +110,19 @@ export default function ExplorePage() {
 
   const loadGyms = async (url: string) => {
     setError(null);
+    setLoadFailed(false);
     setLoading(true);
     try {
       const result = await fetchJson<{ gyms?: Gym[]; error?: string }>(url, { retries: 2 });
       if (!result.ok) {
-        setError(result.error ?? "Could not load gyms. Please try again.");
+        setGyms([]);
+        setLoadFailed(true);
         return;
       }
       setGyms(result.data?.gyms ?? []);
     } catch {
-      setError("Could not load gyms. Please try again.");
+      setGyms([]);
+      setLoadFailed(true);
     } finally {
       setLoading(false);
     }
@@ -605,16 +609,18 @@ export default function ExplorePage() {
             <Skeleton key={i} className="h-40 rounded-2xl" />
           ))}
         </div>
-      ) : error ? (
+      ) : filteredGyms.length === 0 ? (
         <Card className="glass-card p-12 text-center">
-          <p className="text-muted-foreground">{error}</p>
+          <p className="text-muted-foreground">
+            {loadFailed
+              ? "No gyms yet. Please check back soon."
+              : query || maxPrice || maxDistance || onlyFeatured || onlyVerified
+                ? "No gyms found. Try adjusting filters."
+                : "No gyms yet."}
+          </p>
           <Button className="mt-4" onClick={() => window.location.reload()}>
             Retry
           </Button>
-        </Card>
-      ) : filteredGyms.length === 0 ? (
-        <Card className="glass-card p-12 text-center">
-          <p className="text-muted-foreground">No gyms found. Try adjusting filters.</p>
         </Card>
       ) : (
         <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">

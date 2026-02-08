@@ -26,13 +26,19 @@ export function LocationGate({ children }: { children: React.ReactNode }) {
   const [location, setLocation] = useState<LocationState>({ status: "idle" });
   const [waitlistEmail, setWaitlistEmail] = useState("");
   const hasRequestedRef = useRef(false);
+  const allowContinue = useCallback(() => {
+    try {
+      localStorage.setItem("fitdex_location_override", "true");
+    } catch {}
+    setLocation({ status: "ready", serviceable: true });
+  }, []);
 
   const skipGate = SKIP_PATH_PREFIXES.some((p) => pathname?.startsWith(p));
 
   const requestLocation = useCallback(() => {
     if (typeof window === "undefined") return;
     if (!navigator.geolocation) {
-      setLocation({ status: "denied" });
+      allowContinue();
       return;
     }
     setLocation((p) => ({ ...p, status: "requesting" }));
@@ -124,7 +130,7 @@ export function LocationGate({ children }: { children: React.ReactNode }) {
       },
       { enableHighAccuracy: true, timeout: 10000, maximumAge: 300000 }
     );
-  }, []);
+  }, [allowContinue]);
 
   // 1) Check cache and server, then trigger browser location request
   useEffect(() => {
@@ -225,6 +231,13 @@ export function LocationGate({ children }: { children: React.ReactNode }) {
                 requestLocation();
               }} className="w-full">
                 Try again
+              </Button>
+              <Button
+                variant="outline"
+                onClick={allowContinue}
+                className="mt-3 w-full"
+              >
+                Continue without location
               </Button>
             </CardContent>
             </Card>
@@ -333,6 +346,13 @@ export function LocationGate({ children }: { children: React.ReactNode }) {
                   Check your browser for a location permission prompt.
                 </p>
               )}
+              <Button
+                variant="outline"
+                onClick={allowContinue}
+                className="w-full"
+              >
+                Continue without location
+              </Button>
             </CardContent>
             </Card>
           </motion.div>
