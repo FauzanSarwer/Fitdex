@@ -27,6 +27,8 @@ export async function GET() {
         id: true,
         invoiceNumber: true,
         issuedAt: true,
+        invoiceType: true,
+        total: true,
       },
     });
     return NextResponse.json({ invoices });

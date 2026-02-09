@@ -27,6 +27,7 @@ export async function GET(req: Request) {
             verificationStatus: true,
             gstNumber: true,
             gstCertificateUrl: true,
+            invoiceTypeDefault: true,
             partnerDiscountPercent: true,
             quarterlyDiscountType: true,
             quarterlyDiscountValue: true,
@@ -74,6 +75,7 @@ export async function POST(req: Request) {
     quarterlyPrice?: number | null;
     yearlyPrice?: number;
     partnerDiscountPercent?: number;
+    invoiceTypeDefault?: "GST" | "NON_GST" | null;
     quarterlyDiscountType?: "PERCENT" | "FLAT";
     quarterlyDiscountValue?: number;
     yearlyDiscountType?: "PERCENT" | "FLAT";
@@ -105,6 +107,7 @@ export async function POST(req: Request) {
     quarterlyPrice,
     yearlyPrice,
     partnerDiscountPercent,
+    invoiceTypeDefault,
     quarterlyDiscountType,
     quarterlyDiscountValue,
     yearlyDiscountType,
@@ -172,6 +175,7 @@ export async function POST(req: Request) {
         quarterlyPrice: quarterlyPrice != null ? Number(quarterlyPrice) : null,
         yearlyPrice: Number(yearlyPrice),
         partnerDiscountPercent: Number(partnerDiscountPercent ?? 10),
+        invoiceTypeDefault: invoiceTypeDefault ?? null,
         quarterlyDiscountType: quarterlyDiscountType ?? "PERCENT",
         quarterlyDiscountValue: Number(quarterlyDiscountValue ?? 10),
         yearlyDiscountType: yearlyDiscountType ?? "PERCENT",
@@ -215,6 +219,7 @@ export async function PATCH(req: Request) {
     quarterlyPrice?: number | null;
     yearlyPrice?: number;
     partnerDiscountPercent?: number;
+    invoiceTypeDefault?: "GST" | "NON_GST" | null;
     quarterlyDiscountType?: "PERCENT" | "FLAT";
     quarterlyDiscountValue?: number;
     yearlyDiscountType?: "PERCENT" | "FLAT";
@@ -272,6 +277,7 @@ export async function PATCH(req: Request) {
     if (data.quarterlyPrice !== undefined) update.quarterlyPrice = data.quarterlyPrice;
     if (data.yearlyPrice != null) update.yearlyPrice = data.yearlyPrice;
     if (data.partnerDiscountPercent != null) update.partnerDiscountPercent = data.partnerDiscountPercent;
+    if (data.invoiceTypeDefault !== undefined) update.invoiceTypeDefault = data.invoiceTypeDefault;
     if (data.quarterlyDiscountType != null) update.quarterlyDiscountType = data.quarterlyDiscountType;
     if (data.quarterlyDiscountValue != null) update.quarterlyDiscountValue = data.quarterlyDiscountValue;
     if (data.yearlyDiscountType != null) update.yearlyDiscountType = data.yearlyDiscountType;

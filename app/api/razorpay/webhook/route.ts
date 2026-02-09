@@ -4,6 +4,7 @@ import { verifyRazorpayWebhookSignature } from "@/lib/razorpay";
 import { jsonError } from "@/lib/api";
 import { logServerError } from "@/lib/logger";
 import { sendWhatsappNotification } from "@/lib/whatsapp";
+import { ensureOwnerInvoiceForTransaction } from "@/lib/invoice-service";
 
 export async function POST(req: Request) {
   try {
@@ -61,6 +62,14 @@ export async function POST(req: Request) {
             where: { id: transaction.membershipId },
             data: { active: true },
           });
+          try {
+            await ensureOwnerInvoiceForTransaction({
+              transactionId: transaction.id,
+              allowSkip: true,
+            });
+          } catch (error) {
+            logServerError(error as Error, { route: "/api/razorpay/webhook", transactionId: transaction.id });
+          }
           const membership = await prisma.membership.findFirst({
             where: { id: transaction.membershipId },
           });

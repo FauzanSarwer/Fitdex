@@ -13,6 +13,23 @@ enum GymTier {
   EDGE
 }
 
+enum InvoiceType {
+  GST
+  NON_GST
+}
+
+enum InvoiceTaxMode {
+  CGST_SGST
+  IGST
+  NONE
+}
+
+enum InvoiceTaxType {
+  CGST
+  SGST
+  IGST
+}
+
 model User {
   id            String    @id @default(cuid())
   name          String?
@@ -61,7 +78,8 @@ model User {
   ownerSubscriptions OwnerSubscription[]
   leads        Lead[]
   whatsappLogs WhatsAppLog[]
-  invoices     Invoice[]
+  ownerInvoices Invoice[] @relation("OwnerInvoices")
+  memberInvoices Invoice[] @relation("MemberInvoices")
   subscriptionReminders SubscriptionReminderLog[]
 }
 
@@ -212,6 +230,8 @@ model Gym {
   leads       Lead[]
   whatsappLogs WhatsAppLog[]
   invoices    Invoice[]
+  invoiceTypeDefault   InvoiceType?
+  invoiceSequence InvoiceSequence?
 }
 
 model Notification {
@@ -305,6 +325,7 @@ model Membership {
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
   gym  Gym  @relation(fields: [gymId], references: [id], onDelete: Cascade)
   transactions Transaction[]
+  invoice Invoice? @relation("MembershipInvoice")
 }
 
 model GymPageView {
@@ -422,18 +443,80 @@ model Invoice {
   invoiceNumber String   @unique
   ownerId       String
   gymId         String?
+  userId        String?
+  membershipId  String?  @unique
+  transactionId String?
+  invoiceType   InvoiceType @default(NON_GST)
+  taxMode       InvoiceTaxMode @default(NONE)
+  gstRate       Int?
+  subtotal      Int
+  taxTotal      Int
+  total         Int
   amount        Int
+  currency      String   @default("INR")
+  gymName       String
+  gymAddress    String?
+  gymCity       String?
+  gymState      String?
+  gymGstNumber  String?
+  memberName    String?
+  memberEmail   String?
+  memberState   String?
+  pdfUrl        String?
   gstNumber     String?
   status        String   @default("ISSUED")
   issuedAt      DateTime @default(now())
   createdAt     DateTime @default(now())
 
-  owner User @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  owner User @relation("OwnerInvoices", fields: [ownerId], references: [id], onDelete: Cascade)
   gym   Gym?  @relation(fields: [gymId], references: [id], onDelete: SetNull)
+  user  User? @relation("MemberInvoices", fields: [userId], references: [id], onDelete: SetNull)
+  membership Membership? @relation("MembershipInvoice", fields: [membershipId], references: [id], onDelete: SetNull)
+  transaction Transaction? @relation("TransactionInvoice")
+  items InvoiceItem[]
+  taxes InvoiceTax[]
 
   @@index([ownerId, issuedAt])
   @@index([gymId])
+  @@index([transactionId])
 }
+
+model InvoiceItem {
+  id          String   @id @default(cuid())
+  invoiceId   String
+  description String
+  quantity    Int
+  unitPrice   Int
+  total       Int
+  createdAt   DateTime @default(now())
+
+  invoice Invoice @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+
+  @@index([invoiceId])
+}
+
+model InvoiceTax {
+  id        String   @id @default(cuid())
+  invoiceId String
+  taxType   InvoiceTaxType
+  rate      Int
+  amount    Int
+  createdAt DateTime @default(now())
+
+  invoice Invoice @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+
+  @@index([invoiceId])
+}
+
+model InvoiceSequence {
+  id         String   @id @default(cuid())
+  gymId      String   @unique
+  lastNumber Int      @default(0)
+  updatedAt  DateTime @updatedAt
+
+  gym Gym @relation(fields: [gymId], references: [id], onDelete: Cascade)
+}
+
 model Payment {
   id                 String   @id @default(cuid())
   userId             String
@@ -453,6 +536,7 @@ model Transaction {
   userId                    String
   gymId                     String
   membershipId              String
+  invoiceId                 String?  @unique
   totalAmount               Int      // in paise
   platformCommissionAmount  Int      // in paise
   gymPayoutAmount           Int      // in paise
@@ -466,6 +550,7 @@ model Transaction {
   user       User       @relation(fields: [userId], references: [id], onDelete: Cascade)
   gym        Gym        @relation(fields: [gymId], references: [id], onDelete: Cascade)
   membership Membership @relation(fields: [membershipId], references: [id], onDelete: Cascade)
+  invoice    Invoice?   @relation("TransactionInvoice", fields: [invoiceId], references: [id], onDelete: SetNull)
 
   @@index([userId])
   @@index([gymId])

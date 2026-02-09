@@ -90,14 +90,30 @@ export async function POST(req: Request) {
     });
     if (PLAN_PRICES[updated.plan] && PLAN_PRICES[updated.plan] >= 149900) {
       const invoiceNumber = generateInvoiceNumber("OWN");
+      const issuedAt = new Date();
+      const amount = PLAN_PRICES[updated.plan] ?? 0;
       await prisma.invoice.create({
         data: {
           invoiceNumber,
           ownerId: uid,
           gymId: gym?.id,
-          amount: PLAN_PRICES[updated.plan] ?? 0,
+          invoiceType: "NON_GST",
+          taxMode: "NONE",
+          subtotal: amount,
+          taxTotal: 0,
+          total: amount,
+          amount,
+          currency: "INR",
+          gymName: gym?.name ?? "Fitdex",
+          gymAddress: gym?.address ?? null,
+          gymCity: gym?.city ?? null,
+          gymState: gym?.state ?? null,
+          gymGstNumber: gym?.gstNumber ?? null,
+          memberName: null,
+          memberEmail: null,
+          memberState: null,
           gstNumber: gym?.gstNumber ?? null,
-          issuedAt: new Date(),
+          issuedAt,
         },
       });
     }

@@ -5,7 +5,7 @@ import { prisma } from "@/lib/prisma";
 import { requireOwner } from "@/lib/permissions";
 import { jsonError } from "@/lib/api";
 import { logServerError } from "@/lib/logger";
-import { generateInvoicePdfBuffer } from "@/lib/invoice";
+import { generateOwnerInvoicePdfBuffer } from "@/lib/invoice";
 
 export async function GET(_req: Request, { params }: { params: Promise<{ invoiceId: string }> }) {
   const session = await getServerSession(authOptions);
@@ -17,6 +17,10 @@ export async function GET(_req: Request, { params }: { params: Promise<{ invoice
   if (!invoiceId) return jsonError("invoiceId required", 400);
 
   try {
+    const { searchParams } = new URL(_req.url);
+    const layoutParam = searchParams.get("layout")?.toUpperCase();
+    const layout = layoutParam === "THERMAL" ? "THERMAL" : "A4";
+    const disposition = searchParams.get("disposition") === "inline" ? "inline" : "attachment";
     const active = await prisma.ownerSubscription.findFirst({
       where: { ownerId: uid, status: "ACTIVE", expiresAt: { gt: new Date() } },
     });
@@ -25,24 +29,40 @@ export async function GET(_req: Request, { params }: { params: Promise<{ invoice
     }
     const invoice = await prisma.invoice.findFirst({
       where: { id: invoiceId, ownerId: uid },
-      include: { gym: true },
+      include: { items: true, taxes: true },
     });
     if (!invoice) return jsonError("Invoice not found", 404);
 
-    const gymName = invoice.gym?.name ?? "Fitdex";
-    const buffer = await generateInvoicePdfBuffer({
+    const buffer = await generateOwnerInvoicePdfBuffer({
       invoiceNumber: invoice.invoiceNumber,
       issuedAt: invoice.issuedAt,
-      gymName,
-      gstNumber: invoice.gstNumber,
-      amount: invoice.amount,
+      gymName: invoice.gymName,
+      gymAddress: invoice.gymAddress,
+      gymGstNumber: invoice.gymGstNumber ?? invoice.gstNumber,
+      memberName: invoice.memberName,
+      memberEmail: invoice.memberEmail,
+      items: invoice.items.map((item) => ({
+        description: item.description,
+        quantity: item.quantity,
+        unitPrice: item.unitPrice,
+        total: item.total,
+      })),
+      taxes: invoice.taxes.map((tax) => ({
+        label: tax.taxType,
+        rate: tax.rate,
+        amount: tax.amount,
+      })),
+      subtotal: invoice.subtotal,
+      taxTotal: invoice.taxTotal,
+      total: invoice.total,
+      layout,
     });
 
     const body = new Uint8Array(buffer);
     return new NextResponse(body, {
       headers: {
         "Content-Type": "application/pdf",
-        "Content-Disposition": `attachment; filename=${invoice.invoiceNumber}.pdf`,
+        "Content-Disposition": `${disposition}; filename=${invoice.invoiceNumber}.pdf`,
       },
     });
   } catch (error) {

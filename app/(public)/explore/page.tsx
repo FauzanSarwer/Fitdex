@@ -395,14 +395,15 @@ export default function ExplorePage() {
       {locationGate && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
           <div className="glass-card border border-white/10 p-6 rounded-2xl max-w-md w-full text-center space-y-4">
-            <h2 className="text-xl font-semibold">Allow location access?</h2>
+            <h2 className="text-xl font-semibold">Find gyms near you</h2>
             <p className="text-sm text-muted-foreground">
-              We use your location to sort gyms by distance. You can continue without it.
+              Show nearby verified gyms first, with transparent pricing and duo-friendly deals. You can explore without
+              sharing your location.
             </p>
             {locationError && <p className="text-xs text-amber-400">{locationError}</p>}
             <div className="flex flex-col sm:flex-row gap-3 justify-center">
               <Button onClick={requestLocation} disabled={locationLoading}>
-                {locationLoading ? "Requesting…" : "Use my location"}
+                {locationLoading ? "Locating…" : "Show gyms near me"}
               </Button>
               <Button
                 variant="outline"
@@ -424,15 +425,24 @@ export default function ExplorePage() {
         <section className="mb-8 rounded-3xl border border-white/10 bg-white/5 p-6 md:p-8 shadow-glow-sm">
           <div className="flex flex-col gap-6 md:flex-row md:items-end md:justify-between">
             <div className="max-w-2xl space-y-3">
-              <p className="text-xs uppercase tracking-[0.3em] text-muted-foreground">Fitdex Explore</p>
+              <p className="text-xs uppercase tracking-[0.3em] text-muted-foreground">Fitdex</p>
+              <p className="text-xs text-primary/80 font-semibold">Gym discovery + pricing + duo discounts</p>
               <h1 className="text-2xl md:text-4xl font-semibold text-foreground">
-                Find a gym you can trust with <span className="text-primary">verified profiles</span> and
-                <span className="text-primary"> clear pricing</span>.
+                Find verified gyms with <span className="text-primary">transparent pricing</span> and
+                <span className="text-primary"> partner savings</span>.
               </h1>
               <p className="text-sm text-muted-foreground">
-                See what's open now, compare amenities, and spot <span className="text-foreground">duo-friendly</span> savings where
-                available. Sorted by distance when location is on.
+                Explore gyms near you, compare plans fast, and join solo or with a partner to save more.
               </p>
+              <div className="flex flex-wrap items-center gap-3 pt-2">
+                <Button onClick={requestLocation} className="transition-colors">
+                  Find gyms near you
+                </Button>
+                <Button variant="outline" asChild className="transition-colors">
+                  <Link href="/owners">List your gym (owners)</Link>
+                </Button>
+                <span className="text-xs text-muted-foreground">No lock-in. Cancel anytime.</span>
+              </div>
               <div className="flex flex-wrap gap-2 pt-1">
                 <span className="rounded-full border border-primary/30 bg-primary/10 px-3 py-1 text-xs text-primary">
                   Verified listings
@@ -457,20 +467,25 @@ export default function ExplorePage() {
             </div>
           </div>
         </section>
-        <section className="mb-8 grid gap-4 md:grid-cols-3">
+        <section className="mb-6 rounded-2xl border border-white/10 bg-white/5 p-4 md:p-5">
+          <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+            <div>
+              <p className="text-sm font-semibold">Duo discounts, pre-login</p>
+              <p className="text-xs text-muted-foreground">
+                Train with a partner and save more. Look for duo tags on gyms that support partner pricing.
+              </p>
+            </div>
+            <span className="text-xs rounded-full border border-indigo-400/30 bg-indigo-400/10 px-3 py-1 text-indigo-200">
+              Duo savings available
+            </span>
+          </div>
+        </section>
+        <section className="mb-8 grid gap-3 md:grid-cols-4">
           {[
-            {
-              title: "Filter with confidence",
-              body: "Use price, distance, and verified filters to narrow fast.",
-            },
-            {
-              title: "Compare transparently",
-              body: "See pricing, amenities, and open status in one glance.",
-            },
-            {
-              title: "Save together",
-              body: "Look for duo badges to unlock partner discounts.",
-            },
+            { title: "Verified gyms", body: "Profiles reviewed for trust." },
+            { title: "Transparent pricing", body: "See plans before you visit." },
+            { title: "Duo discounts", body: "Save more with a partner." },
+            { title: "Simple memberships", body: "Pick a plan, start fast." },
           ].map((item) => (
             <Card key={item.title} className="glass-card border border-white/10">
               <CardHeader className="pb-2">
@@ -482,11 +497,47 @@ export default function ExplorePage() {
             </Card>
           ))}
         </section>
+        <section className="mb-6">
+          <div className="mb-3 flex items-center justify-between">
+            <h2 className="text-lg font-semibold">How it works</h2>
+            <span className="text-xs text-muted-foreground">3 quick steps</span>
+          </div>
+          <div className="grid gap-4 md:grid-cols-3">
+            {[
+              { title: "Explore nearby gyms", body: "Use location or search any area." },
+              { title: "Compare pricing", body: "See plans, amenities, and open hours." },
+              { title: "Join solo or duo", body: "Unlock partner discounts when offered." },
+            ].map((item, index) => (
+              <Card key={item.title} className="glass-card border border-white/10">
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-sm font-semibold">{index + 1}. {item.title}</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <p className="text-xs text-muted-foreground">{item.body}</p>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        </section>
+        <section className="mb-8 flex flex-wrap gap-2">
+          {[
+            "Verified gyms",
+            "Secure payments",
+            "Cancel anytime",
+          ].map((item) => (
+            <span
+              key={item}
+              className="rounded-full border border-white/10 bg-white/5 px-3 py-1 text-xs text-muted-foreground"
+            >
+              {item}
+            </span>
+          ))}
+        </section>
         <div className="flex flex-col gap-4 mb-6">
         <div className="flex items-center justify-between">
           <h2 className="text-xl font-semibold flex items-center gap-2 text-foreground">
             <MapPin className="h-6 w-6 text-primary" />
-            Browse gyms
+            Find gyms near you
           </h2>
           <div className="flex rounded-xl border border-white/10 overflow-hidden">
             <Button
@@ -677,10 +728,13 @@ export default function ExplorePage() {
         <Card className="glass-card p-12 text-center space-y-3">
           <p className="text-muted-foreground">
             {loadFailed
-              ? "We're still onboarding gyms in this area."
+              ? "We’re still onboarding gyms here. More verified listings are on the way."
               : query || maxPrice || maxDistance || onlyFeatured || onlyVerified
                 ? "No matches yet. Try expanding distance or removing a filter."
-                : "No gyms yet."}
+                : "No gyms yet. Check back soon or explore a nearby area."}
+          </p>
+          <p className="text-xs text-muted-foreground">
+            Want to list your gym? Add your details and go live in minutes.
           </p>
           <div className="flex flex-col sm:flex-row items-center justify-center gap-2">
             <Button variant="secondary" onClick={() => {
@@ -693,8 +747,8 @@ export default function ExplorePage() {
             }}>
               Clear filters
             </Button>
-            <Button className="mt-0 sm:mt-0" onClick={() => window.location.reload()}>
-              Retry
+            <Button variant="outline" asChild>
+              <Link href="/owners">List your gym (owners)</Link>
             </Button>
           </div>
         </Card>
@@ -749,7 +803,7 @@ export default function ExplorePage() {
                         </span>
                       )}
                       {hasDuo && (
-                        <span className="text-[10px] uppercase tracking-wide bg-indigo-500/20 text-indigo-200 px-2 py-0.5 rounded-full">
+                        <span className="text-xs uppercase tracking-wide bg-indigo-500/20 text-indigo-200 px-3 py-1 rounded-full">
                           Duo save {gym.partnerDiscountPercent}%
                         </span>
                       )}
@@ -774,7 +828,7 @@ export default function ExplorePage() {
                     </div>
                   </div>
                   <p className="text-sm text-muted-foreground flex items-center gap-2">
-                    <MapPin className="h-5 w-5" />
+                    <MapPin className="h-6 w-6 text-muted-foreground/80" />
                     <span
                       style={
                         isExpanded

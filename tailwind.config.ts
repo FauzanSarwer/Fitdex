@@ -33,8 +33,8 @@ const config: Config = {
         "gradient-gym": "linear-gradient(135deg, var(--tw-gradient-from) 0%, var(--tw-gradient-to) 100%)",
       },
       boxShadow: {
-        glow: "0 0 40px -10px hsl(var(--glow))",
-        "glow-sm": "0 0 20px -5px hsl(var(--glow))",
+        glow: "0 12px 45px -20px hsl(var(--glow))",
+        "glow-sm": "0 8px 30px -18px hsl(var(--glow))",
       },
       animation: {
         "fade-in": "fadeIn 0.3s ease-out",

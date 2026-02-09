@@ -46,7 +46,7 @@ const BENEFITS = [
   },
 ];
 
-type OwnerPlanType = "STARTER" | "PRO" | "FEATURED";
+type OwnerPlanType = "STARTER" | "PRO";
 
 const PLANS: Array<{
   name: string;
@@ -103,19 +103,6 @@ const PLANS: Array<{
     ],
     popular: true,
     cta: "Go Pro",
-  },
-  {
-    name: "Feature your gym",
-    planType: "FEATURED",
-    price: 99,
-    period: "3 days",
-    tagline: "Short boost for launches and promos.",
-    features: [
-      { label: "Featured badge", available: true },
-      { label: "Top placement in Explore", available: true },
-      { label: "Boosted discovery for new members", available: true },
-    ],
-    cta: "Boost for 3 days",
   },
 ];
 
@@ -312,11 +299,6 @@ export default function OwnersPage() {
                   Popular
                 </div>
               )}
-              {plan.planType === "FEATURED" && (
-                <div className="absolute top-0 left-0 flex items-center gap-1 bg-white/10 text-xs font-medium px-3 py-1 rounded-br-lg">
-                  Add-on
-                </div>
-              )}
               <CardHeader>
                 <h3 className="text-xl font-semibold">{plan.name}</h3>
                 <p className="text-sm text-muted-foreground mt-1">{plan.tagline}</p>
@@ -343,11 +325,7 @@ export default function OwnersPage() {
                     {plan.cta}
                   </Button>
                 ) : owner ? (
-                  plan.planType === "FEATURED" ? (
-                    <Button asChild className="w-full mt-auto" size="lg" variant={plan.popular ? "default" : "outline"}>
-                      <Link href="/dashboard/owner/explore">Boost a gym</Link>
-                    </Button>
-                  ) : activePlan && activePlan === plan.planType ? (
+                  activePlan && activePlan === plan.planType ? (
                     <Button asChild className="w-full mt-auto" size="lg" variant={plan.popular ? "default" : "outline"}>
                       <Link href="/dashboard/owner/subscription">Manage</Link>
                     </Button>
@@ -382,9 +360,6 @@ export default function OwnersPage() {
             </Card>
           ))}
         </div>
-        <p className="text-center text-sm text-muted-foreground mt-6">
-          The "Feature your gym" add-on works with any plan when you want a short visibility boost.
-        </p>
         {!owner && (
           <p className="text-center text-sm text-muted-foreground mt-6">
             Already have an account?{" "}

@@ -1,8 +1,7 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
-import { motion } from "framer-motion";
 import { useSession } from "next-auth/react";
 import { Loader2, MapPin, Image as ImageIcon } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -10,7 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Skeleton } from "@/components/ui/skeleton";
 import { fetchJson } from "@/lib/client-fetch";
-import { buildGymSlug } from "@/lib/utils";
+import { buildGymSlug, formatPrice } from "@/lib/utils";
 import { isPaymentsEnabled, openRazorpayCheckout } from "@/lib/razorpay-checkout";
 import { useToast } from "@/hooks/use-toast";
 
@@ -24,6 +23,7 @@ export default function OwnerExplorePage() {
   const [error, setError] = useState<string | null>(null);
   const [featuring, setFeaturing] = useState<string | null>(null);
   const [upsellGym, setUpsellGym] = useState<any | null>(null);
+  const [boostGym, setBoostGym] = useState<any | null>(null);
   const paymentsEnabled = isPaymentsEnabled() || isAdmin;
 
   useEffect(() => {
@@ -53,101 +53,189 @@ export default function OwnerExplorePage() {
     };
   }, []);
 
-  const title = useMemo(() => "Owner explore", []);
+  const startBoost = async (gymId: string) => {
+    if (!paymentsEnabled) {
+      toast({ title: "Payments not available yet", description: "Please try again later." });
+      return;
+    }
+    setFeaturing(gymId);
+    try {
+      const result = await fetchJson<{
+        amount: number;
+        currency?: string;
+        orderId: string;
+        featuredUntil?: string;
+        error?: string;
+      }>("/api/owner/gym/feature", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ gymId }),
+        retries: 1,
+      });
+      if (!result.ok) {
+        toast({
+          title: "Error",
+          description: result.error ?? "Failed to start payment",
+          variant: "destructive",
+        });
+        setFeaturing(null);
+        return;
+      }
+      if (isAdmin && result.data?.featuredUntil) {
+        toast({ title: "Boost activated", description: "Admin access applied." });
+        setGyms((prev) =>
+          prev.map((gym) => (gym.id === gymId ? { ...gym, featuredUntil: result.data?.featuredUntil } : gym))
+        );
+        setFeaturing(null);
+        return;
+      }
+      const checkout = await openRazorpayCheckout({
+        orderId: result.data?.orderId ?? "",
+        amount: result.data?.amount ?? 0,
+        currency: result.data?.currency ?? "INR",
+        name: "Fitdex",
+        onSuccess: async (res) => {
+          const verifyResult = await fetchJson<{
+            featuredUntil?: string;
+            error?: string;
+          }>("/api/owner/gym/feature/verify", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              gymId,
+              orderId: res.razorpay_order_id,
+              paymentId: res.razorpay_payment_id,
+              signature: res.razorpay_signature,
+            }),
+            retries: 1,
+          });
+          if (verifyResult.ok) {
+            toast({ title: "Boost activated", description: "Your gym is featured for 3 days." });
+            setGyms((prev) =>
+              prev.map((gym) => (gym.id === gymId ? { ...gym, featuredUntil: verifyResult.data?.featuredUntil } : gym))
+            );
+          } else {
+            toast({
+              title: "Verification failed",
+              description: verifyResult.error ?? "Payment failed",
+              variant: "destructive",
+            });
+          }
+        },
+      });
+      if (!checkout.ok && checkout.error && checkout.error !== "DISMISSED") {
+        const message = checkout.error === "PAYMENTS_DISABLED" ? "Payments not available yet" : checkout.error;
+        toast({ title: "Payments unavailable", description: message, variant: "destructive" });
+      }
+    } catch {
+      toast({ title: "Error", variant: "destructive" });
+    }
+    setFeaturing(null);
+  };
 
-  if (loading) {
-    return (
-      <div className="p-6">
-        <Skeleton className="h-64 rounded-2xl" />
+  return (
+    <div className="space-y-6">
+      <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
+        <div>
+          <h1 className="text-2xl font-semibold">Owner explore</h1>
+          <p className="text-sm text-muted-foreground">
+            Benchmark your offers, spot gaps, and boost visibility when you want extra demand.
+          </p>
+        </div>
+        <Button asChild variant="outline" size="sm">
+          <Link href="/explore">View public explore</Link>
+        </Button>
       </div>
-    );
-  }
 
-  if (error) {
-    return (
-      <div className="p-6">
-        <Card className="glass-card p-10 text-center">
-          <CardHeader>
-            <CardTitle>Could not load gyms</CardTitle>
+      {loading ? (
+        <div className="grid gap-4 md:grid-cols-2">
+          {[1, 2, 3, 4].map((i) => (
+            <Skeleton key={i} className="h-40 rounded-2xl" />
+          ))}
+        </div>
+      ) : error ? (
+        <Card className="glass-card border border-white/10 p-6">
+          <CardHeader className="pb-2">
+            <CardTitle>Unable to load explore</CardTitle>
           </CardHeader>
           <CardContent className="space-y-3">
             <p className="text-sm text-muted-foreground">{error}</p>
             <Button onClick={() => window.location.reload()}>Retry</Button>
           </CardContent>
         </Card>
-      </div>
-    );
-  }
-
-  return (
-    <div className="p-5 space-y-5">
-      <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}>
-        <h1 className="text-2xl font-bold flex items-center gap-2">
-          <MapPin className="h-6 w-6" />
-          {title}
-        </h1>
-        <p className="text-muted-foreground text-sm">
-          Turn competitor signals into growth moves. Use Explore to tune pricing, sharpen positioning, and boost visibility.
-        </p>
-      </motion.div>
-
-      <Card className="glass-card">
-        <CardContent className="grid gap-4 p-4 text-sm text-muted-foreground md:grid-cols-3">
-          <div>
-            <p className="text-xs uppercase tracking-[0.2em] text-foreground">Why it matters</p>
-            <p>Competitor activity shows where demand is moving, so you can act early.</p>
-          </div>
-          <div>
-            <p className="text-xs uppercase tracking-[0.2em] text-foreground">What to watch</p>
-            <p>Pricing, visibility, and page interest help you decide when to adjust offers.</p>
-          </div>
-          <div>
-            <p className="text-xs uppercase tracking-[0.2em] text-foreground">Your next move</p>
-            <p>Match standout pricing, refresh your listing, or boost placement.</p>
-          </div>
-        </CardContent>
-      </Card>
-
-      {gyms.length === 0 ? (
-        <Card className="glass-card p-12 text-center">
-          <p className="text-muted-foreground">No gyms found.</p>
+      ) : gyms.length === 0 ? (
+        <Card className="glass-card border border-white/10 p-10 text-center">
+          <CardContent className="space-y-2">
+            <p className="text-sm text-muted-foreground">No gyms listed yet. Add your first gym to see insights.</p>
+            <Button asChild>
+              <Link href="/dashboard/owner/gym">Add your gym</Link>
+            </Button>
+          </CardContent>
         </Card>
       ) : (
-        <div className="grid gap-4 [grid-template-columns:repeat(auto-fit,minmax(260px,1fr))]">
+        <div className="grid gap-4 md:grid-cols-2">
           {gyms.map((gym) => {
-            const isOwner = gym.isOwner;
-            const isVerified = gym.verificationStatus === "VERIFIED";
+            const isOwnerGym = !!gym.isOwner;
+            const hasStats = !!gym.stats;
+            const hasDuo = (gym.partnerDiscountPercent ?? 0) > 0;
+            const images = (gym.imageUrls ?? []).length > 0
+              ? (gym.imageUrls ?? [])
+              : gym.coverImageUrl
+                ? [gym.coverImageUrl]
+                : [];
             return (
-              <Card key={gym.id} className="glass-card overflow-hidden">
-                <div className="relative h-36 bg-gradient-to-br from-primary/30 via-primary/10 to-accent/20">
-                  {gym.coverImageUrl ? (
-                    <img src={gym.coverImageUrl} alt={gym.name} className="absolute inset-0 h-full w-full object-cover" />
-                  ) : (
-                    <div className="flex h-full items-center justify-center text-muted-foreground">
-                      <ImageIcon className="h-8 w-8" />
+              <Card key={gym.id} className="glass-card border border-white/10">
+                <CardHeader className="pb-3">
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="space-y-1">
+                      <CardTitle className="text-lg">{gym.name}</CardTitle>
+                      <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                        <MapPin className="h-4 w-4 text-primary" />
+                        <span>{gym.address ?? "Address not shared"}</span>
+                      </div>
                     </div>
-                  )}
-                  <div className="absolute top-3 left-3 flex items-center gap-2 text-[10px]">
-                    <span className={`rounded-full px-2 py-0.5 ${isOwner ? "bg-primary/20 text-primary" : "bg-amber-500/20 text-amber-400"}`}>
-                      {isOwner ? "Your gym" : "Competitor"}
-                    </span>
-                    {isVerified ? (
-                      <span className="rounded-full bg-emerald-500/20 text-emerald-400 px-2 py-0.5">Verified</span>
-                    ) : (
-                      <span className="rounded-full bg-amber-500/20 text-amber-400 px-2 py-0.5">Unverified</span>
-                    )}
+                    <div className="flex flex-wrap items-center gap-2">
+                      {gym.featuredUntil ? (
+                        <span className="text-[10px] uppercase tracking-wide rounded-full bg-primary/20 text-primary px-2 py-0.5">
+                          Featured
+                        </span>
+                      ) : null}
+                      {gym.verificationStatus === "VERIFIED" ? (
+                        <span className="text-[10px] uppercase tracking-wide rounded-full bg-emerald-500/20 text-emerald-300 px-2 py-0.5">
+                          Verified
+                        </span>
+                      ) : (
+                        <span className="text-[10px] uppercase tracking-wide rounded-full bg-slate-500/20 text-slate-300 px-2 py-0.5">
+                          Listed
+                        </span>
+                      )}
+                      {hasDuo && (
+                        <span className="text-[10px] uppercase tracking-wide rounded-full bg-indigo-500/20 text-indigo-200 px-2 py-0.5">
+                          Duo {gym.partnerDiscountPercent}%
+                        </span>
+                      )}
+                    </div>
                   </div>
-                </div>
-                <CardHeader className="pb-2">
-                  <CardTitle className="text-lg">{gym.name}</CardTitle>
-                  <p className="text-sm text-muted-foreground flex items-center gap-1">
-                    <MapPin className="h-3 w-3" />
-                    {gym.address}
-                  </p>
                 </CardHeader>
-                <CardContent className="space-y-3">
-                  {isOwner && gym.stats ? (
-                    <div className="space-y-2">
+                <CardContent className="space-y-4">
+                  <div className="flex items-center gap-3">
+                    <div className="h-16 w-24 overflow-hidden rounded-lg border border-white/10 bg-white/5 flex items-center justify-center">
+                      {images[0] ? (
+                        <img src={images[0]} alt={gym.name} className="h-full w-full object-cover" />
+                      ) : (
+                        <ImageIcon className="h-6 w-6 text-muted-foreground" />
+                      )}
+                    </div>
+                    <div className="text-xs text-muted-foreground space-y-1">
+                      <p>{gym.openDays ? `Open ${gym.openDays}` : "Hours coming soon"}</p>
+                      <p>
+                        {gym.monthlyPrice ? `Monthly from ${formatPrice(gym.monthlyPrice)}` : "Pricing not shared"}
+                      </p>
+                    </div>
+                  </div>
+
+                  {isOwnerGym ? (
+                    hasStats ? (
                       <div className="grid grid-cols-2 gap-3 text-xs text-muted-foreground">
                         <div className="rounded-lg border border-white/10 px-3 py-2">
                           <div className="text-sm font-semibold text-foreground">{gym.stats.membersJoined}</div>
@@ -158,56 +246,39 @@ export default function OwnerExplorePage() {
                           Page visits
                         </div>
                       </div>
-                      <p className="text-[11px] text-muted-foreground">
-                        Use these baselines to spot gaps versus nearby gyms and refine your offers.
-                      </p>
-                    </div>
-                  ) : isOwner ? (
-                    <div className="relative overflow-hidden rounded-lg border border-white/10 px-3 py-3 text-xs text-muted-foreground">
-                      <div className="grid grid-cols-2 gap-3 blur-[3px]">
-                        <div className="text-sm font-semibold text-foreground">{gym.stats.membersJoined}</div>
-                        Members joined
-                      </div>
-                      <div className="rounded-lg border border-white/10 px-3 py-2">
-                        <div className="text-sm font-semibold text-foreground">{gym.stats.pageViews}</div>
-                        Page visits
-                      </div>
-                      <div className="absolute inset-0 flex items-center justify-between gap-3 bg-background/70 px-3 backdrop-blur-sm">
-                        <div>
-                          <p className="text-xs font-semibold text-foreground">Premium analytics</p>
-                          <p className="text-[11px] text-muted-foreground">Benchmark vs nearby gyms and spot demand shifts.</p>
+                    ) : (
+                      <div className="relative overflow-hidden rounded-lg border border-white/10 px-3 py-3 text-xs text-muted-foreground">
+                        <div className="grid grid-cols-2 gap-3 blur-[3px]">
+                          <div className="rounded-lg border border-white/10 px-3 py-2">
+                            <div className="text-sm font-semibold text-foreground">XXX</div>
+                            Members joined
+                          </div>
+                          <div className="rounded-lg border border-white/10 px-3 py-2">
+                            <div className="text-sm font-semibold text-foreground">XXX</div>
+                            Page visits
+                          </div>
                         </div>
-                        <Button size="sm" variant="outline" onClick={() => setUpsellGym(gym)}>
-                          Unlock insights
-                        </Button>
+                        <div className="absolute inset-0 flex items-center justify-between gap-3 bg-background/70 px-3 backdrop-blur-sm">
+                          <div>
+                            <p className="text-xs font-semibold text-foreground">Premium analytics</p>
+                            <p className="text-[11px] text-muted-foreground">
+                              Benchmark vs nearby gyms and spot demand shifts.
+                            </p>
+                          </div>
+                          <Button size="sm" variant="outline" onClick={() => setUpsellGym(gym)}>
+                            Unlock insights
+                          </Button>
+                        </div>
                       </div>
-                    </div>
+                    )
                   ) : (
-                    <div className="relative overflow-hidden rounded-lg border border-white/10 px-3 py-3 text-xs text-muted-foreground">
-                      <div className="grid grid-cols-2 gap-3 blur-[3px]">
-                        <div className="rounded-lg border border-white/10 px-3 py-2">
-                          <div className="text-sm font-semibold text-foreground">XXX</div>
-                          Monthly sales
-                        </div>
-                        <div className="rounded-lg border border-white/10 px-3 py-2">
-                          <div className="text-sm font-semibold text-foreground">XXX</div>
-                          Page visits
-                        </div>
-                      </div>
-                      <div className="absolute inset-0 flex items-center justify-between gap-3 bg-background/70 px-3 backdrop-blur-sm">
-                        <div>
-                          <p className="text-xs font-semibold text-foreground">Competitor insights</p>
-                          <p className="text-[11px] text-muted-foreground">See how you stack up on pricing and demand.</p>
-                        </div>
-                        <Button size="sm" variant="outline" onClick={() => setUpsellGym(gym)}>
-                          Unlock insights
-                        </Button>
-                      </div>
+                    <div className="rounded-lg border border-white/10 px-3 py-3 text-xs text-muted-foreground">
+                      Competitor analytics are available with premium insights.
                     </div>
                   )}
 
                   <div className="flex flex-wrap gap-2">
-                    {isOwner ? (
+                    {isOwnerGym ? (
                       <Button size="sm" variant="secondary" asChild>
                         <Link href={`/dashboard/owner/explore/${gym.id}`}>View your gym</Link>
                       </Button>
@@ -216,7 +287,7 @@ export default function OwnerExplorePage() {
                         <Link href={`/explore/${buildGymSlug(gym.name, gym.id)}`}>View profile</Link>
                       </Button>
                     )}
-                    {isOwner ? (
+                    {isOwnerGym ? (
                       <Button size="sm" variant="ghost" asChild>
                         <Link href={`/dashboard/owner/explore/${gym.id}`}>Match pricing</Link>
                       </Button>
@@ -225,107 +296,19 @@ export default function OwnerExplorePage() {
                         Compare pricing
                       </Button>
                     )}
-                    {isOwner ? (
+                    {isOwnerGym ? (
                       <Button size="sm" variant="outline" asChild>
                         <Link href={`/explore/${buildGymSlug(gym.name, gym.id)}`}>See customer preview</Link>
                       </Button>
                     ) : null}
-                    {isOwner ? (
+                    {isOwnerGym ? (
                       <Button
                         size="sm"
-                        variant="outline"
+                        className="bg-gradient-to-r from-primary to-accent text-primary-foreground shadow-glow"
                         disabled={!paymentsEnabled || featuring === gym.id}
-                        onClick={async () => {
-                          if (!paymentsEnabled) {
-                            toast({ title: "Payments not available yet", description: "Please try again later." });
-                            return;
-                          }
-                          setFeaturing(gym.id);
-                          try {
-                            const result = await fetchJson<{
-                              amount: number;
-                              currency?: string;
-                              orderId: string;
-                              featuredUntil?: string;
-                              error?: string;
-                            }>("/api/owner/gym/feature", {
-                              method: "POST",
-                              headers: { "Content-Type": "application/json" },
-                              body: JSON.stringify({ gymId: gym.id }),
-                              retries: 1,
-                            });
-                            if (!result.ok) {
-                              toast({
-                                title: "Error",
-                                description: result.error ?? "Failed to start payment",
-                                variant: "destructive",
-                              });
-                              setFeaturing(null);
-                              return;
-                            }
-                            if (isAdmin && result.data?.featuredUntil) {
-                              toast({ title: "Boost activated", description: "Admin access applied." });
-                              setGyms((prev) =>
-                                prev.map((g) =>
-                                  g.id === gym.id ? { ...g, featuredUntil: result.data?.featuredUntil } : g
-                                )
-                              );
-                              setFeaturing(null);
-                              return;
-                            }
-                            const checkout = await openRazorpayCheckout({
-                              orderId: result.data?.orderId ?? "",
-                              amount: result.data?.amount ?? 0,
-                              currency: result.data?.currency ?? "INR",
-                              name: "FITDEX",
-                              onSuccess: async (res) => {
-                                const verifyResult = await fetchJson<{
-                                  featuredUntil?: string;
-                                  error?: string;
-                                }>("/api/owner/gym/feature/verify", {
-                                  method: "POST",
-                                  headers: { "Content-Type": "application/json" },
-                                  body: JSON.stringify({
-                                    gymId: gym.id,
-                                    orderId: res.razorpay_order_id,
-                                    paymentId: res.razorpay_payment_id,
-                                    signature: res.razorpay_signature,
-                                  }),
-                                  retries: 1,
-                                });
-                                if (verifyResult.ok) {
-                                  toast({ title: "Boost activated", description: "Your gym is featured for 3 days." });
-                                  setGyms((prev) =>
-                                    prev.map((g) =>
-                                      g.id === gym.id ? { ...g, featuredUntil: verifyResult.data?.featuredUntil } : g
-                                    )
-                                  );
-                                } else {
-                                  toast({
-                                    title: "Verification failed",
-                                    description: verifyResult.error ?? "Payment failed",
-                                    variant: "destructive",
-                                  });
-                                }
-                              },
-                            });
-                            if (!checkout.ok && checkout.error && checkout.error !== "DISMISSED") {
-                              const message = checkout.error === "PAYMENTS_DISABLED" ? "Payments not available yet" : checkout.error;
-                              toast({ title: "Payments unavailable", description: message, variant: "destructive" });
-                            }
-                          } catch {
-                            toast({ title: "Error", variant: "destructive" });
-                          }
-                          setFeaturing(null);
-                        }}
+                        onClick={() => setBoostGym(gym)}
                       >
-                        {featuring === gym.id ? (
-                          <Loader2 className="h-3 w-3 animate-spin" />
-                        ) : paymentsEnabled ? (
-                          "Boost ₹99 / 3 days"
-                        ) : (
-                          "Payments not available"
-                        )}
+                        {featuring === gym.id ? <Loader2 className="h-4 w-4 animate-spin" /> : "Boost for ₹99"}
                       </Button>
                     ) : null}
                   </div>
@@ -335,6 +318,34 @@ export default function OwnerExplorePage() {
           })}
         </div>
       )}
+
+      <Dialog open={!!boostGym} onOpenChange={(open) => !open && setBoostGym(null)}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Boost visibility for ₹99</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3 text-sm text-muted-foreground">
+            <p>Get top placement in Explore for 3 days. Best for launch weeks, events, and new offers.</p>
+            <div className="rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-xs">{boostGym?.name}</div>
+          </div>
+          <div className="mt-4 flex flex-col gap-2 sm:flex-row sm:justify-end">
+            <Button variant="outline" onClick={() => setBoostGym(null)}>
+              Not now
+            </Button>
+            <Button
+              className="bg-gradient-to-r from-primary to-accent text-primary-foreground shadow-glow"
+              disabled={!boostGym || featuring === boostGym?.id}
+              onClick={async () => {
+                if (!boostGym) return;
+                await startBoost(boostGym.id);
+                setBoostGym(null);
+              }}
+            >
+              {featuring === boostGym?.id ? <Loader2 className="h-4 w-4 animate-spin" /> : "Boost now"}
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
 
       <Dialog open={!!upsellGym} onOpenChange={(open) => !open && setUpsellGym(null)}>
         <DialogContent className="max-w-lg">

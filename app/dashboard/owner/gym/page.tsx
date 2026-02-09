@@ -8,6 +8,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
 import { Skeleton } from "@/components/ui/skeleton";
 import { MapPin, Loader2, Sparkles, ShieldCheck } from "lucide-react";
@@ -32,6 +33,7 @@ type GymFormState = {
   hasAC: boolean;
   amenities: string[];
   ownerConsent: boolean;
+  invoiceTypeDefault: "GST" | "NON_GST" | "";
 };
 
 const emptyForm: GymFormState = {
@@ -51,6 +53,7 @@ const emptyForm: GymFormState = {
   hasAC: false,
   amenities: [],
   ownerConsent: false,
+  invoiceTypeDefault: "",
 };
 
 export default function OwnerGymPage() {
@@ -75,6 +78,7 @@ export default function OwnerGymPage() {
   const [customEditAmenity, setCustomEditAmenity] = useState("");
   const [existingConsent, setExistingConsent] = useState(false);
   const [showAddForm, setShowAddForm] = useState(false);
+  const [boostGym, setBoostGym] = useState<any | null>(null);
   const paymentsEnabled = isPaymentsEnabled() || isAdmin;
 
   const primaryGym = gyms[0];
@@ -166,6 +170,7 @@ export default function OwnerGymPage() {
       hasAC: !!gym.hasAC,
       amenities: Array.isArray(gym.amenities) ? gym.amenities : [],
       ownerConsent: !!gym.ownerConsentAt,
+      invoiceTypeDefault: gym.invoiceTypeDefault ?? "",
     });
   }, [gyms, selectedGymId]);
 
@@ -250,6 +255,86 @@ export default function OwnerGymPage() {
     });
   };
 
+  const startBoost = async (gymId: string) => {
+    if (!paymentsEnabled) {
+      toast({ title: "Payments not available yet", description: "Please try again later." });
+      return;
+    }
+    setFeaturing(gymId);
+    try {
+      const result = await fetchJson<{
+        amount: number;
+        currency?: string;
+        orderId: string;
+        featuredUntil?: string;
+        error?: string;
+      }>("/api/owner/gym/feature", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ gymId }),
+        retries: 1,
+      });
+      if (!result.ok) {
+        toast({
+          title: "Error",
+          description: result.error ?? "Failed to start payment",
+          variant: "destructive",
+        });
+        setFeaturing(null);
+        return;
+      }
+      if (isAdmin && result.data?.featuredUntil) {
+        toast({ title: "Boost activated", description: "Admin access applied." });
+        setGyms((prev) =>
+          prev.map((gym) => (gym.id === gymId ? { ...gym, featuredUntil: result.data?.featuredUntil } : gym))
+        );
+        setFeaturing(null);
+        return;
+      }
+      const checkout = await openRazorpayCheckout({
+        orderId: result.data?.orderId ?? "",
+        amount: result.data?.amount ?? 0,
+        currency: result.data?.currency ?? "INR",
+        name: "Fitdex",
+        onSuccess: async (res) => {
+          const verifyResult = await fetchJson<{
+            featuredUntil?: string;
+            error?: string;
+          }>("/api/owner/gym/feature/verify", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              gymId,
+              orderId: res.razorpay_order_id,
+              paymentId: res.razorpay_payment_id,
+              signature: res.razorpay_signature,
+            }),
+            retries: 1,
+          });
+          if (verifyResult.ok) {
+            toast({ title: "Boost activated", description: "Your gym is now featured for 3 days." });
+            setGyms((prev) =>
+              prev.map((gym) => (gym.id === gymId ? { ...gym, featuredUntil: verifyResult.data?.featuredUntil } : gym))
+            );
+          } else {
+            toast({
+              title: "Verification failed",
+              description: verifyResult.error ?? "Payment failed",
+              variant: "destructive",
+            });
+          }
+        },
+      });
+      if (!checkout.ok && checkout.error && checkout.error !== "DISMISSED") {
+        const message = checkout.error === "PAYMENTS_DISABLED" ? "Payments not available yet" : checkout.error;
+        toast({ title: "Payments unavailable", description: message, variant: "destructive" });
+      }
+    } catch {
+      toast({ title: "Error", variant: "destructive" });
+    }
+    setFeaturing(null);
+  };
+
   async function handleCreate(e: React.FormEvent) {
     e.preventDefault();
     setSaving(true);
@@ -279,6 +364,7 @@ export default function OwnerGymPage() {
           hasAC: form.hasAC,
           amenities: form.amenities,
           ownerConsent: form.ownerConsent,
+          invoiceTypeDefault: form.invoiceTypeDefault || null,
         }),
         retries: 1,
       });
@@ -330,6 +416,7 @@ export default function OwnerGymPage() {
           yearlyPrice: Math.round(parseFloat(editForm.yearlyPrice) * 100) || 299000,
           hasAC: editForm.hasAC,
           amenities: editForm.amenities,
+          invoiceTypeDefault: editForm.invoiceTypeDefault || null,
         }),
         retries: 1,
       });
@@ -695,6 +782,21 @@ export default function OwnerGymPage() {
                     placeholder="2990"
                   />
                 </div>
+                <div className="space-y-2">
+                  <Label>Default invoice type</Label>
+                  <select
+                    value={editForm.invoiceTypeDefault}
+                    onChange={(e) => setEditForm((p) => ({ ...p, invoiceTypeDefault: e.target.value as "GST" | "NON_GST" | "" }))}
+                    className="h-10 w-full rounded-md border border-white/10 bg-background px-3 text-sm"
+                  >
+                    <option value="">Select type</option>
+                    <option value="GST">GST invoice</option>
+                    <option value="NON_GST">Non-GST invoice</option>
+                  </select>
+                  <p className="text-xs text-muted-foreground">
+                    Required for automatic invoice generation after payments.
+                  </p>
+                </div>
               </div>
             </form>
           </CardContent>
@@ -965,6 +1067,21 @@ export default function OwnerGymPage() {
                   placeholder="2990"
                 />
               </div>
+              <div className="space-y-2">
+                <Label>Default invoice type</Label>
+                <select
+                  value={form.invoiceTypeDefault}
+                  onChange={(e) => setForm((p) => ({ ...p, invoiceTypeDefault: e.target.value as "GST" | "NON_GST" | "" }))}
+                  className="h-10 w-full rounded-md border border-white/10 bg-background px-3 text-sm"
+                >
+                  <option value="">Select type</option>
+                  <option value="GST">GST invoice</option>
+                  <option value="NON_GST">Non-GST invoice</option>
+                </select>
+                <p className="text-xs text-muted-foreground">
+                  Required for automatic invoice generation after payments.
+                </p>
+              </div>
               <div className="space-y-2 md:col-span-2">
                 <div className="flex items-start gap-2">
                   <input
@@ -1060,100 +1177,14 @@ export default function OwnerGymPage() {
                 <div className="flex items-center gap-2">
                   <Button
                     size="sm"
-                    variant="secondary"
+                    className="bg-gradient-to-r from-primary to-accent text-primary-foreground shadow-glow"
                     disabled={!paymentsEnabled || featuring === g.id}
-                    onClick={async () => {
-                      if (!paymentsEnabled) {
-                        toast({ title: "Payments not available yet", description: "Please try again later." });
-                        return;
-                      }
-                      setFeaturing(g.id);
-                      try {
-                        const result = await fetchJson<{
-                          amount: number;
-                          currency?: string;
-                          orderId: string;
-                          featuredUntil?: string;
-                          error?: string;
-                        }>("/api/owner/gym/feature", {
-                          method: "POST",
-                          headers: { "Content-Type": "application/json" },
-                          body: JSON.stringify({ gymId: g.id }),
-                          retries: 1,
-                        });
-                        if (!result.ok) {
-                          toast({
-                            title: "Error",
-                            description: result.error ?? "Failed to start payment",
-                            variant: "destructive",
-                          });
-                          setFeaturing(null);
-                          return;
-                        }
-                        if (isAdmin && result.data?.featuredUntil) {
-                          toast({ title: "Featured activated", description: "Admin access applied." });
-                          setGyms((prev) =>
-                            prev.map((gym) =>
-                              gym.id === g.id
-                                ? { ...gym, featuredUntil: result.data?.featuredUntil }
-                                : gym
-                            )
-                          );
-                          setFeaturing(null);
-                          return;
-                        }
-                        const checkout = await openRazorpayCheckout({
-                          orderId: result.data?.orderId ?? "",
-                          amount: result.data?.amount ?? 0,
-                          currency: result.data?.currency ?? "INR",
-                          name: "Fitdex",
-                          onSuccess: async (res) => {
-                            const verifyResult = await fetchJson<{
-                              featuredUntil?: string;
-                              error?: string;
-                            }>("/api/owner/gym/feature/verify", {
-                              method: "POST",
-                              headers: { "Content-Type": "application/json" },
-                              body: JSON.stringify({
-                                gymId: g.id,
-                                orderId: res.razorpay_order_id,
-                                paymentId: res.razorpay_payment_id,
-                                signature: res.razorpay_signature,
-                              }),
-                              retries: 1,
-                            });
-                            if (verifyResult.ok) {
-                              toast({ title: "Featured activated", description: "Your gym is now featured for 3 days." });
-                              setGyms((prev) =>
-                                prev.map((gym) =>
-                                  gym.id === g.id
-                                    ? { ...gym, featuredUntil: verifyResult.data?.featuredUntil }
-                                    : gym
-                                )
-                              );
-                            } else {
-                              toast({
-                                title: "Verification failed",
-                                description: verifyResult.error ?? "Payment failed",
-                                variant: "destructive",
-                              });
-                            }
-                          },
-                        });
-                        if (!checkout.ok && checkout.error && checkout.error !== "DISMISSED") {
-                          const message = checkout.error === "PAYMENTS_DISABLED" ? "Payments not available yet" : checkout.error;
-                          toast({ title: "Payments unavailable", description: message, variant: "destructive" });
-                        }
-                      } catch {
-                        toast({ title: "Error", variant: "destructive" });
-                      }
-                      setFeaturing(null);
-                    }}
+                    onClick={() => setBoostGym(g)}
                   >
                     {featuring === g.id ? (
                       <Loader2 className="h-4 w-4 animate-spin" />
                     ) : paymentsEnabled ? (
-                      "Feature ₹99 / 3 days"
+                      "Boost for ₹99"
                     ) : (
                       "Payments not available yet"
                     )}
@@ -1264,6 +1295,38 @@ export default function OwnerGymPage() {
           </CardContent>
         </Card>
       )}
+
+      <Dialog open={!!boostGym} onOpenChange={(open) => !open && setBoostGym(null)}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Boost visibility for ₹99</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3 text-sm text-muted-foreground">
+            <p>
+              Get top placement in Explore for 3 days. Best for launch weeks, events, and new offers.
+            </p>
+            <div className="rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-xs">
+              {boostGym?.name}
+            </div>
+          </div>
+          <div className="mt-4 flex flex-col gap-2 sm:flex-row sm:justify-end">
+            <Button variant="outline" onClick={() => setBoostGym(null)}>
+              Not now
+            </Button>
+            <Button
+              className="bg-gradient-to-r from-primary to-accent text-primary-foreground shadow-glow"
+              disabled={!boostGym || featuring === boostGym?.id}
+              onClick={async () => {
+                if (!boostGym) return;
+                await startBoost(boostGym.id);
+                setBoostGym(null);
+              }}
+            >
+              {featuring === boostGym?.id ? <Loader2 className="h-4 w-4 animate-spin" /> : "Boost now"}
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

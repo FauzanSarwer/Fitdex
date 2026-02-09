@@ -10,6 +10,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Skeleton } from "@/components/ui/skeleton";
 import { fetchJson } from "@/lib/client-fetch";
 import { isPaymentsEnabled, openRazorpayCheckout } from "@/lib/razorpay-checkout";
@@ -63,6 +64,7 @@ export default function OwnerGymProfilePage() {
   const [saving, setSaving] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [featuring, setFeaturing] = useState(false);
+  const [boostOpen, setBoostOpen] = useState(false);
   const paymentsEnabled = isPaymentsEnabled() || isAdmin;
   const [editForm, setEditForm] = useState({
     name: "",
@@ -295,6 +297,83 @@ export default function OwnerGymProfilePage() {
     setSaving(false);
   };
 
+  const startBoost = async () => {
+    if (!gym?.id) return;
+    if (!paymentsEnabled) {
+      toast({ title: "Payments not available yet", description: "Please try again later." });
+      return;
+    }
+    setFeaturing(true);
+    try {
+      const result = await fetchJson<{
+        amount: number;
+        currency?: string;
+        orderId: string;
+        featuredUntil?: string;
+        error?: string;
+      }>("/api/owner/gym/feature", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ gymId: gym.id }),
+        retries: 1,
+      });
+      if (!result.ok) {
+        toast({
+          title: "Error",
+          description: result.error ?? "Failed to start payment",
+          variant: "destructive",
+        });
+        setFeaturing(false);
+        return;
+      }
+      if (isAdmin && result.data?.featuredUntil) {
+        toast({ title: "Boost activated", description: "Admin access applied." });
+        setGym((prev) => (prev ? { ...prev, featuredUntil: result.data?.featuredUntil } : prev));
+        setFeaturing(false);
+        return;
+      }
+      const checkout = await openRazorpayCheckout({
+        orderId: result.data?.orderId ?? "",
+        amount: result.data?.amount ?? 0,
+        currency: result.data?.currency ?? "INR",
+        name: "FITDEX",
+        onSuccess: async (res) => {
+          const verifyResult = await fetchJson<{
+            featuredUntil?: string;
+            error?: string;
+          }>("/api/owner/gym/feature/verify", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              gymId: gym.id,
+              orderId: res.razorpay_order_id,
+              paymentId: res.razorpay_payment_id,
+              signature: res.razorpay_signature,
+            }),
+            retries: 1,
+          });
+          if (verifyResult.ok) {
+            toast({ title: "Boost activated", description: "Your gym is featured for 3 days." });
+            setGym((prev) => (prev ? { ...prev, featuredUntil: verifyResult.data?.featuredUntil } : prev));
+          } else {
+            toast({
+              title: "Verification failed",
+              description: verifyResult.error ?? "Payment failed",
+              variant: "destructive",
+            });
+          }
+        },
+      });
+      if (!checkout.ok && checkout.error && checkout.error !== "DISMISSED") {
+        const message = checkout.error === "PAYMENTS_DISABLED" ? "Payments not available yet" : checkout.error;
+        toast({ title: "Payments unavailable", description: message, variant: "destructive" });
+      }
+    } catch {
+      toast({ title: "Error", variant: "destructive" });
+    }
+    setFeaturing(false);
+  };
+
   if (loading) {
     return (
       <div className="container mx-auto px-4 py-10">
@@ -345,85 +424,11 @@ export default function OwnerGymProfilePage() {
               <Link href={`/explore/${buildGymSlug(gym.name, gym.id)}`}>See customer preview</Link>
             </Button>
             <Button
-              variant="secondary"
+              className="bg-gradient-to-r from-primary to-accent text-primary-foreground shadow-glow"
               disabled={!paymentsEnabled || featuring}
-              onClick={async () => {
-                if (!paymentsEnabled) {
-                  toast({ title: "Payments not available yet", description: "Please try again later." });
-                  return;
-                }
-                setFeaturing(true);
-                try {
-                  const result = await fetchJson<{
-                    amount: number;
-                    currency?: string;
-                    orderId: string;
-                    featuredUntil?: string;
-                    error?: string;
-                  }>("/api/owner/gym/feature", {
-                    method: "POST",
-                    headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({ gymId: gym.id }),
-                    retries: 1,
-                  });
-                  if (!result.ok) {
-                    toast({
-                      title: "Error",
-                      description: result.error ?? "Failed to start payment",
-                      variant: "destructive",
-                    });
-                    setFeaturing(false);
-                    return;
-                  }
-                  if (isAdmin && result.data?.featuredUntil) {
-                    toast({ title: "Boost activated", description: "Admin access applied." });
-                    setGym((prev) => (prev ? { ...prev, featuredUntil: result.data?.featuredUntil } : prev));
-                    setFeaturing(false);
-                    return;
-                  }
-                  const checkout = await openRazorpayCheckout({
-                    orderId: result.data?.orderId ?? "",
-                    amount: result.data?.amount ?? 0,
-                    currency: result.data?.currency ?? "INR",
-                    name: "FITDEX",
-                    onSuccess: async (res) => {
-                      const verifyResult = await fetchJson<{
-                        featuredUntil?: string;
-                        error?: string;
-                      }>("/api/owner/gym/feature/verify", {
-                        method: "POST",
-                        headers: { "Content-Type": "application/json" },
-                        body: JSON.stringify({
-                          gymId: gym.id,
-                          orderId: res.razorpay_order_id,
-                          paymentId: res.razorpay_payment_id,
-                          signature: res.razorpay_signature,
-                        }),
-                        retries: 1,
-                      });
-                      if (verifyResult.ok) {
-                        toast({ title: "Boost activated", description: "Your gym is featured for 3 days." });
-                        setGym((prev) => (prev ? { ...prev, featuredUntil: verifyResult.data?.featuredUntil } : prev));
-                      } else {
-                        toast({
-                          title: "Verification failed",
-                          description: verifyResult.error ?? "Payment failed",
-                          variant: "destructive",
-                        });
-                      }
-                    },
-                  });
-                  if (!checkout.ok && checkout.error && checkout.error !== "DISMISSED") {
-                    const message = checkout.error === "PAYMENTS_DISABLED" ? "Payments not available yet" : checkout.error;
-                    toast({ title: "Payments unavailable", description: message, variant: "destructive" });
-                  }
-                } catch {
-                  toast({ title: "Error", variant: "destructive" });
-                }
-                setFeaturing(false);
-              }}
+              onClick={() => setBoostOpen(true)}
             >
-              {featuring ? <Loader2 className="h-4 w-4 animate-spin" /> : "Boost ₹99 / 3 days"}
+              {featuring ? <Loader2 className="h-4 w-4 animate-spin" /> : "Boost for ₹99"}
             </Button>
           </div>
         </div>
@@ -702,6 +707,37 @@ export default function OwnerGymProfilePage() {
             </CardContent>
           </Card>
         </div>
+
+        <Dialog open={boostOpen} onOpenChange={(open) => !open && setBoostOpen(false)}>
+          <DialogContent className="max-w-md">
+            <DialogHeader>
+              <DialogTitle>Boost visibility for ₹99</DialogTitle>
+            </DialogHeader>
+            <div className="space-y-3 text-sm text-muted-foreground">
+              <p>
+                Get top placement in Explore for 3 days. Best for launch weeks, events, and new offers.
+              </p>
+              <div className="rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-xs">
+                {gym.name}
+              </div>
+            </div>
+            <div className="mt-4 flex flex-col gap-2 sm:flex-row sm:justify-end">
+              <Button variant="outline" onClick={() => setBoostOpen(false)}>
+                Not now
+              </Button>
+              <Button
+                className="bg-gradient-to-r from-primary to-accent text-primary-foreground shadow-glow"
+                disabled={featuring}
+                onClick={async () => {
+                  await startBoost();
+                  setBoostOpen(false);
+                }}
+              >
+                {featuring ? <Loader2 className="h-4 w-4 animate-spin" /> : "Boost now"}
+              </Button>
+            </div>
+          </DialogContent>
+        </Dialog>
       </motion.div>
     </div>
   );
