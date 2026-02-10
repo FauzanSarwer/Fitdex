@@ -34,6 +34,20 @@ export interface GymDiscountConfig {
   welcomeDiscountValue: number;
 }
 
+const DEFAULT_DISCOUNT_TYPE = "NONE";
+const DEFAULT_DISCOUNT_VALUE = 0;
+
+function validateDiscountInputs(basePrice: number, planType: PlanType, gym: GymDiscountConfig): boolean {
+  return (
+    Number.isFinite(basePrice) &&
+    basePrice > 0 &&
+    ["DAY_PASS", "MONTHLY", "QUARTERLY", "YEARLY"].includes(planType) &&
+    gym != null &&
+    Number.isFinite(gym.monthlyPrice) &&
+    Number.isFinite(gym.yearlyPrice)
+  );
+}
+
 export function computeDiscount(
   basePrice: number,
   planType: PlanType,
@@ -45,9 +59,12 @@ export function computeDiscount(
   }
 ): { finalPrice: number; breakdown: DiscountBreakdown } {
   const { isFirstTimeUser, hasActiveDuo, promo, gym } = options;
-  const normalizedBasePrice = Number.isFinite(basePrice)
-    ? Math.max(0, Math.round(basePrice))
-    : 0;
+
+  if (!validateDiscountInputs(basePrice, planType, gym)) {
+    throw new Error("Invalid discount computation inputs.");
+  }
+
+  const normalizedBasePrice = Math.max(0, Math.round(basePrice));
   const clampPercent = (value: number) => Math.min(100, Math.max(0, value));
   const applyDiscount = (type: "PERCENT" | "FLAT", value: number) => {
     if (type === "PERCENT") {
@@ -64,39 +81,33 @@ export function computeDiscount(
   const quarterlyEligible = planType === "QUARTERLY" && (gym.quarterlyDiscountValue ?? 0) > 0;
   const yearlyEligible = planType === "YEARLY" && (gym.yearlyDiscountValue ?? 0) > 0;
 
-  const quarterlyType = quarterlyEligible ? (gym.quarterlyDiscountType ?? "PERCENT") : "NONE";
-  const quarterlyValue = quarterlyEligible ? (gym.quarterlyDiscountValue ?? 0) : 0;
-  const yearlyType = yearlyEligible ? gym.yearlyDiscountType : "NONE";
-  const yearlyValue = yearlyEligible ? gym.yearlyDiscountValue : 0;
-  const welcomeType = allowWelcome ? gym.welcomeDiscountType : "NONE";
-  const welcomeValue = allowWelcome ? gym.welcomeDiscountValue : 0;
+  const quarterlyType = quarterlyEligible ? gym.quarterlyDiscountType ?? DEFAULT_DISCOUNT_TYPE : DEFAULT_DISCOUNT_TYPE;
+  const quarterlyValue = quarterlyEligible ? gym.quarterlyDiscountValue ?? DEFAULT_DISCOUNT_VALUE : DEFAULT_DISCOUNT_VALUE;
+  const yearlyType = yearlyEligible ? gym.yearlyDiscountType : DEFAULT_DISCOUNT_TYPE;
+  const yearlyValue = yearlyEligible ? gym.yearlyDiscountValue : DEFAULT_DISCOUNT_VALUE;
+  const welcomeType = allowWelcome ? gym.welcomeDiscountType : DEFAULT_DISCOUNT_TYPE;
+  const welcomeValue = allowWelcome ? gym.welcomeDiscountValue : DEFAULT_DISCOUNT_VALUE;
 
   const quarterlyAmount = quarterlyEligible
-    ? applyDiscount(quarterlyType === "NONE" ? "PERCENT" : quarterlyType, quarterlyValue)
+    ? applyDiscount(quarterlyType, quarterlyValue)
     : 0;
   const yearlyAmount = yearlyEligible
-    ? applyDiscount(yearlyType === "NONE" ? "PERCENT" : yearlyType, yearlyValue)
+    ? applyDiscount(yearlyType, yearlyValue)
     : 0;
   const planDiscountAmount = allowPlanDiscount
     ? quarterlyEligible
       ? quarterlyAmount
       : yearlyEligible
-        ? yearlyAmount
-        : 0
+      ? yearlyAmount
+      : 0
     : 0;
 
   const partnerAmount = allowPartnerDiscount
     ? Math.round((normalizedBasePrice * clampPercent(gym.partnerDiscountPercent)) / 100)
     : 0;
   const promoAmount = hasPromo ? applyDiscount(promo!.type, promo!.value) : 0;
-  const welcomeAmount = allowWelcome
-    ? applyDiscount(welcomeType === "NONE" ? "PERCENT" : welcomeType, welcomeValue)
-    : 0;
+  const welcomeAmount = allowWelcome ? applyDiscount(welcomeType, welcomeValue) : 0;
 
-  // Stacking rules:
-  // - Welcome cannot stack with any other discount.
-  // - Promo can stack with yearly/quarterly only.
-  // - Duo can stack with yearly/quarterly only, and cannot stack with promo or welcome.
   let totalDiscountAmount = 0;
   if (welcomeAmount > 0) {
     totalDiscountAmount = welcomeAmount;
@@ -112,7 +123,7 @@ export function computeDiscount(
     totalDiscountAmount = partnerAmount;
   }
 
-  if (totalDiscountAmount > normalizedBasePrice) totalDiscountAmount = normalizedBasePrice;
+  totalDiscountAmount = Math.min(totalDiscountAmount, normalizedBasePrice);
   const finalPrice = Math.max(0, normalizedBasePrice - totalDiscountAmount);
 
   const breakdown: DiscountBreakdown = {
@@ -129,8 +140,8 @@ export function computeDiscount(
     yearlyAmount,
     partnerDiscountPercent: partnerAmount > 0 ? gym.partnerDiscountPercent : 0,
     partnerAmount,
-    promoDiscountType: hasPromo ? promo!.type : "NONE",
-    promoDiscountValue: hasPromo ? promo!.value : 0,
+    promoDiscountType: hasPromo ? promo!.type : DEFAULT_DISCOUNT_TYPE,
+    promoDiscountValue: hasPromo ? promo!.value : DEFAULT_DISCOUNT_VALUE,
     promoAmount,
     totalDiscountAmount,
     finalPrice,

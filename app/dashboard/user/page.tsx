@@ -8,36 +8,7 @@ import { MapPin, CreditCard, Users, Loader2, Sparkles, Trophy, Bookmark } from "
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import dynamic from "next/dynamic";
-import { buildGymSlug, formatPrice } from "@/lib/utils";
-import { Skeleton } from "@/components/ui/skeleton";
-import { fetchJson } from "@/lib/client-fetch";
-
-const MapView = dynamic(() => import("@/components/maps/MapView").then((m) => m.MapView), {
-  ssr: false,
-  loading: () => <div className="h-48 rounded-2xl bg-white/5 animate-pulse" />,
-});
-
-interface Membership {
-  id: string;
-  active: boolean;
-  planType: string;
-  basePrice: number;
-  finalPrice: number;
-  startedAt: string;
-  expiresAt: string;
-  gym: { id: string; name: string; address: string; latitude: number; longitude: number };
-}
-
-interface Duo {
-  id: string;
-  active: boolean;
-  gym: { name: string };
-  userOne: { name: string | null };
-  userTwo: { name: string | null };
-}
-
-function UserDashboardContent() {
-  const { data: session } = useSession();
+function useUserDashboard() {
   const searchParams = useSearchParams();
   const router = useRouter();
   const [memberships, setMemberships] = useState<Membership[]>([]);
@@ -113,6 +84,13 @@ function UserDashboardContent() {
     };
   }, [searchParams, router]);
 
+  return { memberships, duos, location, savedGyms, loading, error };
+}
+
+function UserDashboardContent() {
+  const { data: session } = useSession();
+  const { memberships, duos, location, savedGyms, loading, error } = useUserDashboard();
+
   const activeMembership = memberships.find((m) => m.active && m.gym);
   const activeDuo = duos.find((d) => d.active);
   const streakDays = activeMembership
@@ -155,6 +133,34 @@ function UserDashboardContent() {
       <div className="p-6 space-y-6">
         <Skeleton className="h-32 w-full rounded-2xl" />
         <Skeleton className="h-48 w-full rounded-2xl" />
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="p-6">
+        <Card className="glass-card p-10 text-center">
+          <CardHeader>
+            <CardTitle>Could not load dashboard</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            <p className="text-sm text-muted-foreground">{error}</p>
+            <Button onClick={() => window.location.reload()}>Retry</Button>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
+  const displayName = session?.user?.name ?? "there";
+
+  return (
+    <div className="p-6 space-y-6">
+      {/* ...existing code... */}
+    </div>
+  );
+}
       </div>
     );
   }

@@ -4,8 +4,20 @@ type AnalyticsPayload = {
   meta?: Record<string, unknown>;
 };
 
+const ANALYTICS_ENDPOINT = "/api/analytics";
+
+function validateAnalyticsPayload(payload: AnalyticsPayload): boolean {
+  return typeof payload.event === "string" && payload.event.trim().length > 0;
+}
+
 export function trackEvent(payload: AnalyticsPayload) {
   if (typeof window === "undefined") {
+    console.warn("Analytics tracking is disabled on the server.");
+    return;
+  }
+
+  if (!validateAnalyticsPayload(payload)) {
+    console.error("Invalid analytics payload", payload);
     return;
   }
 
@@ -14,17 +26,17 @@ export function trackEvent(payload: AnalyticsPayload) {
     timestamp: new Date().toISOString(),
   });
 
-  const url = "/api/analytics";
-
   if (navigator.sendBeacon) {
-    const ok = navigator.sendBeacon(url, body);
+    const ok = navigator.sendBeacon(ANALYTICS_ENDPOINT, body);
     if (ok) return;
   }
 
-  fetch(url, {
+  fetch(ANALYTICS_ENDPOINT, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body,
     keepalive: true,
-  }).catch(() => undefined);
+  }).catch((error) => {
+    console.error("Failed to send analytics event", error);
+  });
 }

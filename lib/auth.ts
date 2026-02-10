@@ -13,6 +13,32 @@ import { logServerError } from "@/lib/logger";
 import { hashOtp, normalizePhoneNumber, timingSafeEqual } from "@/lib/otp";
 const prismaAny = prisma as any;
 
+// Define constants for roles and providers
+const ROLES = { USER: "USER", OWNER: "OWNER", ADMIN: "ADMIN" } as const;
+const PROVIDERS = { GOOGLE: "google", CREDENTIALS: "credentials", PHONE_OTP: "phone-otp" } as const;
+
+// Utility function to update user role
+async function updateUserRole(email: string, role: keyof typeof ROLES) {
+  try {
+    await prisma.user.update({
+      where: { email: email.toLowerCase() },
+      data: { role },
+    });
+  } catch (error) {
+    logServerError(error as Error, { scope: "auth/updateUserRole", email, role });
+  }
+}
+
+// Utility function to verify user email
+async function verifyUserEmail(userId: string, email: string) {
+  try {
+    const links = await createEmailVerificationLinks(userId, email);
+    await sendVerificationEmail(email, links.verifyUrl, links.deleteUrl);
+  } catch (error) {
+    logServerError(error as Error, { scope: "auth/verifyUserEmail", userId, email });
+  }
+}
+
 const googleClientId = getOptionalEnv("GOOGLE_CLIENT_ID");
 const googleClientSecret = getOptionalEnv("GOOGLE_CLIENT_SECRET");
 const adminEmails = (getOptionalEnv("ADMIN_EMAILS") ?? "")
@@ -22,6 +48,8 @@ const adminEmails = (getOptionalEnv("ADMIN_EMAILS") ?? "")
 
 function isAdminEmail(email?: string | null) {
   if (!email) return false;
+  // Defensive: validate email format
+  if (!/^[^@]+@[^@]+\.[^@]+$/.test(email)) return false;
   const normalized = email.trim().toLowerCase();
   return adminEmails.includes(normalized);
 }
@@ -160,7 +188,7 @@ export const authOptions: NextAuthOptions = {
     async jwt({ token, user, trigger, session }) {
       if (user) {
         token.id = user.id;
-        token.role = (user as { role?: "USER" | "OWNER" | "ADMIN" }).role;
+        token.role = (user as { role?: keyof typeof ROLES }).role;
         if (user.email) {
           const u = await prisma.user.findUnique({
             where: { email: user.email },
@@ -171,15 +199,10 @@ export const authOptions: NextAuthOptions = {
       }
       const adminEmail = user?.email ?? token.email;
       if (isAdminEmail(adminEmail)) {
-        if (token.role !== "ADMIN" && adminEmail) {
-          try {
-            await prisma.user.update({
-              where: { email: adminEmail.toLowerCase() },
-              data: { role: "ADMIN" },
-            });
-          } catch {}
+        if (token.role !== ROLES.ADMIN && adminEmail) {
+          await updateUserRole(adminEmail, ROLES.ADMIN);
         }
-        token.role = "ADMIN";
+        token.role = ROLES.ADMIN;
       }
       if (trigger === "update" && session) {
         token.name = session.name;
@@ -190,7 +213,7 @@ export const authOptions: NextAuthOptions = {
           where: { id: token.sub },
           select: { role: true, emailVerified: true },
         });
-        if (u?.role) token.role = u.role as "USER" | "OWNER" | "ADMIN";
+        if (u?.role) token.role = u.role as keyof typeof ROLES;
         if (u?.emailVerified != null) token.emailVerified = !!u.emailVerified;
       }
       return token;
@@ -217,22 +240,14 @@ export const authOptions: NextAuthOptions = {
     },
     async signIn({ user, account }) {
       if (user?.email && isAdminEmail(user.email)) {
-        try {
-          await prisma.user.update({
-            where: { email: user.email.toLowerCase() },
-            data: { role: "ADMIN" },
-          });
-        } catch {}
+        await updateUserRole(user.email, ROLES.ADMIN);
       }
-      if (account?.provider === "google" && user.email) {
+      if (account?.provider === PROVIDERS.GOOGLE && user.email) {
         const existing = await prisma.user.findUnique({
           where: { email: user.email },
         });
         if (existing && !existing.role) {
-          await prisma.user.update({
-            where: { id: existing.id },
-            data: { role: "USER" },
-          });
+          await updateUserRole(existing.email, ROLES.USER);
         }
         if (existing && !existing.emailVerified) {
           await prisma.user.update({
@@ -241,14 +256,13 @@ export const authOptions: NextAuthOptions = {
           });
         }
       }
-      if (account?.provider === "credentials" && user?.email) {
+      if (account?.provider === PROVIDERS.CREDENTIALS && user?.email) {
         const existing = await prisma.user.findUnique({
           where: { email: user.email },
           select: { id: true, email: true, emailVerified: true },
         });
         if (existing && !existing.emailVerified) {
-          const links = await createEmailVerificationLinks(existing.id, existing.email);
-          await sendVerificationEmail(existing.email, links.verifyUrl, links.deleteUrl);
+          await verifyUserEmail(existing.id, existing.email);
         }
       }
       return true;

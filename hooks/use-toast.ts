@@ -3,7 +3,9 @@
 import * as React from "react";
 import type { ToastActionElement, ToastProps } from "@/components/ui/toast";
 
+// Maximum number of toasts allowed at a time
 const TOAST_LIMIT = 3;
+// Delay before a toast is automatically removed (in milliseconds)
 const TOAST_REMOVE_DELAY = 5000;
 
 type ToasterToast = ToastProps & {
@@ -54,7 +56,7 @@ interface State {
 const toastTimeouts = new Map<string, ReturnType<typeof setTimeout>>();
 
 const addToRemoveQueue = (toastId: string) => {
-  if (toastTimeouts.has(toastId)) return;
+  if (!toastId || toastTimeouts.has(toastId)) return;
   const timeout = setTimeout(() => {
     toastTimeouts.delete(toastId);
     dispatch({
@@ -101,6 +103,9 @@ const reducer = (state: State, action: Action): State => {
         ...state,
         toasts: state.toasts.filter((t) => t.id !== action.toastId),
       };
+    default:
+      console.warn(`Unhandled action type: ${(action as Action).type}`);
+      return state;
   }
 };
 
@@ -109,18 +114,20 @@ const listeners: Array<(state: State) => void> = [];
 let memoryState: State = { toasts: [] };
 
 function dispatch(action: Action) {
-  memoryState = reducer(memoryState, action);
-  listeners.forEach((listener) => {
-    listener(memoryState);
-  });
+  try {
+    memoryState = reducer(memoryState, action);
+    listeners.forEach((listener) => {
+      listener(memoryState);
+    });
+  } catch (error) {
+    console.error("Error in toast dispatch:", error);
+  }
 }
 
 type Toast = Omit<ToasterToast, "id">;
 
 function toast({ ...props }: Toast) {
   const id = genId();
-  const update = (props: ToasterToast) =>
-    dispatch({ type: "UPDATE_TOAST", toast: { ...props, id } });
   const dismiss = () => dispatch({ type: "DISMISS_TOAST", toastId: id });
 
   dispatch({
@@ -138,7 +145,8 @@ function toast({ ...props }: Toast) {
   return {
     id: id,
     dismiss,
-    update,
+    update: (props: ToasterToast) =>
+      dispatch({ type: "UPDATE_TOAST", toast: { ...props, id } }),
   };
 }
 

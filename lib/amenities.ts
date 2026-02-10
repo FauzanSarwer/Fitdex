@@ -16,8 +16,12 @@ export const AMENITY_OPTIONS: AmenityOption[] = [
 ];
 
 const AMENITY_ICON_MAP = new Map(AMENITY_OPTIONS.map((a) => [a.value.toLowerCase(), a.emoji]));
+const DEFAULT_AMENITY_EMOJI = "✨";
 
-export function getAmenityEmoji(name?: string | null) {
-  if (!name) return "";
-  return AMENITY_ICON_MAP.get(name.toLowerCase()) ?? "✨";
+export function getAmenityEmoji(name?: string | null): string {
+  if (typeof name !== "string" || !name.trim()) {
+    console.warn("Invalid amenity name provided", name);
+    return DEFAULT_AMENITY_EMOJI;
+  }
+  return AMENITY_ICON_MAP.get(name.toLowerCase()) ?? DEFAULT_AMENITY_EMOJI;
 }

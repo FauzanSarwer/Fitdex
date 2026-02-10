@@ -1,3 +1,7 @@
+import QuickLRU from "quick-lru";
+
+const cache = new QuickLRU<string, FetchJsonResult<any>>({ maxSize: 100 });
+
 export type FetchJsonResult<T> = {
   ok: boolean;
   status: number;
@@ -9,7 +13,13 @@ type FetchJsonOptions = RequestInit & {
   timeoutMs?: number;
   retries?: number;
   retryDelayMs?: number;
+  cacheKey?: string;
+  useCache?: boolean;
 };
+
+const DEFAULT_TIMEOUT_MS = 8000;
+const DEFAULT_RETRIES = 1;
+const DEFAULT_RETRY_DELAY_MS = 400;
 
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
@@ -18,15 +28,22 @@ export async function fetchJson<T>(
   options: FetchJsonOptions = {}
 ): Promise<FetchJsonResult<T>> {
   const {
-    timeoutMs = 8000,
-    retries = 1,
-    retryDelayMs = 400,
+    timeoutMs = DEFAULT_TIMEOUT_MS,
+    retries = DEFAULT_RETRIES,
+    retryDelayMs = DEFAULT_RETRY_DELAY_MS,
+    cacheKey,
+    useCache = false,
     ...fetchOptions
   } = options;
+
+  if (useCache && cacheKey && cache.has(cacheKey)) {
+    return cache.get(cacheKey) as FetchJsonResult<T>;
+  }
 
   for (let attempt = 0; attempt <= retries; attempt += 1) {
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), timeoutMs);
+
     try {
       const res = await fetch(input, { ...fetchOptions, signal: controller.signal });
       const contentType = res.headers.get("content-type") ?? "";
@@ -47,24 +64,23 @@ export async function fetchJson<T>(
       }
       clearTimeout(timeout);
 
-      if (res.ok) {
-        return { ok: true, status: res.status, data };
+      const result: FetchJsonResult<T> = res.ok
+        ? { ok: true, status: res.status, data }
+        : {
+            ok: false,
+            status: res.status,
+            data,
+            error:
+              (data as { error?: string })?.error ??
+              rawError?.slice(0, 300) ??
+              (res.statusText || "Request failed"),
+          };
+
+      if (useCache && cacheKey) {
+        cache.set(cacheKey, result);
       }
 
-      if (res.status >= 500 && attempt < retries) {
-        await sleep(retryDelayMs * (attempt + 1));
-        continue;
-      }
-
-      return {
-        ok: false,
-        status: res.status,
-        data,
-        error:
-          (data as { error?: string })?.error ??
-          rawError?.slice(0, 300) ??
-          (res.statusText || "Request failed"),
-      };
+      return result;
     } catch (error) {
       clearTimeout(timeout);
       if (attempt < retries) {

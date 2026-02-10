@@ -47,6 +47,10 @@ const Toast = React.forwardRef<
     <ToastPrimitive.Root
       ref={ref}
       className={cn(toastVariants({ variant }), className)}
+      role="status"
+      aria-live="polite"
+      aria-label={typeof props.children === "string" ? props.children : "Toast notification"}
+      tabIndex={0}
       {...props}
     />
   );

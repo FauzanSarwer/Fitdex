@@ -22,6 +22,45 @@ import { getGymTierRank, isGymFeatured } from "@/lib/gym-utils";
 import { Skeleton } from "@/components/ui/skeleton";
 import { getGymOpenStatus } from "@/lib/gym-hours";
 import { fetchJson } from "@/lib/client-fetch";
+
+function useGyms(url: string) {
+  const [gyms, setGyms] = useState<Gym[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [loadFailed, setLoadFailed] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+    setLoading(true);
+    setError(null);
+    setLoadFailed(false);
+    fetchJson<{ gyms?: Gym[]; error?: string }>(url, { retries: 2 })
+      .then((result) => {
+        if (cancelled) return;
+        if (!result.ok) {
+          setGyms([]);
+          setLoadFailed(true);
+          setError(result.error ?? "Failed to load gyms");
+          return;
+        }
+        setGyms(result.data?.gyms ?? []);
+      })
+      .catch(() => {
+        if (cancelled) return;
+        setGyms([]);
+        setLoadFailed(true);
+        setError("Failed to load gyms");
+      })
+      .finally(() => {
+        if (cancelled) return;
+        setLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [url]);
+  return { gyms, loading, error, loadFailed };
+}
 import { getAmenityEmoji } from "@/lib/amenities";
 
 type ViewMode = "map" | "list";
@@ -131,10 +170,6 @@ function GymImageCarousel({ images, name }: { images: string[]; name: string }) 
 
 export default function ExplorePage() {
   const [view, setView] = useState<ViewMode>("list");
-  const [gyms, setGyms] = useState<Gym[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [loadFailed, setLoadFailed] = useState(false);
   const [userLat, setUserLat] = useState<number | null>(null);
   const [userLng, setUserLng] = useState<number | null>(null);
   const [locationGate, setLocationGate] = useState(true);
@@ -153,6 +188,9 @@ export default function ExplorePage() {
   const deferredMaxPrice = useDeferredValue(maxPrice);
   const deferredMaxDistance = useDeferredValue(maxDistance);
 
+  // Use custom hook for gym fetching
+  const { gyms, loading, error, loadFailed } = useGyms("/api/gyms");
+
   const mapCenter = useMemo(() => {
     if (userLat != null && userLng != null) {
       return { latitude: userLat, longitude: userLng, showUserMarker: true };
@@ -164,40 +202,7 @@ export default function ExplorePage() {
     return { latitude: 28.6139, longitude: 77.209, showUserMarker: false };
   }, [userLat, userLng, gyms]);
 
-  const loadGyms = async (url: string) => {
-    setError(null);
-    setLoadFailed(false);
-    setLoading(true);
-    try {
-      const result = await fetchJson<{ gyms?: Gym[]; error?: string }>(url, { retries: 2 });
-      if (!result.ok) {
-        setGyms([]);
-        setLoadFailed(true);
-        return;
-      }
-      setGyms(result.data?.gyms ?? []);
-    } catch {
-      setGyms([]);
-      setLoadFailed(true);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const requestLocation = () => {
-    if (!navigator.geolocation) {
-      setLocationError("Location is not supported on this device.");
-      setLocationGate(false);
-      try {
-        localStorage.setItem("fitdex_explore_skip", "true");
-      } catch {}
-      loadGyms("/api/gyms");
-      return;
-    }
-    setLocationLoading(true);
-    navigator.geolocation.getCurrentPosition(
-      (pos) => {
-        const lat = pos.coords.latitude;
+  // ...existing code...
         const lng = pos.coords.longitude;
         setUserLat(lat);
         setUserLng(lng);

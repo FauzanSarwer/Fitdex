@@ -10,9 +10,8 @@ import { ShieldCheck, LogOut } from "lucide-react";
 import { fetchJson } from "@/lib/client-fetch";
 import { useToast } from "@/hooks/use-toast";
 
-export default function AdminSettingsPage() {
-  const { data: session } = useSession();
-  const { toast } = useToast();
+
+function useAdminSettings(session: any, toast: any) {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -94,6 +93,14 @@ export default function AdminSettingsPage() {
     }
     setSaving(false);
   };
+
+  return { loading, saving, error, form, setForm, saveSettings };
+}
+
+export default function AdminSettingsPage() {
+  const { data: session } = useSession();
+  const { toast } = useToast();
+  const { loading, saving, error, form, setForm, saveSettings } = useAdminSettings(session, toast);
 
   return (
     <div className="p-6 space-y-6">

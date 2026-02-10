@@ -37,22 +37,26 @@
   a:focus-visible,
   button:focus-visible {
     outline: none;
-    box-shadow: 0 0 0 2px hsl(var(--ring));
+    box-shadow: 0 0 0 3px hsl(var(--ring)), 0 0 8px 2px hsl(var(--accent));
+    transition: box-shadow 0.2s;
   }
 }
 
 /* Glassmorphism */
 .glass {
-  @apply bg-white/5 backdrop-blur-xl border border-white/10 shadow-glow-sm;
+  @apply bg-white/10 backdrop-blur-2xl border border-white/20 shadow-glow;
+  /* Improved glassmorphism for clarity and confidence */
 }
 
 .glass-card {
-  @apply bg-white/[0.06] backdrop-blur-2xl border border-white/10 rounded-2xl shadow-glow-sm;
+  @apply bg-white/[0.08] backdrop-blur-2xl border border-white/20 rounded-2xl shadow-glow;
+  /* Improved glass-card for visual polish */
 }
 
 /* Glow */
 .glow-text {
-  text-shadow: 0 0 30px hsl(var(--glow));
+  text-shadow: 0 0 30px hsl(var(--glow)), 0 0 8px hsl(var(--accent));
+  /* Enhanced glow for confidence */
 }
 
 .scrollbar-thin::-webkit-scrollbar {

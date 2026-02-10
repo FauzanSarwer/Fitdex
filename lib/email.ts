@@ -2,16 +2,28 @@ import { sendEmail } from "@/lib/mailer";
 import { getOptionalEnv } from "@/lib/env";
 
 const appName = getOptionalEnv("NEXT_PUBLIC_APP_NAME") || "Fitdex";
+const EMAIL_STYLES = {
+  fontFamily: "font-family:Arial,sans-serif;line-height:1.6;color:#111",
+  button: "padding:10px 16px;border-radius:8px;display:inline-block;text-decoration:none;color:#fff",
+};
+
+function validateEmailInputs(email: string, url: string, urlType: string) {
+  if (!email) return { ok: false as const, error: `Missing recipient email for ${urlType}` };
+  if (!url) return { ok: false as const, error: `Missing ${urlType} URL` };
+  return { ok: true as const };
+}
 
 export async function sendPasswordResetEmail(email: string, resetUrl: string) {
-  if (!resetUrl) return { ok: false as const, error: "Missing reset URL" };
+  const validation = validateEmailInputs(email, resetUrl, "reset");
+  if (!validation.ok) return validation;
+
   const subject = `${appName} password reset`;
   const html = `
-    <div style="font-family:Arial,sans-serif;line-height:1.6;color:#111">
+    <div style="${EMAIL_STYLES.fontFamily}">
       <h2 style="margin:0 0 12px">Reset your ${appName} password</h2>
       <p>We received a request to reset your password. Click the button below to continue.</p>
       <p style="margin:24px 0">
-        <a href="${resetUrl}" style="background:#6D28D9;color:#fff;text-decoration:none;padding:10px 16px;border-radius:8px;display:inline-block">Reset password</a>
+        <a href="${resetUrl}" style="background:#6D28D9;${EMAIL_STYLES.button}">Reset password</a>
       </p>
       <p>If you did not request this, you can safely ignore this email.</p>
     </div>
@@ -21,14 +33,18 @@ export async function sendPasswordResetEmail(email: string, resetUrl: string) {
 }
 
 export async function sendVerificationEmail(email: string, verifyUrl: string, deleteUrl: string) {
-  if (!verifyUrl) return { ok: false as const, error: "Missing verification URL" };
+  const validation = validateEmailInputs(email, verifyUrl, "verification");
+  if (!validation.ok) return validation;
+
+  if (!deleteUrl) return { ok: false as const, error: "Missing delete URL" };
+
   const subject = `Verify your ${appName} email`;
   const html = `
-    <div style="font-family:Arial,sans-serif;line-height:1.6;color:#111">
+    <div style="${EMAIL_STYLES.fontFamily}">
       <h2 style="margin:0 0 12px">Verify your ${appName} email</h2>
       <p>Thanks for signing up. Please verify your email to unlock full access.</p>
       <p style="margin:24px 0">
-        <a href="${verifyUrl}" style="background:#16A34A;color:#fff;text-decoration:none;padding:10px 16px;border-radius:8px;display:inline-block">Verify email</a>
+        <a href="${verifyUrl}" style="background:#16A34A;${EMAIL_STYLES.button}">Verify email</a>
       </p>
       <p style="margin-top:20px">Not you? You can delete this account:</p>
       <p><a href="${deleteUrl}" style="color:#DC2626">Delete my account</a></p>

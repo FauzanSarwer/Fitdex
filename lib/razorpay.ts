@@ -7,12 +7,31 @@ export class PaymentConfigError extends Error {
   }
 }
 
+export class RazorpayAPIError extends Error {
+  constructor(message: string, public statusCode: number) {
+    super(message);
+    this.name = "RazorpayAPIError";
+  }
+}
+
+const RAZORPAY_API_URL = "https://api.razorpay.com/v1/orders"; // Razorpay API base URL
+const CURRENCY = "INR"; // Default currency
+
 function requireEnv(name: string) {
   const value = getOptionalEnv(name);
   if (!value) {
     throw new PaymentConfigError("Payments unavailable: missing configuration");
   }
   return value;
+}
+
+async function fetchRazorpay(url: string, options: RequestInit): Promise<Response> {
+  const res = await fetch(url, options);
+  if (!res.ok) {
+    const err = await res.text();
+    throw new RazorpayAPIError(err, res.status);
+  }
+  return res;
 }
 
 export function getRazorpayKeyId() {
@@ -25,7 +44,7 @@ export async function createRazorpayOrder(
   notes?: Record<string, string>
 ) {
   const key = getRazorpayAuthHeader();
-  const res = await fetch("https://api.razorpay.com/v1/orders", {
+  const res = await fetchRazorpay(RAZORPAY_API_URL, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
@@ -33,15 +52,11 @@ export async function createRazorpayOrder(
     },
     body: JSON.stringify({
       amount: amountPaise,
-      currency: "INR",
+      currency: CURRENCY,
       receipt,
       notes: notes ?? {},
     }),
   });
-  if (!res.ok) {
-    const err = await res.text();
-    throw new Error("Razorpay order failed: " + err);
-  }
   return res.json() as Promise<{ id: string; amount: number; currency: string }>;
 }
 
@@ -53,7 +68,7 @@ export async function createRazorpayMarketplaceOrder(
   notes?: Record<string, string>
 ) {
   const key = getRazorpayAuthHeader();
-  const res = await fetch("https://api.razorpay.com/v1/orders", {
+  const res = await fetchRazorpay(RAZORPAY_API_URL, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
@@ -61,23 +76,19 @@ export async function createRazorpayMarketplaceOrder(
     },
     body: JSON.stringify({
       amount: amountPaise,
-      currency: "INR",
+      currency: CURRENCY,
       receipt,
       notes: notes ?? {},
       transfers: [
         {
           account: transferAccountId,
           amount: transferAmountPaise,
-          currency: "INR",
+          currency: CURRENCY,
           on_hold: false,
         },
       ],
     }),
   });
-  if (!res.ok) {
-    const err = await res.text();
-    throw new Error("Razorpay marketplace order failed: " + err);
-  }
   return res.json() as Promise<{ id: string; amount: number; currency: string }>;
 }
 
@@ -106,7 +117,8 @@ export function verifyRazorpayWebhookSignature(
     secret = requireEnv("RAZORPAY_WEBHOOK_SECRET");
   } catch (e) {
     if (e instanceof PaymentConfigError) return false;
-    throw e;
+    console.error("Unexpected error in verifyRazorpayWebhookSignature:", e);
+    return false;
   }
   const expected = crypto
     .createHmac("sha256", secret)
