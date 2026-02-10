@@ -231,7 +231,7 @@ function useOwnerSubscription(owner: boolean, isAdmin: boolean, toast: any) {
   };
 
   return { subscription, loadingSub, processingPlan, activePlan, startCheckout };
-}
+            }
             toast({ title: "Subscription active", description: "Your plan has been updated." });
             setSubscription(verifyResult.data?.subscription ?? null);
           } else {

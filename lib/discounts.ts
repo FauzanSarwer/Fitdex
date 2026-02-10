@@ -89,11 +89,11 @@ export function computeDiscount(
   const welcomeValue = allowWelcome ? gym.welcomeDiscountValue : DEFAULT_DISCOUNT_VALUE;
 
   const quarterlyAmount = quarterlyEligible
-    ? applyDiscount(quarterlyType, quarterlyValue)
-    : 0;
+      ? (quarterlyType !== "NONE" ? applyDiscount(quarterlyType as "FLAT" | "PERCENT", quarterlyValue) : 0)
+      : 0;
   const yearlyAmount = yearlyEligible
-    ? applyDiscount(yearlyType, yearlyValue)
-    : 0;
+      ? (yearlyType !== "NONE" ? applyDiscount(yearlyType as "FLAT" | "PERCENT", yearlyValue) : 0)
+      : 0;
   const planDiscountAmount = allowPlanDiscount
     ? quarterlyEligible
       ? quarterlyAmount
@@ -106,7 +106,7 @@ export function computeDiscount(
     ? Math.round((normalizedBasePrice * clampPercent(gym.partnerDiscountPercent)) / 100)
     : 0;
   const promoAmount = hasPromo ? applyDiscount(promo!.type, promo!.value) : 0;
-  const welcomeAmount = allowWelcome ? applyDiscount(welcomeType, welcomeValue) : 0;
+    const welcomeAmount = allowWelcome ? (welcomeType !== "NONE" ? applyDiscount(welcomeType as "FLAT" | "PERCENT", welcomeValue) : 0) : 0;
 
   let totalDiscountAmount = 0;
   if (welcomeAmount > 0) {
