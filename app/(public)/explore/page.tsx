@@ -17,17 +17,108 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { MapView } from "@/components/maps/MapView";
-export default function ExplorePage() {
-  // All hooks, state, and handlers at the top
-  // ...existing logic, handlers, and effects...
-  // Only one function body, only one return
-  // ...existing UI and logic, properly closed...
-  return (
-    <div className="p-6 space-y-6">
-      {/* ...existing dashboard JSX, ensure all elements are properly closed and wrapped... */}
-    </div>
-  );
+import { buildGymSlug, cn, formatPrice } from "@/lib/utils";
+import { getGymTierRank, isGymFeatured } from "@/lib/gym-utils";
+import { Skeleton } from "@/components/ui/skeleton";
+import { getGymOpenStatus } from "@/lib/gym-hours";
+import { fetchJson } from "@/lib/client-fetch";
+import { getAmenityEmoji } from "@/lib/amenities";
+
+type ViewMode = "map" | "list";
+
+interface Gym {
+  id: string;
+  name: string;
+  address: string;
+  latitude: number;
+  longitude: number;
+  verificationStatus: string;
+  openTime?: string | null;
+  closeTime?: string | null;
+  openDays?: string | null;
+  monthlyPrice: number;
+  yearlyPrice: number;
+  partnerDiscountPercent: number;
+  distance?: number;
+  createdAt?: string | Date;
+  coverImageUrl?: string | null;
+  imageUrls?: string[] | null;
+  featuredUntil?: string | Date | null;
+  verifiedUntil?: string | Date | null;
+  isFeatured?: boolean | null;
+  featuredStartAt?: string | Date | null;
+  featuredEndAt?: string | Date | null;
+  gymTier?: string | null;
+  hasAC?: boolean;
+  amenities?: string[];
 }
+
+type SortOption = "price_asc" | "price_desc" | "distance" | "newest";
+
+const SORT_LABELS: Record<SortOption, string> = {
+  price_asc: "Price: low → high",
+  price_desc: "Price: high → low",
+  distance: "Nearby first",
+  newest: "Newest",
+};
+
+const SERVICEABLE_CITIES = [
+  "Delhi",
+  "New Delhi",
+  "Gurugram",
+  "Noida",
+  "Ghaziabad",
+  "Faridabad",
+];
+
+const normalize = (value: string) => value.toLowerCase().replace(/[^a-z0-9]/g, "");
+
+const levenshtein = (a: string, b: string) => {
+  const m = a.length;
+  const n = b.length;
+  if (!m) return n;
+  if (!n) return m;
+  const dp = Array.from({ length: m + 1 }, () => new Array(n + 1).fill(0));
+  for (let i = 0; i <= m; i += 1) dp[i][0] = i;
+  for (let j = 0; j <= n; j += 1) dp[0][j] = j;
+  for (let i = 1; i <= m; i += 1) {
+    for (let j = 1; j <= n; j += 1) {
+      const cost = a[i - 1] === b[j - 1] ? 0 : 1;
+      dp[i][j] = Math.min(
+        dp[i - 1][j] + 1,
+        dp[i][j - 1] + 1,
+        dp[i - 1][j - 1] + cost
+      );
+    }
+  }
+  return dp[m][n];
+};
+
+const fuzzyMatch = (name: string, q: string) => {
+  const n = normalize(name);
+  const query = normalize(q);
+  if (!query) return true;
+  if (n.includes(query)) return true;
+  if (query.length < 3) return false;
+  const distance = levenshtein(n, query);
+  const threshold = Math.max(2, Math.floor(query.length * 0.3));
+  return distance <= threshold;
+};
+
+function GymImageCarousel({ images, name }: { images: string[]; name: string }) {
+  const [index, setIndex] = useState(0);
+  if (images.length === 0) return null;
+  const active = images[index] ?? images[0];
+  return (
+    <div className="relative h-full w-full">
+      <img src={active} alt={name} className="h-full w-full object-cover" loading="lazy" decoding="async" />
+      {images.length > 1 && (
+        <div className="absolute bottom-2 left-1/2 -translate-x-1/2 flex items-center gap-1">
+          {images.map((_, i) => (
+            <button
+              key={i}
+              type="button"
+              onClick={() => setIndex(i)}
               className={`h-1.5 w-1.5 rounded-full ${i === index ? "bg-white" : "bg-white/50"}`}
               aria-label={`Show image ${i + 1}`}
             />
@@ -40,6 +131,10 @@ export default function ExplorePage() {
 
 export default function ExplorePage() {
   const [view, setView] = useState<ViewMode>("list");
+  const [gyms, setGyms] = useState<Gym[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [loadFailed, setLoadFailed] = useState(false);
   const [userLat, setUserLat] = useState<number | null>(null);
   const [userLng, setUserLng] = useState<number | null>(null);
   const [locationGate, setLocationGate] = useState(true);
@@ -58,9 +153,6 @@ export default function ExplorePage() {
   const deferredMaxPrice = useDeferredValue(maxPrice);
   const deferredMaxDistance = useDeferredValue(maxDistance);
 
-  // Use custom hook for gym fetching
-  const { gyms, loading, error, loadFailed } = useGyms("/api/gyms");
-
   const mapCenter = useMemo(() => {
     if (userLat != null && userLng != null) {
       return { latitude: userLat, longitude: userLng, showUserMarker: true };
@@ -72,7 +164,40 @@ export default function ExplorePage() {
     return { latitude: 28.6139, longitude: 77.209, showUserMarker: false };
   }, [userLat, userLng, gyms]);
 
-  // ...existing code...
+  const loadGyms = async (url: string) => {
+    setError(null);
+    setLoadFailed(false);
+    setLoading(true);
+    try {
+      const result = await fetchJson<{ gyms?: Gym[]; error?: string }>(url, { retries: 2 });
+      if (!result.ok) {
+        setGyms([]);
+        setLoadFailed(true);
+        return;
+      }
+      setGyms(result.data?.gyms ?? []);
+    } catch {
+      setGyms([]);
+      setLoadFailed(true);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const requestLocation = () => {
+    if (!navigator.geolocation) {
+      setLocationError("Location is not supported on this device.");
+      setLocationGate(false);
+      try {
+        localStorage.setItem("fitdex_explore_skip", "true");
+      } catch {}
+      loadGyms("/api/gyms");
+      return;
+    }
+    setLocationLoading(true);
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        const lat = pos.coords.latitude;
         const lng = pos.coords.longitude;
         setUserLat(lat);
         setUserLng(lng);
@@ -431,16 +556,15 @@ export default function ExplorePage() {
               onClick={() => setView("map")}
             >
               <LayoutGrid className="h-4 w-4 mr-1" />
-               );
-               localStorage.removeItem("fitdex_explore_skip");
-             } catch {}
-           }
-         },
-         () => {
-           setLocationError("Location access denied. Showing gyms without distance sorting.");
-           setLocationGate(false);
-         }
-       );
+              Map
+            </Button>
+          </div>
+        </div>
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <p className="text-sm text-muted-foreground">
+            {loading ? "Loading gyms..." : `${filteredGyms.length} gyms available`}
+          </p>
+          <p className="text-xs text-muted-foreground">
             Sorted by <span className="text-foreground">{SORT_LABELS[sortBy]}</span>
           </p>
           {activeFilters.length > 0 && (
@@ -538,16 +662,15 @@ export default function ExplorePage() {
                       onClick={() => setOnlyFeatured((prev) => !prev)}
                       className={`w-full rounded-lg border px-3 py-2 text-left text-sm ${
                         onlyFeatured ? "border-primary/50 bg-primary/10 text-primary" : "border-white/10"
-                       );
-                       localStorage.removeItem("fitdex_explore_skip");
-                     } catch {}
-                   }
-                 },
-                 () => {
-                   setLocationError("Location access denied. Showing gyms without distance sorting.");
-                   setLocationGate(false);
-                 }
-               );
+                      }`}
+                    >
+                      Featured gyms
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setOnlyVerified((prev) => !prev)}
+                      className={`w-full rounded-lg border px-3 py-2 text-left text-sm ${
+                        onlyVerified ? "border-emerald-400/50 bg-emerald-400/10 text-emerald-300" : "border-white/10"
                       }`}
                     >
                       Verified gyms
