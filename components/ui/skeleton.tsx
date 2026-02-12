@@ -13,9 +13,10 @@ function SkeletonBase({
 }: React.HTMLAttributes<HTMLDivElement>) {
   return (
     <div
-      className={cn("animate-pulse rounded-xl bg-muted", className)}
+      className={cn("animate-pulse rounded-xl bg-white/10", className)}
       role="status"
       aria-label="Loading"
+      tabIndex={0}
       {...props}
     />
   );

@@ -12,6 +12,7 @@ import {
   Users,
   Tag,
   Loader2,
+  Check,
   Sparkles,
   ArrowRight,
 } from "lucide-react";

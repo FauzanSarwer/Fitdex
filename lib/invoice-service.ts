@@ -107,7 +107,7 @@ export async function ensureOwnerInvoiceForTransaction(params: {
 
   try {
     return await prisma.$transaction(async (tx) => {
-      await tx.invoiceSequence.upsert({
+      const sequenceRow = await tx.invoiceSequence.upsert({
         where: { gymId: gym.id },
         create: { gymId: gym.id, lastNumber: 0 },
         update: {},

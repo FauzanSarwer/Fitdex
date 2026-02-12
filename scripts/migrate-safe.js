@@ -38,11 +38,6 @@ function isLockTimeout(errorOutput) {
   );
 }
 
-function isDatabaseUnavailable(errorOutput) {
-  const value = (errorOutput ?? "").toLowerCase();
-  return value.includes("can't reach database server") || value.includes("prismaclientinitializationerror");
-}
-
 async function runMigrateDeployWithRetry(maxAttempts = 3) {
   let lastError;
   for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
@@ -68,30 +63,12 @@ async function runMigrateDeployWithRetry(maxAttempts = 3) {
 async function main() {
   const prisma = new PrismaClient();
   try {
-    try {
-      await resolveFailedMigration(prisma);
-    } catch (error) {
-      const message = error instanceof Error ? error.message : String(error);
-      if (isDatabaseUnavailable(message)) {
-        console.warn("[migrate-safe] Database unavailable. Skipping migration step for this build.");
-        return;
-      }
-      throw error;
-    }
+    await resolveFailedMigration(prisma);
   } finally {
     await prisma.$disconnect();
   }
 
-  try {
-    await runMigrateDeployWithRetry(3);
-  } catch (error) {
-    const message = error instanceof Error ? error.message : String(error);
-    if (isDatabaseUnavailable(message)) {
-      console.warn("[migrate-safe] Database unavailable. Skipping migration deploy for this build.");
-      return;
-    }
-    throw error;
-  }
+  await runMigrateDeployWithRetry(3);
 }
 
 main().catch((error) => {

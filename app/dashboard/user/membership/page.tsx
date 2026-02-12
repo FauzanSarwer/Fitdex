@@ -50,6 +50,7 @@ function MembershipContent() {
   }, [toast]);
 
   const activeMembership = memberships.find((m) => m.active);
+  const pendingMembership = memberships.find((m) => !m.active && m.gymId === joinGymId) ?? memberships.find((m) => !m.active);
 
   async function createMembership(gymId: string, planType: "MONTHLY" | "YEARLY") {
     setCreating(true);
@@ -69,7 +70,7 @@ function MembershipContent() {
       setMemberships((prev) => (membership ? [membership, ...prev] : prev));
       toast({ title: "Membership created", description: "Proceed to payment." });
       if (membership) {
-        await openRazorpay(membership.id);
+        await openRazorpay(membership.id, result.data?.finalPricePaise ?? 0);
       }
     } catch {
       toast({ title: "Error", description: "Something went wrong", variant: "destructive" });
@@ -77,7 +78,7 @@ function MembershipContent() {
     setCreating(false);
   }
 
-  async function openRazorpay(membershipId: string) {
+  async function openRazorpay(membershipId: string, amountPaise: number) {
     if (!paymentsEnabled) {
       toast({ title: "Payments not available yet", description: "Please try again later." });
       return;
@@ -299,7 +300,7 @@ function MembershipContent() {
                     <Button
                       size="sm"
                       disabled={!paymentsEnabled || paying === m.id}
-                      onClick={() => openRazorpay(m.id)}
+                      onClick={() => openRazorpay(m.id, m.finalPrice)}
                     >
                       {paying === m.id ? (
                         <Loader2 className="h-4 w-4 animate-spin" />

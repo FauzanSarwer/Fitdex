@@ -105,6 +105,7 @@ export async function GET(req: Request) {
       amenities: g.amenities,
       createdAt: g.createdAt,
     }));
+    const now = Date.now();
     if (lat && lng) {
       const numLat = parseFloat(lat);
       const numLng = parseFloat(lng);

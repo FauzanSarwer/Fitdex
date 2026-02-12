@@ -14,19 +14,18 @@ const ProgressBase = React.forwardRef<
   React.ElementRef<typeof ProgressPrimitive.Root>,
   React.ComponentPropsWithoutRef<typeof ProgressPrimitive.Root>
 >(
-  ({ className, value, ...props }, ref) => {
-    const numericValue = typeof value === "number" ? value : undefined;
-    return (
-      <ProgressPrimitive.Root
-        ref={ref}
-        className={cn(
-        "relative h-2 w-full overflow-hidden rounded-full bg-muted",
+  ({ className, value, ...props }, ref) => (
+    <ProgressPrimitive.Root
+      ref={ref}
+      className={cn(
+        "relative h-2 w-full overflow-hidden rounded-full bg-white/10",
         className
       )}
       role="progressbar"
-      aria-valuenow={numericValue}
+      aria-valuenow={value}
       aria-valuemin={0}
       aria-valuemax={100}
+      tabIndex={0}
       {...props}
     >
       <ProgressPrimitive.Indicator
@@ -34,8 +33,7 @@ const ProgressBase = React.forwardRef<
         style={{ transform: `translateX(-${100 - (value || 0)}%)` }}
       />
     </ProgressPrimitive.Root>
-    );
-  }
+  )
 );
 ProgressBase.displayName = ProgressPrimitive.Root.displayName;
 

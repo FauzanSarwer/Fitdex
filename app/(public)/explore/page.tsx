@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState, useEffect, useDeferredValue, useRef } from "react";
+import { useMemo, useState, useEffect, useDeferredValue } from "react";
 import Link from "next/link";
 import { useSession } from "next-auth/react";
 import { MapPin, List, LayoutGrid, Search, ArrowRight, Heart, SlidersHorizontal, ArrowDownUp } from "lucide-react";
@@ -17,14 +17,12 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { MapView } from "@/components/maps/MapView";
-import Image from "next/image";
 import { buildGymSlug, cn, formatPrice } from "@/lib/utils";
 import { getGymTierRank, isGymFeatured } from "@/lib/gym-utils";
 import { Skeleton } from "@/components/ui/skeleton";
 import { getGymOpenStatus } from "@/lib/gym-hours";
 import { fetchJson } from "@/lib/client-fetch";
 import { getAmenityEmoji } from "@/lib/amenities";
-import { GymCard, GymCardSkeleton, type GymCardData } from "@/components/gyms/gym-card";
 
 type ViewMode = "map" | "list";
 
@@ -113,13 +111,7 @@ function GymImageCarousel({ images, name }: { images: string[]; name: string }) 
   const active = images[index] ?? images[0];
   return (
     <div className="relative h-full w-full">
-      <Image
-        src={active}
-        alt={name}
-        fill
-        sizes="(max-width: 768px) 100vw, 50vw"
-        className="h-full w-full object-cover"
-      />
+      <img src={active} alt={name} className="h-full w-full object-cover" loading="lazy" decoding="async" />
       {images.length > 1 && (
         <div className="absolute bottom-2 left-1/2 -translate-x-1/2 flex items-center gap-1">
           {images.map((_, i) => (
@@ -149,7 +141,6 @@ export default function ExplorePage() {
   const [locationLoading, setLocationLoading] = useState(false);
   const [locationError, setLocationError] = useState<string | null>(null);
   const [query, setQuery] = useState("");
-  const inputRef = useRef<HTMLInputElement>(null);
   const [maxPrice, setMaxPrice] = useState<string>("");
   const [maxDistance, setMaxDistance] = useState<string>("");
   const [sortBy, setSortBy] = useState<SortOption>("distance");
@@ -253,9 +244,6 @@ export default function ExplorePage() {
         }
       }
     } catch {}
-    if (typeof window !== "undefined" && window.innerWidth > 768 && inputRef.current) {
-      inputRef.current.focus();
-    }
   }, []);
 
   useEffect(() => {
@@ -434,65 +422,50 @@ export default function ExplorePage() {
         </div>
       )}
       <div className={locationGate ? "pointer-events-none blur-sm" : ""}>
-        <section className="mb-2 md:mb-4 rounded-3xl border border-white/10 bg-white/5 p-3 md:p-5 shadow-glow-sm flex flex-col gap-3 md:gap-4">
-          <div className="flex flex-col gap-2 md:gap-4">
-            <h1 className="text-2xl md:text-4xl font-bold text-foreground mb-1">Find gyms in your city</h1>
-            <div className="flex flex-col md:flex-row md:items-center gap-2 md:gap-4">
-              <div className="relative w-full md:max-w-lg">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                <Input
-                  ref={inputRef}
-                  placeholder="Search gyms in your city..."
-                  value={query}
-                  onChange={(e) => setQuery(e.target.value)}
-                  className="pl-9"
-                />
+        <section className="mb-8 rounded-3xl border border-white/10 bg-white/5 p-6 md:p-8 shadow-glow-sm">
+          <div className="flex flex-col gap-6 md:flex-row md:items-end md:justify-between">
+            <div className="max-w-2xl space-y-3">
+              <p className="text-xs uppercase tracking-[0.3em] text-muted-foreground">Fitdex</p>
+              <p className="text-xs text-primary/80 font-semibold">Gym discovery + pricing + duo discounts</p>
+              <h1 className="text-2xl md:text-4xl font-semibold text-foreground">
+                Find verified gyms with <span className="text-primary">transparent pricing</span> and
+                <span className="text-primary"> partner savings</span>.
+              </h1>
+              <p className="text-sm text-muted-foreground">
+                Explore gyms near you, compare plans fast, and join solo or with a partner to save more.
+              </p>
+              <div className="flex flex-wrap items-center gap-3 pt-2">
+                <Button onClick={requestLocation} className="transition-colors">
+                  Find gyms near you
+                </Button>
+                <Button variant="outline" asChild className="transition-colors">
+                  <Link href="/owners">List your gym (owners)</Link>
+                </Button>
+                <span className="text-xs text-muted-foreground">No lock-in. Cancel anytime.</span>
               </div>
-              <Button onClick={requestLocation} className="transition-colors whitespace-nowrap" variant="secondary">
-                Find gyms near me
-              </Button>
+              <div className="flex flex-wrap gap-2 pt-1">
+                <span className="rounded-full border border-primary/30 bg-primary/10 px-3 py-1 text-xs text-primary">
+                  Verified listings
+                </span>
+                <span className="rounded-full border border-emerald-400/30 bg-emerald-400/10 px-3 py-1 text-xs text-emerald-300">
+                  Transparent pricing
+                </span>
+                <span className="rounded-full border border-sky-400/30 bg-sky-400/10 px-3 py-1 text-xs text-sky-200">
+                  Duo savings where available
+                </span>
+              </div>
             </div>
-            <p className="text-xs text-muted-foreground mt-1">Discover verified gyms across India.</p>
-            <div className="flex flex-wrap gap-2 pt-1">
+            <div className="flex flex-wrap gap-2">
               {SERVICEABLE_CITIES.map((city) => (
-                <Link
+                <span
                   key={city}
-                  href={`/gyms-in-${city.toLowerCase().replace(/\s+/g, "-")}`}
-                  className="rounded-full border border-white/10 bg-white/5 px-3 py-1 text-xs text-primary hover:bg-primary/10 hover:text-primary-foreground transition-colors"
+                  className="rounded-full border border-white/10 bg-white/5 px-3 py-1 text-xs text-muted-foreground"
                 >
                   {city}
-                </Link>
+                </span>
               ))}
             </div>
           </div>
-        </section>
-        {/* Featured gyms section */}
-        <section className="mb-4">
-          <h2 className="text-lg font-semibold mb-2">Featured gyms</h2>
-          {loading ? (
-            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-              {[1, 2, 3, 4, 5, 6].map((i) => <GymCardSkeleton key={i} />)}
-            </div>
-          ) : (
-            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-              {(gyms.filter(isGymFeatured).length > 0 ? gyms.filter(isGymFeatured) : gyms)
-                .slice(0, 9)
-                .map((gym) => {
-                  const cardData: GymCardData = {
-                    id: gym.id,
-                    slug: buildGymSlug(gym.name, gym.id),
-                    name: gym.name,
-                    city: null,
-                    address: gym.address,
-                    monthlyPrice: gym.monthlyPrice,
-                    rating: null,
-                    amenities: gym.amenities,
-                    imageUrl: gym.coverImageUrl || gym.imageUrls?.[0] || null,
-                  };
-                  return <GymCard key={gym.id} gym={cardData} />;
-                })}
-            </div>
-          )}
         </section>
         <section className="mb-6 rounded-2xl border border-white/10 bg-white/5 p-4 md:p-5">
           <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">

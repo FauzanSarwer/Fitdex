@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { motion } from "framer-motion";
 import Image from "next/image";
 import {
   LayoutDashboard,
@@ -18,7 +19,6 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { GlobalSearch } from "@/components/layout/global-search";
-import { ThemeToggle } from "@/components/layout/theme-toggle";
 
 const USER_LINKS = [
   { href: "/dashboard/user", label: "Overview", icon: LayoutDashboard },
@@ -56,7 +56,7 @@ const ADMIN_LINKS = [
 
 export function DashboardNav({
   role,
-  isOwner: _isOwner,
+  isOwner,
   showVerification,
 }: {
   role: string;
@@ -88,10 +88,10 @@ export function DashboardNav({
 
   return (
     <>
-      <header className="fixed top-0 left-0 right-0 z-40 glass border-b border-border/60 md:pl-56">
+      <header className="fixed top-0 left-0 right-0 z-40 glass border-b border-white/10 md:pl-56">
         <div className="flex h-16 items-center gap-4 px-4">
           <Link href="/" className="flex items-center gap-2">
-            <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-card/80 shadow-glow-sm">
+            <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-white/10 shadow-glow-sm">
               <Image
                 src="/fitdex-logo.png"
                 alt="Fitdex"
@@ -106,7 +106,6 @@ export function DashboardNav({
           <div className="hidden md:flex flex-1 justify-center">
             <GlobalSearch className="w-full max-w-md" />
           </div>
-          <ThemeToggle />
           {role === "ADMIN" && (
             <div className="ml-auto flex items-center gap-2">
               <Link
@@ -115,7 +114,7 @@ export function DashboardNav({
                   "rounded-full px-4 py-2 text-xs font-semibold transition-colors",
                   adminActive
                     ? "bg-primary/20 text-primary"
-                    : "bg-card/70 text-foreground hover:bg-card"
+                    : "bg-white/10 text-foreground hover:bg-white/20"
                 )}
               >
                 Admin panel
@@ -126,7 +125,7 @@ export function DashboardNav({
                   "rounded-full px-3 py-2 text-xs font-semibold transition-colors",
                   ownerActive
                     ? "bg-primary/20 text-primary"
-                    : "bg-card/70 text-foreground hover:bg-card"
+                    : "bg-white/10 text-foreground hover:bg-white/20"
                 )}
               >
                 Owner dashboard
@@ -137,7 +136,7 @@ export function DashboardNav({
                   "rounded-full px-3 py-2 text-xs font-semibold transition-colors",
                   userActive
                     ? "bg-primary/20 text-primary"
-                    : "bg-card/70 text-foreground hover:bg-card"
+                    : "bg-white/10 text-foreground hover:bg-white/20"
                 )}
               >
                 User dashboard
@@ -146,8 +145,8 @@ export function DashboardNav({
           )}
         </div>
       </header>
-      <aside className="fixed left-0 top-0 z-50 hidden h-full w-56 flex-col border-r border-border/60 bg-background/95 backdrop-blur md:flex">
-        <div className="flex h-16 items-center border-b border-border/60 px-4">
+      <aside className="fixed left-0 top-0 z-50 hidden h-full w-56 flex-col border-r border-white/10 bg-background/95 backdrop-blur md:flex">
+        <div className="flex h-16 items-center border-b border-white/10 px-4">
           <Link href={navRole === "ADMIN" ? "/dashboard/admin" : navRole === "OWNER" ? "/dashboard/owner" : "/dashboard/user"} className="flex items-center gap-2">
             <User className="h-5 w-5 text-primary" />
             <span className="font-semibold">{navRole === "ADMIN" ? "Admin" : navRole === "OWNER" ? "Owner" : "Member"}</span>
@@ -165,7 +164,7 @@ export function DashboardNav({
                   "flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium transition-colors",
                   active
                     ? "bg-primary/20 text-primary"
-                    : "text-muted-foreground hover:bg-card hover:text-foreground"
+                    : "text-muted-foreground hover:bg-white/10 hover:text-foreground"
                 )}
               >
                 <item.icon className="h-4 w-4" />

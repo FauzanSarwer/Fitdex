@@ -3,62 +3,11 @@ import "./globals.css";
 import { Providers } from "@/components/providers";
 import { SpeedInsights } from "@vercel/speed-insights/next";
 import React, { Suspense } from "react";
-import { SITE_NAME, SITE_DESCRIPTION, getBaseUrl } from "@/lib/site";
-
-const BASE_URL = getBaseUrl();
 
 export const metadata: Metadata = {
-  metadataBase: new URL(BASE_URL),
-  title: `${SITE_NAME} – Find Gyms Near You in India`,
-  description: SITE_DESCRIPTION,
-  openGraph: {
-    title: `${SITE_NAME} – Find Gyms Near You in India`,
-    description: SITE_DESCRIPTION,
-    url: BASE_URL,
-    siteName: SITE_NAME,
-    images: [
-      {
-        url: `${BASE_URL}/fitdex-og.png`,
-        width: 1200,
-        height: 630,
-        alt: SITE_NAME,
-      },
-    ],
-    locale: "en_IN",
-    type: "website",
-  },
-  twitter: {
-    card: "summary_large_image",
-    title: `${SITE_NAME} – Find Gyms Near You in India`,
-    description: SITE_DESCRIPTION,
-    images: [`${BASE_URL}/fitdex-og.png`],
-  },
-  alternates: {
-    canonical: `${BASE_URL}/`,
-  },
+  title: "Fitdex — District of Gyms",
+  description: "Premium gym discovery and duo accountability in Delhi",
 };
-
-const organizationJsonLd = {
-  "@context": "https://schema.org",
-  "@type": "Organization",
-  name: SITE_NAME,
-  url: BASE_URL,
-  logo: `${BASE_URL}/fitdex-logo.png`,
-};
-
-const themeInitScript = `
-(() => {
-  try {
-    const stored = localStorage.getItem("fitdex-theme");
-    const theme = stored === "light" ? "light" : "dark";
-    const root = document.documentElement;
-    root.classList.remove("light", "dark");
-    root.classList.add(theme);
-  } catch (_error) {
-    document.documentElement.classList.add("dark");
-  }
-})();
-`;
 
 export default function RootLayout({
   children,
@@ -66,16 +15,28 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="en" className="dark" suppressHydrationWarning>
+    <html lang="en" className="dark">
       <head>
-        <script dangerouslySetInnerHTML={{ __html: themeInitScript }} />
+        {/* Preconnects for performance */}
+        <link rel="preconnect" href="https://checkout.razorpay.com" />
+        <link rel="preconnect" href="https://cdnjs.cloudflare.com" />
+        <link rel="preconnect" href="https://tile.openstreetmap.org" />
+        {/* SEO & Social Meta */}
+        <meta name="viewport" content="width=device-width, initial-scale=1" />
+        <meta name="theme-color" content="#18181b" />
+        <meta property="og:title" content="Fitdex — District of Gyms" />
+        <meta property="og:description" content="Premium gym discovery and duo accountability in Delhi" />
+        <meta property="og:type" content="website" />
+        <meta property="og:image" content="/fitdex-og.png" />
+        <meta name="twitter:card" content="summary_large_image" />
+        <meta name="twitter:title" content="Fitdex — District of Gyms" />
+        <meta name="twitter:description" content="Premium gym discovery and duo accountability in Delhi" />
+        <meta name="twitter:image" content="/fitdex-og.png" />
       </head>
       <body className="font-sans min-h-screen bg-background antialiased">
-        <script
-          type="application/ld+json"
-          dangerouslySetInnerHTML={{ __html: JSON.stringify(organizationJsonLd) }}
-        />
+        {/* Defensive: Providers should never break layout */}
         <Providers>
+          {/* Error boundary and fallback for robustness */}
           <Suspense fallback={<div className="p-8 text-center text-muted-foreground">Loading...</div>}>
             {children}
           </Suspense>

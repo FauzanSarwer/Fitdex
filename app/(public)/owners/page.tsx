@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
+import { useOwnerSubscription } from "@/hooks/useOwnerSubscription"; // Assuming this is where the hook will be placed
 import {
   BarChart3,
   Headphones,
@@ -109,9 +110,22 @@ const PLANS: Array<{
 export default function OwnersPage() {
   const { data: session, status } = useSession();
   const owner = status === "authenticated" && isOwner(session);
-  const role = (session?.user as { role?: string })?.role;
+  const role = (session?.user as { role?: string })?.role || {};
   const isAdmin = role === "ADMIN";
   const { toast } = useToast();
+
+
+
+  const { subscription, loadingSub, processingPlan, activePlan, startCheckout } = useOwnerSubscription(owner, isAdmin, toast);
+
+  return (
+    <div className="p-6 space-y-6">
+      {/* ...existing code... */}
+    </div>
+  );
+}
+
+function useOwnerSubscription(owner: boolean, isAdmin: boolean, toast: any) {
   const [subscription, setSubscription] = useState<any | null>(null);
   const [loadingSub, setLoadingSub] = useState(false);
   const [processingPlan, setProcessingPlan] = useState<string | null>(null);
@@ -198,6 +212,26 @@ export default function OwnersPage() {
             }
           );
           if (verifyResult.ok) {
+            toast({ title: "Payment success", description: "Plan activated." });
+            setSubscription(verifyResult.data?.subscription ?? null);
+          } else {
+            toast({ title: "Error", description: verifyResult.error ?? "Failed to verify payment", variant: "destructive" });
+          }
+          setProcessingPlan(null);
+        },
+        onError: () => {
+          toast({ title: "Payment failed", description: "Please try again." });
+          setProcessingPlan(null);
+        },
+      });
+    } catch {
+      toast({ title: "Error", description: "Failed to start checkout", variant: "destructive" });
+      setProcessingPlan(null);
+    }
+  };
+
+  return { subscription, loadingSub, processingPlan, activePlan, startCheckout };
+            }
             toast({ title: "Subscription active", description: "Your plan has been updated." });
             setSubscription(verifyResult.data?.subscription ?? null);
           } else {

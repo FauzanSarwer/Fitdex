@@ -5,8 +5,7 @@ type Role = "USER" | "OWNER" | "ADMIN";
 
 function hasRole(session: Session | null, roles: Role[]): boolean {
   const user = getSessionUser(session);
-  const role = user?.role;
-  return role != null && roles.includes(role);
+  return !!user && roles.includes(user.role);
 }
 
 export function isOwner(session: Session | null): boolean {

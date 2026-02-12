@@ -8,7 +8,6 @@ import { motion } from "framer-motion";
 import Image from "next/image";
 import { MapPin, User, LayoutDashboard, LogOut } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { ThemeToggle } from "@/components/layout/theme-toggle";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -33,7 +32,7 @@ export function Header() {
     <motion.header
       initial={{ y: -20, opacity: 0 }}
       animate={{ y: 0, opacity: 1 }}
-      className="fixed top-0 left-0 right-0 z-50 glass border-b border-border/60"
+      className="fixed top-0 left-0 right-0 z-50 glass border-b border-white/10"
     >
       {!emailVerified && session && (
         <div className="bg-amber-500/20 border-b border-amber-500/30">
@@ -62,7 +61,7 @@ export function Header() {
       )}
       <div className="container mx-auto flex h-16 items-center justify-between px-4">
         <Link href="/" className="flex items-center gap-2">
-          <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-card/80 shadow-glow-sm">
+          <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-white/10 shadow-glow-sm">
             <Image
               src="/fitdex-logo.png"
               alt="Fitdex"
@@ -119,9 +118,8 @@ export function Header() {
           )}
         </nav>
         <div className="flex items-center gap-3">
-          <ThemeToggle />
           {status === "loading" ? (
-            <div className="h-9 w-12 rounded-lg bg-muted animate-pulse" />
+            <div className="h-9 w-12 rounded-lg bg-white/10 animate-pulse" />
           ) : session ? (
             <>
               <span className="hidden md:inline text-sm font-medium text-muted-foreground">
@@ -135,7 +133,7 @@ export function Header() {
                     </div>
                   </Button>
                 </DropdownMenuTrigger>
-                <DropdownMenuContent align="end" className="w-48 glass border-border/60">
+                <DropdownMenuContent align="end" className="w-48 glass border-white/10">
                   <DropdownMenuItem asChild>
                     <Link href={role === "ADMIN" ? "/dashboard/admin" : owner ? "/dashboard/owner" : "/dashboard/user"}>
                       <LayoutDashboard className="mr-2 h-4 w-4" />
