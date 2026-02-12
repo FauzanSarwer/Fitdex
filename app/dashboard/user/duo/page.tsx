@@ -9,7 +9,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Users, Mail } from "lucide-react";
+import { Users } from "lucide-react";
 import { fetchJson } from "@/lib/client-fetch";
 
 export default function DuoPage() {

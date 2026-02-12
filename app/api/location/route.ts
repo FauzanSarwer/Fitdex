@@ -241,7 +241,7 @@ export async function POST(req: Request) {
 /**
  * GET: For client-side UI location fallback and recovery.
  */
-export async function GET(req: Request) {
+export async function GET() {
   try {
     // --- SESSION ---
     let session: { user?: { id?: string } } | null = null;

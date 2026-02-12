@@ -1,18 +1,67 @@
 import type { MetadataRoute } from "next";
-import { getOptionalEnv } from "@/lib/env";
+import { prisma } from "@/lib/prisma";
+import { buildGymSlug } from "@/lib/utils";
+import { getBaseUrl } from "@/lib/site";
+import { normalizeCityName } from "@/lib/seo/cities";
 
-export default function sitemap(): MetadataRoute.Sitemap {
-  const baseUrl =
-    getOptionalEnv("NEXT_PUBLIC_APP_URL") ||
-    getOptionalEnv("NEXTAUTH_URL") ||
-    "http://localhost:3000";
+export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
+  const baseUrl = getBaseUrl();
 
-  const routes = ["/", "/explore", "/auth/login", "/auth/register"];
+  const homepage: MetadataRoute.Sitemap = [
+    {
+      url: `${baseUrl}/`,
+      lastModified: new Date(),
+      changeFrequency: "daily",
+      priority: 1,
+    },
+  ];
 
-  return routes.map((route) => ({
-    url: `${baseUrl}${route}`,
-    lastModified: new Date(),
+  try {
+    const [gyms, cityRows] = await Promise.all([
+      prisma.gym.findMany({
+        where: {
+          suspendedAt: null,
+          verificationStatus: { not: "REJECTED" },
+        },
+        select: {
+          id: true,
+          name: true,
+          updatedAt: true,
+        },
+      }),
+      prisma.gym.findMany({
+        where: {
+          suspendedAt: null,
+          verificationStatus: { not: "REJECTED" },
+          city: { not: null },
+        },
+        select: { city: true, updatedAt: true },
+        distinct: ["city"],
+      }),
+    ]);
+
+  const cityRoutes: MetadataRoute.Sitemap = cityRows
+    .map((row) => {
+      const citySlug = normalizeCityName(row.city ?? "");
+      if (!citySlug) return null;
+      return {
+        url: `${baseUrl}/gyms-in-${citySlug}`,
+        lastModified: row.updatedAt,
+        changeFrequency: "daily" as const,
+        priority: 0.8,
+      };
+    })
+    .filter((entry): entry is NonNullable<typeof entry> => Boolean(entry));
+
+  const gymRoutes: MetadataRoute.Sitemap = gyms.map((gym) => ({
+    url: `${baseUrl}/gym/${buildGymSlug(gym.name, gym.id)}`,
+    lastModified: gym.updatedAt,
     changeFrequency: "weekly",
-    priority: route === "/" ? 1 : 0.7,
+    priority: 0.7,
   }));
+
+    return [...homepage, ...cityRoutes, ...gymRoutes];
+  } catch {
+    return homepage;
+  }
 }

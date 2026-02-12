@@ -14,7 +14,7 @@ export function Footer() {
   const showPricing = status === "authenticated" && isOwner(session);
 
   return (
-    <footer className="mt-auto border-t border-white/10 bg-white/5 backdrop-blur">
+    <footer className="mt-auto border-t border-border/60 bg-card/40 backdrop-blur">
       <div className="container mx-auto px-4 py-10">
         <motion.div
           initial={{ opacity: 0, y: 10 }}
@@ -23,7 +23,7 @@ export function Footer() {
           className="grid gap-8 md:grid-cols-[1.2fr_1fr_1fr] md:items-start"
         >
           <div className="flex items-center gap-3">
-            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-white/10 shadow-glow-sm">
+            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-card shadow-glow-sm">
               <Image
                 src="/fitdex-logo.png"
                 alt="Fitdex"
@@ -59,13 +59,16 @@ export function Footer() {
             <div className="text-xs uppercase tracking-[0.2em] text-muted-foreground">Trust</div>
             <div className="flex flex-col gap-2">
               <Link href="/owners" className="text-muted-foreground hover:text-foreground transition-colors">
-                For gym owners
+                About
               </Link>
               <Link href="/privacy" className="text-muted-foreground hover:text-foreground transition-colors">
-                Privacy policy
+                Privacy
               </Link>
               <Link href="/terms" className="text-muted-foreground hover:text-foreground transition-colors">
-                Terms of service
+                Terms
+              </Link>
+              <Link href="mailto:support@fitdex.in" className="text-muted-foreground hover:text-foreground transition-colors">
+                Contact
               </Link>
             </div>
             {showOwnerCta && (
