@@ -4,28 +4,6 @@
 
 @layer base {
   :root {
-    color-scheme: light;
-    --background: 210 33% 98%;
-    --foreground: 222 47% 12%;
-    --card: 0 0% 100%;
-    --card-foreground: 222 47% 12%;
-    --primary: 216 92% 56%;
-    --primary-foreground: 210 40% 98%;
-    --secondary: 214 32% 92%;
-    --secondary-foreground: 222 47% 16%;
-    --muted: 215 28% 94%;
-    --muted-foreground: 217 19% 42%;
-    --accent: 258 90% 66%;
-    --accent-foreground: 210 40% 98%;
-    --destructive: 0 84% 60%;
-    --border: 215 23% 86%;
-    --input: 215 23% 86%;
-    --ring: 216 92% 56%;
-    --glow: 216 92% 56% / 0.2;
-  }
-
-  .dark {
-    color-scheme: dark;
     --background: 222 47% 6%;
     --foreground: 210 40% 98%;
     --card: 222 47% 9%;
@@ -56,52 +34,29 @@
   body {
     @apply bg-background text-foreground antialiased;
   }
-  h1 {
-    @apply text-3xl font-bold tracking-tight sm:text-4xl;
-  }
-  h2 {
-    @apply text-2xl font-semibold tracking-tight;
-  }
-  h3 {
-    @apply text-lg font-semibold tracking-tight;
-  }
-  p {
-    @apply leading-relaxed text-foreground/90;
-  }
   a:focus-visible,
   button:focus-visible {
     outline: none;
-    box-shadow: 0 0 0 3px hsl(var(--ring)), 0 0 10px 2px hsl(var(--glow));
+    box-shadow: 0 0 0 3px hsl(var(--ring)), 0 0 8px 2px hsl(var(--accent));
     transition: box-shadow 0.2s;
   }
 }
 
+/* Glassmorphism */
 .glass {
-  @apply border border-border/70 bg-background/80 backdrop-blur-xl shadow-glow-sm;
-}
-
-.dark .glass {
-  @apply border-white/15 bg-black/20;
+  @apply bg-white/10 backdrop-blur-2xl border border-white/20 shadow-glow;
+  /* Improved glassmorphism for clarity and confidence */
 }
 
 .glass-card {
-  @apply rounded-2xl border border-border/70 bg-card/85 shadow-sm backdrop-blur;
+  @apply bg-white/[0.08] backdrop-blur-2xl border border-white/20 rounded-2xl shadow-glow;
+  /* Improved glass-card for visual polish */
 }
 
-.dark .glass-card {
-  @apply border-white/15 bg-white/[0.06] shadow-glow-sm;
-}
-
+/* Glow */
 .glow-text {
   text-shadow: 0 0 30px hsl(var(--glow)), 0 0 8px hsl(var(--accent));
-}
-
-.surface-card {
-  @apply rounded-2xl border border-border/70 bg-card/90 shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md;
-}
-
-.section-shell {
-  @apply rounded-2xl border border-border/70 bg-card/80 p-6 shadow-sm;
+  /* Enhanced glow for confidence */
 }
 
 .scrollbar-thin::-webkit-scrollbar {
@@ -112,5 +67,5 @@
   @apply bg-transparent;
 }
 .scrollbar-thin::-webkit-scrollbar-thumb {
-  @apply rounded-full bg-muted-foreground/40;
+  @apply bg-white/20 rounded-full;
 }
