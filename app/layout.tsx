@@ -3,16 +3,9 @@ import "./globals.css";
 import { Providers } from "@/components/providers";
 import { SpeedInsights } from "@vercel/speed-insights/next";
 import React, { Suspense } from "react";
-import localFont from "next/font/local";
 import { organizationSchema } from "@/lib/seo/schema";
 import { rootMetadata } from "@/lib/seo/config";
 import { Footer } from "@/components/layout/footer";
-
-const inter = localFont({
-  src: "../public/fonts/inter-variable.woff2",
-  variable: "--font-inter",
-  display: "swap",
-});
 
 export const metadata: Metadata = rootMetadata;
 
@@ -40,7 +33,7 @@ export default function RootLayout({
       <head>
         <script dangerouslySetInnerHTML={{ __html: themeInitScript }} />
       </head>
-      <body className={`${inter.className} min-h-screen bg-background antialiased`}>
+      <body className="min-h-screen bg-background antialiased">
         <script
           type="application/ld+json"
           dangerouslySetInnerHTML={{ __html: JSON.stringify(organizationSchema()) }}

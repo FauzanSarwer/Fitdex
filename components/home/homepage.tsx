@@ -42,7 +42,7 @@ export function HomePageView(): JSX.Element {
     <div className="w-full">
       <section className="relative isolate min-h-[calc(100vh-4rem)] overflow-hidden">
         <Image
-          src="/home-hero-gym-bg.svg"
+          src="/hero-bg.jpg"
           alt="Modern fitness studio"
           fill
           priority
