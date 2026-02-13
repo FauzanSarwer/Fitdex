@@ -32,7 +32,7 @@ export function Footer() {
           viewport={{ once: true }}
           className="grid gap-8 lg:grid-cols-[1.2fr_0.9fr_0.9fr_1.4fr] lg:items-start"
         >
-          <div className="flex items-center gap-3">
+          <Link href="/" className="flex items-center gap-3">
             <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-card shadow-glow-sm">
               <Image
                 src="/fitdex-logo.png"
@@ -46,7 +46,7 @@ export function Footer() {
               <div className="text-lg font-semibold">Fitdex</div>
               <div className="text-sm text-muted-foreground">Find the right gym, faster.</div>
             </div>
-          </div>
+          </Link>
           <div className="space-y-3 text-sm">
             <div className="text-xs uppercase tracking-[0.2em] text-muted-foreground">Discover</div>
             <div className="flex flex-col gap-2">

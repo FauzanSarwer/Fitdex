@@ -2,7 +2,7 @@ import Link from "next/link";
 import Image from "next/image";
 import { formatPrice } from "@/lib/utils";
 
-const FALLBACK_IMAGE = "/placeholder-gym.jpg";
+const FALLBACK_IMAGE = "/placeholder-gym.svg";
 
 export interface GymCardData {
   id: string;

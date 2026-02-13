@@ -69,7 +69,7 @@ export default async function GymDetailPage({ params }: { params: Params }) {
   const citySlug = gym.city?.trim() ? normalizeCityName(gym.city) : "";
   const city = citySlug ? cityLabel(citySlug) : "India";
   const amenities = (gym.amenities ?? []).filter(Boolean);
-  const heroImage = gym.imageUrls?.[0] || gym.coverImageUrl || "/placeholder-gym.jpg";
+  const heroImage = gym.imageUrls?.[0] || gym.coverImageUrl || "/placeholder-gym.svg";
 
   const relatedRaw = gym.city
     ? await prisma.gym.findMany({
