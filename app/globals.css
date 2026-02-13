@@ -128,6 +128,17 @@
   }
 }
 
+@keyframes twinkle {
+  0% { opacity: var(--fitdex-star-min); }
+  50% { opacity: var(--fitdex-star-max); }
+  100% { opacity: var(--fitdex-star-min); }
+}
+
+.fitdex-hero-star-twinkle {
+  animation: twinkle var(--fitdex-star-duration) ease-in-out infinite;
+  animation-delay: var(--fitdex-star-delay);
+}
+
 .animate-home-arrow {
   animation: homeArrow 2.1s cubic-bezier(0.42, 0, 0.58, 1) infinite;
 }
