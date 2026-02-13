@@ -12,6 +12,44 @@ interface MapViewProps {
   showUserMarker?: boolean;
 }
 
+type LeafletMapLike = {
+  setView: (coords: [number, number], zoom: number) => LeafletMapLike;
+  on: (eventName: string, handler: () => void) => void;
+  getZoom: () => number;
+  invalidateSize: () => void;
+  remove: () => void;
+};
+
+type LeafletMarkerLike = {
+  addTo: (layer: LeafletLayerGroupLike) => LeafletMarkerLike;
+  bindPopup: (content: string) => LeafletMarkerLike;
+  bindTooltip: (
+    content: string,
+    options: { permanent: boolean; direction: "top"; offset: [number, number]; className: string; opacity: number }
+  ) => LeafletMarkerLike;
+};
+
+type LeafletLayerGroupLike = {
+  addTo: (map: LeafletMapLike) => LeafletLayerGroupLike;
+  clearLayers: () => void;
+};
+
+type LeafletLike = {
+  map: (container: HTMLDivElement, options: { zoomControl: boolean; preferCanvas: boolean }) => LeafletMapLike;
+  tileLayer: (url: string, options: { maxZoom: number; attribution: string }) => { addTo: (map: LeafletMapLike) => void };
+  layerGroup: () => LeafletLayerGroupLike;
+  marker: (
+    coords: [number, number],
+    options: { title: string; icon: unknown }
+  ) => LeafletMarkerLike;
+  divIcon: (options: { className: string; html: string; iconSize: [number, number]; iconAnchor: [number, number] }) => unknown;
+};
+
+type FitdexWindow = Window & {
+  L?: LeafletLike;
+  __fitdexLeafletPromise?: Promise<void>;
+};
+
 const LABEL_MIN_ZOOM = 14;
 
 const escapeHtml = (value: string) =>
@@ -22,25 +60,35 @@ const escapeHtml = (value: string) =>
     .replaceAll('"', "&quot;")
     .replaceAll("'", "&#039;");
 
+const getLeafletWindow = (): FitdexWindow | null => {
+  if (typeof window === "undefined") return null;
+  return window as FitdexWindow;
+};
+
 export function MapView({ latitude, longitude, gyms = [], className, zoom = 13, showUserMarker = false }: MapViewProps) {
   const containerRef = useRef<HTMLDivElement>(null);
-  const mapRef = useRef<any>(null);
-  const markersRef = useRef<any>(null);
+  const mapRef = useRef<LeafletMapLike | null>(null);
+  const markersRef = useRef<LeafletLayerGroupLike | null>(null);
+  const markerIconsRef = useRef<{ gym: unknown; user: unknown } | null>(null);
   const lastMarkersKeyRef = useRef<string>("");
 
   const gymsKey = useMemo(() => {
     if (!gyms.length) return "";
-    return gyms.map((g) => `${g.id}:${g.latitude}:${g.longitude}`).join("|");
+    return gyms.map((g) => `${g.id}:${g.latitude}:${g.longitude}:${g.url ?? ""}`).join("|");
   }, [gyms]);
 
-  const centerKey = useMemo(() => `${latitude}:${longitude}:${zoom}:${showUserMarker ? 1 : 0}`, [latitude, longitude, zoom, showUserMarker]);
+  const centerKey = useMemo(
+    () => `${latitude}:${longitude}:${zoom}:${showUserMarker ? 1 : 0}`,
+    [latitude, longitude, zoom, showUserMarker]
+  );
 
   const loadLeaflet = () => {
-    if (typeof window === "undefined") return Promise.resolve(null);
-    if ((window as any).__fitdexLeafletPromise) return (window as any).__fitdexLeafletPromise;
+    const win = getLeafletWindow();
+    if (!win) return Promise.resolve(null);
+    if (win.__fitdexLeafletPromise) return win.__fitdexLeafletPromise;
 
-    (window as any).__fitdexLeafletPromise = new Promise<void>((resolve) => {
-      if ((window as any).L) {
+    win.__fitdexLeafletPromise = new Promise<void>((resolve) => {
+      if (win.L) {
         resolve();
         return;
       }
@@ -57,89 +105,37 @@ export function MapView({ latitude, longitude, gyms = [], className, zoom = 13, 
       document.head.appendChild(script);
     });
 
-    return (window as any).__fitdexLeafletPromise as Promise<void>;
-  };
-
-  useEffect(() => {
-    if (typeof window === "undefined") return;
-    let cancelled = false;
-    loadLeaflet().then(() => {
-      if (cancelled) return;
-      initMap();
-    });
-    return () => {
-      cancelled = true;
-      if (mapRef.current) {
-        mapRef.current.remove();
-        mapRef.current = null;
-        markersRef.current = null;
-      }
-    };
-  }, []);
-
-  const initMap = () => {
-    if (!containerRef.current || mapRef.current) return;
-
-    const L = (window as any).L;
-    if (!L) return;
-
-    // Create map
-    const map = L.map(containerRef.current, {
-      zoomControl: false,
-      preferCanvas: true,
-    }).setView([latitude, longitude], zoom);
-
-    // Add lighter tiles for better label contrast
-    L.tileLayer("https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png", {
-      maxZoom: 19,
-      attribution: '© OpenStreetMap contributors © CARTO',
-    }).addTo(map);
-
-    mapRef.current = map;
-    markersRef.current = L.layerGroup().addTo(map);
-    updateMarkers();
-    map.on("zoomend", updateMarkers);
-    setTimeout(() => map.invalidateSize(), 0);
+    return win.__fitdexLeafletPromise;
   };
 
   const updateMarkers = () => {
-    if (!mapRef.current || !markersRef.current) return;
-    const L = (window as any).L;
-    if (!L) return;
-    const currentZoom = mapRef.current?.getZoom?.() ?? zoom;
+    const map = mapRef.current;
+    const markers = markersRef.current;
+    const win = getLeafletWindow();
+    if (!map || !markers || !win?.L || !markerIconsRef.current) return;
+
+    const currentZoom = map.getZoom?.() ?? zoom;
     const key = `${centerKey}|${gymsKey}|${currentZoom}`;
     if (key === lastMarkersKeyRef.current) return;
     lastMarkersKeyRef.current = key;
-    markersRef.current.clearLayers();
 
-    const createMarkerIcon = (type: "gym" | "user") =>
-      L.divIcon({
-        className: "fitdex-map-marker-host",
-        html:
-          type === "user"
-            ? '<span class="fitdex-map-marker fitdex-map-marker-user"><span class="fitdex-map-marker-core"></span></span>'
-            : '<span class="fitdex-map-marker fitdex-map-marker-gym"><span class="fitdex-map-marker-core"></span></span>',
-        iconSize: [18, 18],
-        iconAnchor: [9, 9],
-      });
+    markers.clearLayers();
 
     if (showUserMarker) {
-      L.marker([latitude, longitude], {
+      win.L.marker([latitude, longitude], {
         title: "You",
-        icon: createMarkerIcon("user"),
+        icon: markerIconsRef.current.user,
       })
-        .addTo(markersRef.current)
+        .addTo(markers)
         .bindPopup("Your location");
     }
 
-    // Add gym markers
     const showLabels = currentZoom >= LABEL_MIN_ZOOM;
-    gyms.forEach((gym) => {
-      const marker = L.marker([gym.latitude, gym.longitude], {
+    for (const gym of gyms) {
+      const marker = win.L.marker([gym.latitude, gym.longitude], {
         title: gym.name,
-        icon: createMarkerIcon("gym"),
-      })
-        .addTo(markersRef.current);
+        icon: markerIconsRef.current.gym,
+      }).addTo(markers);
 
       if (showLabels) {
         marker.bindTooltip(escapeHtml(gym.name), {
@@ -156,23 +152,70 @@ export function MapView({ latitude, longitude, gyms = [], className, zoom = 13, 
           ? `<div style="display:flex;flex-direction:column;gap:4px"><strong>${escapeHtml(gym.name)}</strong><a href="${gym.url}" style="color:#22c55e;text-decoration:underline" target="_blank" rel="noreferrer">View gym</a></div>`
           : escapeHtml(gym.name)
       );
-    });
+    }
+  };
+
+  const initMap = () => {
+    if (!containerRef.current || mapRef.current) return;
+
+    const win = getLeafletWindow();
+    if (!win?.L) return;
+
+    const map = win.L.map(containerRef.current, {
+      zoomControl: false,
+      preferCanvas: true,
+    }).setView([latitude, longitude], zoom);
+
+    win.L.tileLayer("https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png", {
+      maxZoom: 19,
+      attribution: "© OpenStreetMap contributors © CARTO",
+    }).addTo(map);
+
+    mapRef.current = map;
+    markersRef.current = win.L.layerGroup().addTo(map);
+    markerIconsRef.current = {
+      user: win.L.divIcon({
+        className: "fitdex-map-marker-host",
+        html: '<span class="fitdex-map-marker fitdex-map-marker-user"><span class="fitdex-map-marker-core"></span></span>',
+        iconSize: [18, 18],
+        iconAnchor: [9, 9],
+      }),
+      gym: win.L.divIcon({
+        className: "fitdex-map-marker-host",
+        html: '<span class="fitdex-map-marker fitdex-map-marker-gym"><span class="fitdex-map-marker-core"></span></span>',
+        iconSize: [18, 18],
+        iconAnchor: [9, 9],
+      }),
+    };
+
+    updateMarkers();
+    map.on("zoomend", updateMarkers);
+    setTimeout(() => map.invalidateSize(), 0);
   };
 
   useEffect(() => {
-    if (!mapRef.current) return;
-    const L = (window as any).L;
-    if (!L) return;
+    let cancelled = false;
+    loadLeaflet().then(() => {
+      if (cancelled) return;
+      initMap();
+    });
 
-    // Update map view when coordinates change
+    return () => {
+      cancelled = true;
+      if (mapRef.current) {
+        mapRef.current.remove();
+        mapRef.current = null;
+        markersRef.current = null;
+        markerIconsRef.current = null;
+      }
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!mapRef.current) return;
     mapRef.current.setView([latitude, longitude], zoom);
     updateMarkers();
   }, [centerKey, gymsKey]);
 
-  return (
-    <div
-      ref={containerRef}
-      className={cn("rounded-2xl overflow-hidden min-h-[200px] bg-white/5 border border-white/10", className)}
-    />
-  );
+  return <div ref={containerRef} className={cn("rounded-2xl overflow-hidden min-h-[200px] bg-white/5 border border-white/10", className)} />;
 }

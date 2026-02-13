@@ -53,14 +53,14 @@ export async function GET() {
     });
     const hasOwnerSubscription = !!activeSubscription;
 
-    const viewCounts = await (prisma as any).gymPageView.groupBy({
+    const viewCounts = await prisma.gymPageView.groupBy({
       by: ["gymId"],
       _count: { _all: true },
     });
-    const viewMap = new Map((viewCounts as Array<any>).map((v) => [v.gymId, v._count._all]));
+    const viewMap = new Map(viewCounts.map((view) => [view.gymId, view._count._all]));
 
     const now = Date.now();
-    const list = gyms.map((g: any) => {
+    const list = gyms.map((g) => {
       const isOwner = g.ownerId === uid;
       const hasPremiumAccess =
         hasOwnerSubscription ||
@@ -105,7 +105,10 @@ export async function GET() {
       };
     });
 
-    return NextResponse.json({ gyms: list });
+    return NextResponse.json(
+      { gyms: list },
+      { headers: { "Cache-Control": "private, max-age=20, stale-while-revalidate=40" } }
+    );
   } catch (error) {
     logServerError(error as Error, { route: "/api/owner/explore", userId: uid });
     return jsonError("Failed to load explore data", 500);

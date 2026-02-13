@@ -21,7 +21,12 @@ export async function GET() {
       orderBy: { createdAt: "asc" },
     });
     const gymIds = gyms.map((g) => g.id);
-    if (gymIds.length === 0) return NextResponse.json({ leads: [] });
+    if (gymIds.length === 0) {
+      return NextResponse.json(
+        { leads: [] },
+        { headers: { "Cache-Control": "private, max-age=15, stale-while-revalidate=30" } }
+      );
+    }
 
     const thirtyDaysAgo = new Date();
     thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
@@ -49,7 +54,10 @@ export async function GET() {
       leadsLast30Days: last30Map.get(g.id) ?? 0,
     }));
 
-    return NextResponse.json({ leads: result });
+    return NextResponse.json(
+      { leads: result },
+      { headers: { "Cache-Control": "private, max-age=15, stale-while-revalidate=30" } }
+    );
   } catch (error) {
     logServerError(error as Error, { route: "/api/owner/leads", userId: uid });
     return jsonError("Failed to load leads", 500);

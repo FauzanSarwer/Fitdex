@@ -32,7 +32,12 @@ export default function OwnerMembersPage() {
 
   useEffect(() => {
     let active = true;
-    fetchJson<{ gyms?: any[]; error?: string }>("/api/owner/gym?compact=1", { retries: 1 })
+    fetchJson<{ gyms?: any[]; error?: string }>("/api/owner/gym?compact=1", {
+      retries: 1,
+      useCache: true,
+      cacheKey: "owner-gyms-compact",
+      cacheTtlMs: 30000,
+    })
       .then((result) => {
         if (!active) return;
         if (!result.ok) {
@@ -58,7 +63,12 @@ export default function OwnerMembersPage() {
 
   useEffect(() => {
     let active = true;
-    fetchJson<{ subscription?: any }>("/api/owner/subscription", { retries: 1 })
+    fetchJson<{ subscription?: any }>("/api/owner/subscription", {
+      retries: 1,
+      useCache: true,
+      cacheKey: "owner-subscription",
+      cacheTtlMs: 20000,
+    })
       .then((result) => {
         if (!active) return;
         if (result.ok) setSubscription(result.data?.subscription ?? null);
@@ -80,7 +90,12 @@ export default function OwnerMembersPage() {
   useEffect(() => {
     if (!selectedGymId) return;
     let active = true;
-    fetchJson<{ members?: any[]; error?: string }>(`/api/owner/members?gymId=${selectedGymId}`, { retries: 1 })
+    fetchJson<{ members?: any[]; error?: string }>(`/api/owner/members?gymId=${selectedGymId}`, {
+      retries: 1,
+      useCache: true,
+      cacheKey: `owner-members:${selectedGymId}`,
+      cacheTtlMs: 15000,
+    })
       .then((result) => {
         if (!active) return;
         if (!result.ok) {

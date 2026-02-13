@@ -8,6 +8,7 @@ import { fetchJson } from "@/lib/client-fetch";
 import { isPaymentsEnabled, openRazorpayCheckout } from "@/lib/razorpay-checkout";
 import { useToast } from "@/hooks/use-toast";
 import { useSession } from "next-auth/react";
+import { runWhenIdle } from "@/lib/browser-idle";
 
 const PLAN_LABELS: Record<string, string> = {
   FREE: "Free",
@@ -30,7 +31,12 @@ export default function OwnerSubscriptionPage() {
   const loadSubscription = async () => {
     setLoading(true);
     try {
-      const result = await fetchJson<{ subscription?: any; error?: string }>("/api/owner/subscription", { retries: 1 });
+      const result = await fetchJson<{ subscription?: any; error?: string }>("/api/owner/subscription", {
+        retries: 1,
+        useCache: true,
+        cacheKey: "owner-subscription",
+        cacheTtlMs: 20000,
+      });
       if (result.ok) {
         setSubscription(result.data?.subscription ?? null);
       }
@@ -39,7 +45,12 @@ export default function OwnerSubscriptionPage() {
     }
 
     const loadInvoices = async () => {
-      const invoiceResult = await fetchJson<{ invoices?: any[]; error?: string }>("/api/owner/invoices", { retries: 1 });
+      const invoiceResult = await fetchJson<{ invoices?: any[]; error?: string }>("/api/owner/invoices", {
+        retries: 1,
+        useCache: true,
+        cacheKey: "owner-invoices",
+        cacheTtlMs: 20000,
+      });
       if (invoiceResult.ok) {
         setInvoices(invoiceResult.data?.invoices ?? []);
         setInvoiceError(null);
@@ -49,11 +60,7 @@ export default function OwnerSubscriptionPage() {
       }
     };
 
-    if (typeof (window as any).requestIdleCallback === "function") {
-      (window as any).requestIdleCallback(loadInvoices);
-    } else {
-      setTimeout(loadInvoices, 0);
-    }
+    runWhenIdle(loadInvoices);
   };
 
   useEffect(() => {

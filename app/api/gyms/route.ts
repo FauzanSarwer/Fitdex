@@ -3,10 +3,47 @@ import { prisma } from "@/lib/prisma";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { jsonError, safeJson } from "@/lib/api";
-import { computeDiscount } from "@/lib/discounts";
+import { computeDiscount, type PlanType } from "@/lib/discounts";
 import { logServerError } from "@/lib/logger";
 import { getGymTierRank, isGymFeatured } from "@/lib/gym-utils";
 import { cityLabel, normalizeCityName } from "@/lib/seo/cities";
+
+type GymListItem = {
+  id: string;
+  name: string;
+  address: string;
+  latitude: number;
+  longitude: number;
+  verificationStatus: string;
+  coverImageUrl: string | null;
+  imageUrls: string[] | null;
+  openTime: string | null;
+  closeTime: string | null;
+  openDays: string | null;
+  dayPassPrice: number | null;
+  monthlyPrice: number;
+  yearlyPrice: number;
+  partnerDiscountPercent: number;
+  yearlyDiscountType: string;
+  yearlyDiscountValue: number;
+  quarterlyDiscountType: string;
+  quarterlyDiscountValue: number;
+  welcomeDiscountType: string;
+  welcomeDiscountValue: number;
+  ownerId: string;
+  featuredUntil: Date | null;
+  isFeatured: boolean;
+  featuredStartAt: Date | null;
+  featuredEndAt: Date | null;
+  verifiedUntil: Date | null;
+  gymTier: string;
+  hasAC: boolean;
+  amenities: string[];
+  createdAt: Date;
+  distance?: number;
+  __tierRank: number;
+  __isFeatured: boolean;
+};
 
 const CITY_EQUIVALENT_SLUGS: Record<string, string[]> = {
   delhi: ["delhi", "new-delhi"],
@@ -72,6 +109,12 @@ function haversine(
 
 export const dynamic = 'force-dynamic';
 
+const DISCOUNT_PLAN_TYPE_BY_REQUEST_PLAN: Record<"day_pass" | "monthly" | "yearly", PlanType> = {
+  day_pass: "DAY_PASS",
+  monthly: "MONTHLY",
+  yearly: "YEARLY",
+};
+
 export async function GET(req: Request) {
   try {
     const { searchParams } = new URL(req.url);
@@ -116,10 +159,10 @@ export async function GET(req: Request) {
         hasAC: true,
         amenities: true,
         createdAt: true,
-        owner: { select: { id: true, name: true } },
       },
     });
-    let list = gyms.map((g) => ({
+
+    let list: GymListItem[] = gyms.map((g) => ({
       id: g.id,
       name: g.name,
       address: g.address,
@@ -151,7 +194,21 @@ export async function GET(req: Request) {
       hasAC: g.hasAC,
       amenities: g.amenities,
       createdAt: g.createdAt,
+      __tierRank: getGymTierRank(g.gymTier),
+      __isFeatured: isGymFeatured(g),
     }));
+
+    const sortByTierAndDistance = (a: GymListItem, b: GymListItem) =>
+      a.__tierRank - b.__tierRank ||
+      (a.distance ?? Number.POSITIVE_INFINITY) - (b.distance ?? Number.POSITIVE_INFINITY) ||
+      Number(b.__isFeatured) - Number(a.__isFeatured) ||
+      (a.monthlyPrice ?? 0) - (b.monthlyPrice ?? 0);
+
+    const sortByTierAndPrice = (a: GymListItem, b: GymListItem) =>
+      a.__tierRank - b.__tierRank ||
+      Number(b.__isFeatured) - Number(a.__isFeatured) ||
+      (a.monthlyPrice ?? 0) - (b.monthlyPrice ?? 0);
+
     if (lat && lng) {
       const numLat = parseFloat(lat);
       const numLng = parseFloat(lng);
@@ -161,35 +218,22 @@ export async function GET(req: Request) {
             ...g,
             distance: haversine(numLat, numLng, g.latitude, g.longitude),
           }))
-          .sort((a, b) => {
-            const tierDelta = getGymTierRank(a.gymTier) - getGymTierRank(b.gymTier);
-            if (tierDelta !== 0) return tierDelta;
-            const distDelta = (a.distance ?? Infinity) - (b.distance ?? Infinity);
-            if (distDelta !== 0) return distDelta;
-            const aFeatured = isGymFeatured(a);
-            const bFeatured = isGymFeatured(b);
-            if (aFeatured !== bFeatured) return aFeatured ? -1 : 1;
-            return (a.monthlyPrice ?? 0) - (b.monthlyPrice ?? 0);
-          });
+          .sort(sortByTierAndDistance);
       }
     } else {
-      list = list.sort((a, b) => {
-        const tierDelta = getGymTierRank(a.gymTier) - getGymTierRank(b.gymTier);
-        if (tierDelta !== 0) return tierDelta;
-        const aFeatured = isGymFeatured(a);
-        const bFeatured = isGymFeatured(b);
-        if (aFeatured !== bFeatured) return aFeatured ? -1 : 1;
-        return (a.monthlyPrice ?? 0) - (b.monthlyPrice ?? 0);
-      });
+      list = list.sort(sortByTierAndPrice);
     }
 
     const MIN_RESULTS_WITHOUT_EDGE = 10;
-    const nonEdge = list.filter((g) => getGymTierRank(g.gymTier) < 2);
+    const nonEdge = list.filter((g) => g.__tierRank < 2);
     if (nonEdge.length >= MIN_RESULTS_WITHOUT_EDGE) {
-      list = list.filter((g) => getGymTierRank(g.gymTier) < 2);
+      list = list.filter((g) => g.__tierRank < 2);
     }
+
+    const responseList = list.map(({ __tierRank: _tierRank, __isFeatured: _isFeatured, ...gym }) => gym);
+
     return NextResponse.json(
-      { gyms: list },
+      { gyms: responseList },
       { headers: { "Cache-Control": "public, max-age=30, stale-while-revalidate=60" } }
     );
   } catch (e) {
@@ -312,12 +356,15 @@ export async function POST(req: Request) {
       }
     }
 
-    const discountResult = computeDiscount(planData?.originalPrice ?? 0, selectedPlan.toUpperCase() as any, {
-      isFirstTimeUser,
-      hasActiveDuo: !!partnerId,
-      promo,
-      gym: {
-        monthlyPrice: gym.monthlyPrice,
+    const discountResult = computeDiscount(
+      planData?.originalPrice ?? 0,
+      DISCOUNT_PLAN_TYPE_BY_REQUEST_PLAN[selectedPlan],
+      {
+        isFirstTimeUser,
+        hasActiveDuo: !!partnerId,
+        promo,
+        gym: {
+          monthlyPrice: gym.monthlyPrice,
         quarterlyPrice: gym.quarterlyPrice ?? undefined,
         yearlyPrice: gym.yearlyPrice,
         partnerDiscountPercent: gym.partnerDiscountPercent,
@@ -328,7 +375,8 @@ export async function POST(req: Request) {
         welcomeDiscountType: gym.welcomeDiscountType as "PERCENT" | "FLAT",
         welcomeDiscountValue: gym.welcomeDiscountValue,
       },
-    });
+      }
+    );
 
     finalPrice = discountResult.finalPrice;
     const b = discountResult.breakdown;

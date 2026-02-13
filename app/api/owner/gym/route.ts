@@ -46,7 +46,10 @@ export async function GET(req: Request) {
           },
         };
     const gyms = await prisma.gym.findMany(query);
-    return NextResponse.json({ gyms });
+    return NextResponse.json(
+      { gyms },
+      { headers: { "Cache-Control": "private, max-age=20, stale-while-revalidate=40" } }
+    );
   } catch (error) {
     logServerError(error as Error, { route: "/api/owner/gym", userId: uid });
     return jsonError("Failed to load gyms", 500);

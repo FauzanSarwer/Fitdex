@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { runWhenIdle } from "@/lib/browser-idle";
 
 function LoginForm() {
   const searchParams = useSearchParams();
@@ -36,15 +37,13 @@ function LoginForm() {
   })();
 
   useEffect(() => {
-    if (typeof (window as any).requestIdleCallback === "function") {
-      (window as any).requestIdleCallback(() => {
-        getProviders().then(setProviders).catch(() => setProviders(null));
-      });
-    } else {
-      setTimeout(() => {
-        getProviders().then(setProviders).catch(() => setProviders(null));
-      }, 0);
-    }
+    const cancelIdle = runWhenIdle(() => {
+      getProviders().then(setProviders).catch(() => setProviders(null));
+    });
+
+    return () => {
+      cancelIdle();
+    };
   }, []);
 
   useEffect(() => {
@@ -134,7 +133,6 @@ function LoginForm() {
               <Input
                 id="name"
                 type="text"
-                placeholder="Your name"
                 value={name}
                 onChange={(e) => setName(e.target.value)}
                 required={isEmailIdentifier}
@@ -147,7 +145,6 @@ function LoginForm() {
               <Input
                 id="email"
                 type="text"
-                placeholder="admin or you@example.com"
                 value={identifier}
                 onChange={(e) => setIdentifier(e.target.value)}
                 required

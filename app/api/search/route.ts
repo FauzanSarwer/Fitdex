@@ -21,7 +21,7 @@ export async function GET(req: Request) {
 
   const role = (session.user as { role?: string }).role ?? "USER";
   const userId = (session.user as { id?: string }).id;
-  const query = q.toLowerCase();
+  const query = q;
 
   const results: Array<{ type: string; label: string; subtitle?: string; href: string }> = [];
 
@@ -130,5 +130,8 @@ export async function GET(req: Request) {
     );
   }
 
-  return NextResponse.json({ results: results.slice(0, 12) });
+  return NextResponse.json(
+    { results: results.slice(0, 12) },
+    { headers: { "Cache-Control": "private, max-age=15, stale-while-revalidate=30" } }
+  );
 }

@@ -90,7 +90,12 @@ export default function GymProfilePage() {
   useEffect(() => {
     let active = true;
     if (!gymId) return () => { active = false; };
-    fetchJson<{ gym?: GymData; error?: string }>(`/api/gyms/${gymId}`, { retries: 1 })
+    fetchJson<{ gym?: GymData; error?: string }>(`/api/gyms/${gymId}`, {
+      retries: 1,
+      useCache: true,
+      cacheKey: `gym:${gymId}`,
+      cacheTtlMs: 30000,
+    })
       .then((result) => {
         if (!active) return;
         if (!result.ok) {
@@ -128,7 +133,12 @@ export default function GymProfilePage() {
 
   useEffect(() => {
     if (status !== "authenticated") return;
-    fetchJson<{ saved?: Array<{ gymId: string }> }>("/api/saved-gyms", { retries: 1 })
+    fetchJson<{ saved?: Array<{ gymId: string }> }>("/api/saved-gyms", {
+      retries: 1,
+      useCache: true,
+      cacheKey: "saved-gyms",
+      cacheTtlMs: 10000,
+    })
       .then((result) => {
         if (!result.ok) return;
         const ids = new Set((result.data?.saved ?? []).map((s) => s.gymId));
@@ -225,6 +235,12 @@ export default function GymProfilePage() {
   const amenities = (gym.amenities ?? []).filter(Boolean);
   const heroImage = (gym.imageUrls && gym.imageUrls.length > 0 ? gym.imageUrls[0] : gym.coverImageUrl) ?? null;
   const featured = isGymFeatured(gym);
+  const openStatus = getGymOpenStatus({
+    openTime: gym.openTime,
+    closeTime: gym.closeTime,
+    openDays: gym.openDays,
+    useIst: true,
+  });
 
   const recordLead = async (type: "BOOK_CTA" | "ENQUIRY") => {
     try {
@@ -281,8 +297,8 @@ export default function GymProfilePage() {
                   <MapPin className="h-4 w-4" />
                   {gym.address}
                 </p>
-                <p className={`text-xs mt-2 ${getGymOpenStatus({ ...gym, useIst: true }).isOpen ? "text-emerald-400" : "text-muted-foreground"}`}>
-                  {getGymOpenStatus({ ...gym, useIst: true }).label}
+                <p className={`text-xs mt-2 ${openStatus.isOpen ? "text-emerald-400" : "text-muted-foreground"}`}>
+                  {openStatus.label}
                 </p>
               </div>
               <div className="flex flex-col sm:flex-row gap-3">

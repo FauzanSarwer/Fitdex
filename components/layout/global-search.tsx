@@ -1,10 +1,11 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useDeferredValue, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { Search } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
+import { fetchJson } from "@/lib/client-fetch";
 
 type Result = {
   type: string;
@@ -18,27 +19,39 @@ export function GlobalSearch({ className }: { className?: string }) {
   const [results, setResults] = useState<Result[]>([]);
   const [loading, setLoading] = useState(false);
   const [open, setOpen] = useState(false);
+  const requestIdRef = useRef(0);
 
   const trimmed = useMemo(() => query.trim(), [query]);
+  const deferredTrimmed = useDeferredValue(trimmed);
 
   useEffect(() => {
-    if (trimmed.length < 2) {
+    if (deferredTrimmed.length < 2) {
       setResults([]);
       setOpen(false);
+      setLoading(false);
       return;
     }
 
     let active = true;
+    const requestId = ++requestIdRef.current;
     setLoading(true);
+
     const timer = setTimeout(async () => {
       try {
-        const res = await fetch(`/api/search?q=${encodeURIComponent(trimmed)}`);
-        const data = await res.json();
-        if (!active) return;
-        setResults(data.results ?? []);
+        const result = await fetchJson<{ results?: Result[] }>(
+          `/api/search?q=${encodeURIComponent(deferredTrimmed)}`,
+          {
+            retries: 1,
+            useCache: true,
+            cacheTtlMs: 15000,
+            cacheKey: `search:${deferredTrimmed.toLowerCase()}`,
+          }
+        );
+        if (!active || requestId !== requestIdRef.current) return;
+        setResults(result.ok ? result.data?.results ?? [] : []);
         setOpen(true);
       } catch {
-        if (!active) return;
+        if (!active || requestId !== requestIdRef.current) return;
         setResults([]);
         setOpen(true);
       } finally {
@@ -50,7 +63,7 @@ export function GlobalSearch({ className }: { className?: string }) {
       active = false;
       clearTimeout(timer);
     };
-  }, [trimmed]);
+  }, [deferredTrimmed]);
 
   return (
     <div className={cn("relative", className)}>

@@ -11,6 +11,7 @@ import dynamic from "next/dynamic";
 import { buildGymSlug, formatPrice } from "@/lib/utils";
 import { Skeleton } from "@/components/ui/skeleton";
 import { fetchJson } from "@/lib/client-fetch";
+import { runWhenIdle } from "@/lib/browser-idle";
 
 const MapView = dynamic(() => import("@/components/maps/MapView").then((m) => m.MapView), {
   ssr: false,
@@ -49,6 +50,7 @@ function UserDashboardContent() {
 
   useEffect(() => {
     let active = true;
+    let cancelIdle: () => void = () => {};
     const joinGymId = searchParams.get("join");
     if (joinGymId) {
       router.replace(`/dashboard/user/join/${joinGymId}`);
@@ -58,8 +60,18 @@ function UserDashboardContent() {
     const load = async () => {
       try {
         const results = await Promise.allSettled([
-          fetchJson<{ memberships?: Membership[] }>("/api/memberships", { retries: 1 }),
-          fetchJson<{ duos?: Duo[] }>("/api/duos", { retries: 1 }),
+          fetchJson<{ memberships?: Membership[] }>("/api/memberships", {
+            retries: 1,
+            useCache: true,
+            cacheKey: "user-memberships",
+            cacheTtlMs: 15000,
+          }),
+          fetchJson<{ duos?: Duo[] }>("/api/duos", {
+            retries: 1,
+            useCache: true,
+            cacheKey: "user-duos",
+            cacheTtlMs: 15000,
+          }),
         ]);
 
         if (!active) return;
@@ -68,8 +80,18 @@ function UserDashboardContent() {
         const d = results[1].status === "fulfilled" ? results[1].value : null;
         const loadExtras = async () => {
           const extra = await Promise.allSettled([
-            fetchJson<{ location?: { latitude?: number; longitude?: number } }>("/api/location", { retries: 1 }),
-            fetchJson<{ saved?: any[] }>("/api/saved-gyms", { retries: 1 }),
+            fetchJson<{ location?: { latitude?: number; longitude?: number } }>("/api/location", {
+              retries: 1,
+              useCache: true,
+              cacheKey: "user-location",
+              cacheTtlMs: 15000,
+            }),
+            fetchJson<{ saved?: any[] }>("/api/saved-gyms", {
+              retries: 1,
+              useCache: true,
+              cacheKey: "user-saved-gyms",
+              cacheTtlMs: 10000,
+            }),
           ]);
 
           if (!active) return;
@@ -94,11 +116,7 @@ function UserDashboardContent() {
 
         setMemberships(mem?.data?.memberships ?? []);
         setDuos(d?.data?.duos ?? []);
-        if (typeof (window as any).requestIdleCallback === "function") {
-          (window as any).requestIdleCallback(loadExtras);
-        } else {
-          setTimeout(loadExtras, 0);
-        }
+        cancelIdle = runWhenIdle(loadExtras);
       } catch {
         if (active) setError("Failed to load your dashboard");
       } finally {
@@ -110,6 +128,7 @@ function UserDashboardContent() {
 
     return () => {
       active = false;
+      cancelIdle();
     };
   }, [searchParams, router]);
 

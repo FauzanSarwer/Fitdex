@@ -31,7 +31,10 @@ export async function GET() {
         total: true,
       },
     });
-    return NextResponse.json({ invoices });
+    return NextResponse.json(
+      { invoices },
+      { headers: { "Cache-Control": "private, max-age=20, stale-while-revalidate=40" } }
+    );
   } catch (error) {
     logServerError(error as Error, { route: "/api/owner/invoices", userId: uid });
     return jsonError("Failed to load invoices", 500);

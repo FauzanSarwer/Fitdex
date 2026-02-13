@@ -14,19 +14,22 @@ export async function GET() {
   const uid = (session!.user as { id: string }).id;
   const role = (session!.user as { role?: string }).role;
   if (role === "ADMIN") {
-    return NextResponse.json({
-      subscription: {
-        id: `admin_${uid}`,
-        ownerId: uid,
-        plan: "PRO",
-        status: "ACTIVE",
-        startsAt: new Date(0),
-        expiresAt: new Date("2999-12-31"),
-        createdAt: new Date(0),
-        updatedAt: new Date(),
-        adminAccess: true,
+    return NextResponse.json(
+      {
+        subscription: {
+          id: `admin_${uid}`,
+          ownerId: uid,
+          plan: "PRO",
+          status: "ACTIVE",
+          startsAt: new Date(0),
+          expiresAt: new Date("2999-12-31"),
+          createdAt: new Date(0),
+          updatedAt: new Date(),
+          adminAccess: true,
+        },
       },
-    });
+      { headers: { "Cache-Control": "private, max-age=15, stale-while-revalidate=30" } }
+    );
   }
   try {
     const now = new Date();
@@ -38,9 +41,12 @@ export async function GET() {
       where: { ownerId: uid },
       orderBy: { createdAt: "desc" },
     });
-    return NextResponse.json({
-      subscription: active ?? latest ?? null,
-    });
+    return NextResponse.json(
+      {
+        subscription: active ?? latest ?? null,
+      },
+      { headers: { "Cache-Control": "private, max-age=15, stale-while-revalidate=30" } }
+    );
   } catch (error) {
     logServerError(error as Error, { route: "/api/owner/subscription", userId: uid });
     return jsonError("Failed to load subscription", 500);

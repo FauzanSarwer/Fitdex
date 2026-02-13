@@ -30,7 +30,12 @@ export default function OwnerExplorePage() {
     let active = true;
     setLoading(true);
     setError(null);
-    fetchJson<{ gyms?: any[]; error?: string }>("/api/owner/explore", { retries: 1 })
+    fetchJson<{ gyms?: any[]; error?: string }>("/api/owner/explore", {
+      retries: 1,
+      useCache: true,
+      cacheKey: "owner-explore-gyms",
+      cacheTtlMs: 20000,
+    })
       .then((result) => {
         if (!active) return;
         if (!result.ok) {

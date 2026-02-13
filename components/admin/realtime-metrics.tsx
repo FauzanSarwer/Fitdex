@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { formatPrice } from "@/lib/utils";
+import { runWhenIdle } from "@/lib/browser-idle";
 
 type Metrics = {
   pendingGyms: number;
@@ -37,14 +38,11 @@ export function RealtimeAdminMetrics() {
       }
     };
 
-    if (typeof (window as any).requestIdleCallback === "function") {
-      (window as any).requestIdleCallback(load);
-    } else {
-      setTimeout(load, 0);
-    }
+    const cancelIdle = runWhenIdle(load);
     const timer = setInterval(load, 60000);
     return () => {
       active = false;
+      cancelIdle();
       clearInterval(timer);
     };
   }, []);

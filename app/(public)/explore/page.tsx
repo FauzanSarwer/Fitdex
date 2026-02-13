@@ -64,11 +64,17 @@ interface Gym {
 
 type SortOption = "price_asc" | "price_desc" | "distance" | "newest";
 
-const SORT_LABELS: Record<SortOption, string> = {
-  price_asc: "Price: low → high",
-  price_desc: "Price: high → low",
-  distance: "Nearby first",
-  newest: "Newest",
+type PreparedGym = Gym & {
+  normalizedName: string;
+  tierRank: number;
+  featured: boolean;
+  distanceValue: number;
+  createdAtValue: number;
+  slug: string;
+  amenityPreview: string[];
+  imageList: string[];
+  hasDuo: boolean;
+  isPremium: boolean;
 };
 
 const normalize = (value: string) => value.toLowerCase().replace(/[^a-z0-9]/g, "");
@@ -94,9 +100,9 @@ const levenshtein = (a: string, b: string) => {
   return dp[m][n];
 };
 
-const fuzzyMatch = (name: string, q: string) => {
-  const n = normalize(name);
-  const query = normalize(q);
+const fuzzyMatch = (normalizedName: string, normalizedQuery: string) => {
+  const n = normalizedName;
+  const query = normalizedQuery;
   if (!query) return true;
   if (n.includes(query)) return true;
   if (query.length < 3) return false;
@@ -156,7 +162,6 @@ export default function ExplorePage() {
   const deferredQuery = useDeferredValue(query);
   const deferredMaxPrice = useDeferredValue(maxPrice);
   const deferredMaxDistance = useDeferredValue(maxDistance);
-  const headingRef = useRef<HTMLHeadingElement | null>(null);
   const cardRefs = useRef<Array<HTMLDivElement | null>>([]);
   const cityQueryParam = searchParams.get("city") ?? "";
   const queryFromNav = searchParams.get("q") ?? "";
@@ -176,12 +181,52 @@ export default function ExplorePage() {
     return { latitude: 28.6139, longitude: 77.209, showUserMarker: false };
   }, [userLat, userLng, gyms]);
 
+  const preparedGyms = useMemo<PreparedGym[]>(
+    () =>
+      gyms.map((gym) => ({
+        ...gym,
+        amenityPreview: (gym.amenities ?? []).filter(Boolean).slice(0, 3),
+        imageList:
+          (gym.imageUrls ?? []).length > 0
+            ? (gym.imageUrls ?? [])
+            : gym.coverImageUrl
+              ? [gym.coverImageUrl]
+              : [],
+        hasDuo: gym.partnerDiscountPercent > 0,
+        normalizedName: normalize(gym.name),
+        tierRank: getGymTierRank(gym.gymTier),
+        isPremium: getGymTierRank(gym.gymTier) <= 1,
+        featured: isGymFeatured(gym),
+        distanceValue: gym.distance ?? Number.POSITIVE_INFINITY,
+        createdAtValue: new Date(gym.createdAt ?? 0).getTime(),
+        slug: buildGymSlug(gym.name, gym.id),
+      })),
+    [gyms]
+  );
+
+  const mapGyms = useMemo(
+    () =>
+      preparedGyms.map((gym) => ({
+        id: gym.id,
+        name: gym.name,
+        latitude: gym.latitude,
+        longitude: gym.longitude,
+        url: `/explore/${gym.slug}`,
+      })),
+    [preparedGyms]
+  );
+
   const loadGyms = async (url: string) => {
     setError(null);
     setLoadFailed(false);
     setLoading(true);
     try {
-      const result = await fetchJson<{ gyms?: Gym[]; error?: string }>(url, { retries: 2 });
+      const result = await fetchJson<{ gyms?: Gym[]; error?: string }>(url, {
+        retries: 2,
+        useCache: true,
+        cacheKey: url,
+        cacheTtlMs: 20000,
+      });
       if (!result.ok) {
         setGyms([]);
         setLoadFailed(true);
@@ -266,7 +311,12 @@ export default function ExplorePage() {
 
   useEffect(() => {
     if (status !== "authenticated") return;
-    fetchJson<{ saved?: Array<{ gymId: string }> }>("/api/saved-gyms", { retries: 1 })
+    fetchJson<{ saved?: Array<{ gymId: string }> }>("/api/saved-gyms", {
+      retries: 1,
+      useCache: true,
+      cacheKey: "saved-gyms",
+      cacheTtlMs: 10000,
+    })
       .then((result) => {
         if (!result.ok) return;
         const ids = new Set<string>((result.data?.saved ?? []).map((s) => s.gymId));
@@ -280,37 +330,6 @@ export default function ExplorePage() {
       setSavedIds(new Set());
     }
   }, [status]);
-
-  useEffect(() => {
-    if (typeof window === "undefined") return;
-    const heading = headingRef.current;
-    if (!heading) return;
-
-    const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-    if (reduceMotion) {
-      heading.style.transform = "translate3d(0, 0, 0) scale(1)";
-      return;
-    }
-
-    let rafId = 0;
-    const update = () => {
-      if (!headingRef.current) return;
-      const rect = headingRef.current.getBoundingClientRect();
-      const center = rect.top + rect.height * 0.5;
-      const distance = Math.abs(center - window.innerHeight * 0.4);
-      const influence = 1 - Math.min(distance / (window.innerHeight * 0.9), 1);
-      const scale = 0.96 + influence * 0.04;
-      headingRef.current.style.transform = `translate3d(0, 0, 0) scale(${scale.toFixed(3)})`;
-      rafId = window.requestAnimationFrame(update);
-    };
-
-    rafId = window.requestAnimationFrame(update);
-    return () => {
-      if (rafId) {
-        window.cancelAnimationFrame(rafId);
-      }
-    };
-  }, []);
 
   useEffect(() => {
     if (typeof window === "undefined" || loading) return;
@@ -377,10 +396,10 @@ export default function ExplorePage() {
   }
 
   const filteredGyms = useMemo(() => {
-    let list = [...gyms];
-    const q = deferredQuery.trim().toLowerCase();
+    let list = preparedGyms;
+    const q = normalize(deferredQuery.trim());
     if (q) {
-      list = list.filter((g) => fuzzyMatch(g.name, q));
+      list = list.filter((g) => fuzzyMatch(g.normalizedName, q));
     }
     const priceCap = Number(deferredMaxPrice);
     if (Number.isFinite(priceCap) && priceCap > 0) {
@@ -388,41 +407,36 @@ export default function ExplorePage() {
     }
     const distCap = Number(deferredMaxDistance);
     if (Number.isFinite(distCap) && distCap > 0) {
-      list = list.filter((g) => (g.distance ?? Infinity) <= distCap * 1000);
+      list = list.filter((g) => g.distanceValue <= distCap * 1000);
     }
     if (onlyFeatured) {
-      list = list.filter((g) => isGymFeatured(g));
+      list = list.filter((g) => g.featured);
     }
     if (onlyVerified) {
-      list = list.filter(
-        (g) => g.verificationStatus === "VERIFIED"
-      );
+      list = list.filter((g) => g.verificationStatus === "VERIFIED");
     }
 
-    const tierSort = (a: Gym, b: Gym) => getGymTierRank(a.gymTier) - getGymTierRank(b.gymTier);
-    const featuredSort = (a: Gym, b: Gym) => {
-      const aFeatured = isGymFeatured(a);
-      const bFeatured = isGymFeatured(b);
-      if (aFeatured !== bFeatured) return aFeatured ? -1 : 1;
-      return 0;
-    };
+    const tierSort = (a: PreparedGym, b: PreparedGym) => a.tierRank - b.tierRank;
+    const featuredSort = (a: PreparedGym, b: PreparedGym) => Number(b.featured) - Number(a.featured);
+
+    list = [...list];
 
     switch (sortBy) {
       case "price_asc":
-        list.sort((a, b) => tierSort(a, b) || a.monthlyPrice - b.monthlyPrice || (a.distance ?? Infinity) - (b.distance ?? Infinity) || featuredSort(a, b));
+        list.sort((a, b) => tierSort(a, b) || a.monthlyPrice - b.monthlyPrice || a.distanceValue - b.distanceValue || featuredSort(a, b));
         break;
       case "price_desc":
-        list.sort((a, b) => tierSort(a, b) || b.monthlyPrice - a.monthlyPrice || (a.distance ?? Infinity) - (b.distance ?? Infinity) || featuredSort(a, b));
+        list.sort((a, b) => tierSort(a, b) || b.monthlyPrice - a.monthlyPrice || a.distanceValue - b.distanceValue || featuredSort(a, b));
         break;
       case "newest":
-        list.sort((a, b) => tierSort(a, b) || new Date(b.createdAt ?? 0).getTime() - new Date(a.createdAt ?? 0).getTime() || featuredSort(a, b));
+        list.sort((a, b) => tierSort(a, b) || b.createdAtValue - a.createdAtValue || featuredSort(a, b));
         break;
       case "distance":
       default:
-        list.sort((a, b) => tierSort(a, b) || (a.distance ?? Infinity) - (b.distance ?? Infinity) || featuredSort(a, b) || a.monthlyPrice - b.monthlyPrice);
+        list.sort((a, b) => tierSort(a, b) || a.distanceValue - b.distanceValue || featuredSort(a, b) || a.monthlyPrice - b.monthlyPrice);
     }
     return list;
-  }, [gyms, deferredMaxDistance, deferredMaxPrice, deferredQuery, sortBy, onlyFeatured, onlyVerified]);
+  }, [preparedGyms, deferredMaxDistance, deferredMaxPrice, deferredQuery, sortBy, onlyFeatured, onlyVerified]);
 
   const filterCount =
     (query.trim() ? 1 : 0) +
@@ -430,6 +444,15 @@ export default function ExplorePage() {
     (Number(maxDistance) > 0 ? 1 : 0) +
     (onlyFeatured ? 1 : 0) +
     (onlyVerified ? 1 : 0);
+
+  const clearFilters = () => {
+    setQuery("");
+    setMaxPrice("");
+    setMaxDistance("");
+    setSortBy("distance");
+    setOnlyFeatured(false);
+    setOnlyVerified(false);
+  };
 
   if (error) {
     return (
@@ -552,14 +575,7 @@ export default function ExplorePage() {
                       type="button"
                       variant="ghost"
                       size="sm"
-                      onClick={() => {
-                        setQuery("");
-                        setMaxPrice("");
-                        setMaxDistance("");
-                        setSortBy("distance");
-                        setOnlyFeatured(false);
-                        setOnlyVerified(false);
-                      }}
+                      onClick={clearFilters}
                     >
                       Clear all
                     </Button>
@@ -577,13 +593,7 @@ export default function ExplorePage() {
           <MapView
             latitude={mapCenter.latitude}
             longitude={mapCenter.longitude}
-            gyms={gyms.map((g) => ({
-              id: g.id,
-              name: g.name,
-              latitude: g.latitude,
-              longitude: g.longitude,
-              url: `/explore/${buildGymSlug(g.name, g.id)}`,
-            }))}
+            gyms={mapGyms}
             className="w-full h-full"
             showUserMarker={mapCenter.showUserMarker}
           />
@@ -609,14 +619,7 @@ export default function ExplorePage() {
             Want to list your gym? Add your details and go live in minutes.
           </p>
           <div className="flex flex-col sm:flex-row items-center justify-center gap-2">
-            <Button variant="secondary" onClick={() => {
-              setQuery("");
-              setMaxPrice("");
-              setMaxDistance("");
-              setSortBy("distance");
-              setOnlyFeatured(false);
-              setOnlyVerified(false);
-            }}>
+            <Button variant="secondary" onClick={clearFilters}>
               Clear filters
             </Button>
             {!exploreCity && (
@@ -629,17 +632,19 @@ export default function ExplorePage() {
         ) : (
         <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
           {filteredGyms.map((gym, index) => {
-            const isFeatured = isGymFeatured(gym);
+            const isFeatured = gym.featured;
             const accentName = accentByIndex(index);
             const accent = accents[accentName];
-            const amenities = (gym.amenities ?? []).filter(Boolean).slice(0, 3);
-            const hasDuo = gym.partnerDiscountPercent > 0;
-            const isPremium = getGymTierRank(gym.gymTier) <= 1;
-            const images = (gym.imageUrls ?? []).length > 0
-              ? (gym.imageUrls ?? [])
-              : gym.coverImageUrl
-                ? [gym.coverImageUrl]
-                : [];
+            const amenities = gym.amenityPreview;
+            const hasDuo = gym.hasDuo;
+            const isPremium = gym.isPremium;
+            const images = gym.imageList;
+            const openStatus = getGymOpenStatus({
+              openTime: gym.openTime,
+              closeTime: gym.closeTime,
+              openDays: gym.openDays,
+              useIst: true,
+            });
             return (
             <div
               key={gym.id}
@@ -720,7 +725,7 @@ export default function ExplorePage() {
                           <Heart className={`h-4 w-4 ${savedIds.has(gym.id) ? "fill-primary" : ""}`} />
                         </button>
                       )}
-                      <Link href={`/explore/${buildGymSlug(gym.name, gym.id)}`} className="text-xs text-primary hover:underline">
+                      <Link href={`/explore/${gym.slug}`} className="text-xs text-primary hover:underline">
                         View
                       </Link>
                     </div>
@@ -729,8 +734,8 @@ export default function ExplorePage() {
                     <MapPin className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground/80" />
                     <span className="line-clamp-2">{gym.address}</span>
                   </p>
-                  <p className={`text-xs mt-1 ${getGymOpenStatus({ ...gym, useIst: true }).isOpen ? "text-emerald-400" : "text-muted-foreground"}`}>
-                    {getGymOpenStatus({ ...gym, useIst: true }).label}
+                  <p className={`text-xs mt-1 ${openStatus.isOpen ? "text-emerald-400" : "text-muted-foreground"}`}>
+                    {openStatus.label}
                   </p>
                   {amenities.length > 0 ? (
                     <div className="mt-1 flex flex-wrap gap-1.5">
@@ -768,7 +773,7 @@ export default function ExplorePage() {
                     )}
                   </div>
                   <Button asChild size="sm" className="shrink-0">
-                    <Link href={`/explore/${buildGymSlug(gym.name, gym.id)}`}>
+                    <Link href={`/explore/${gym.slug}`}>
                       View details
                       <ArrowRight className="ml-2 h-3 w-3" />
                     </Link>

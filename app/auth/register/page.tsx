@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { runWhenIdle } from "@/lib/browser-idle";
 import {
   Select,
   SelectContent,
@@ -46,15 +47,13 @@ function RegisterForm() {
   })();
 
   useEffect(() => {
-    if (typeof (window as any).requestIdleCallback === "function") {
-      (window as any).requestIdleCallback(() => {
-        getProviders().then(setProviders).catch(() => setProviders(null));
-      });
-    } else {
-      setTimeout(() => {
-        getProviders().then(setProviders).catch(() => setProviders(null));
-      }, 0);
-    }
+    const cancelIdle = runWhenIdle(() => {
+      getProviders().then(setProviders).catch(() => setProviders(null));
+    });
+
+    return () => {
+      cancelIdle();
+    };
   }, []);
 
   function resolveAuthError(code?: string) {

@@ -49,7 +49,12 @@ export default function OwnerSettingsPage() {
     let active = true;
     setLoading(true);
     setError(null);
-    fetchJson<{ settings?: any; error?: string }>("/api/user/settings", { retries: 1 })
+    fetchJson<{ settings?: any; error?: string }>("/api/user/settings", {
+      retries: 1,
+      useCache: true,
+      cacheKey: "user-settings",
+      cacheTtlMs: 20000,
+    })
       .then((result) => {
         if (!active) return;
         if (!result.ok) {
@@ -91,7 +96,12 @@ export default function OwnerSettingsPage() {
 
   useEffect(() => {
     let active = true;
-    fetchJson<{ gyms?: any[]; error?: string }>("/api/owner/gym?compact=1", { retries: 1 })
+    fetchJson<{ gyms?: any[]; error?: string }>("/api/owner/gym?compact=1", {
+      retries: 1,
+      useCache: true,
+      cacheKey: "owner-gyms-compact",
+      cacheTtlMs: 30000,
+    })
       .then((result) => {
         if (!active) return;
         if (result.ok) {

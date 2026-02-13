@@ -4,6 +4,7 @@ import { useEffect, useRef } from "react";
 import { useSession } from "next-auth/react";
 import { useToast } from "@/hooks/use-toast";
 import { fetchJson } from "@/lib/client-fetch";
+import { runWhenIdle } from "@/lib/browser-idle";
 
 type NotificationItem = {
   id: string;
@@ -56,13 +57,12 @@ export function NotificationPoller() {
       }
     };
 
-    if (typeof (window as any).requestIdleCallback === "function") {
-      (window as any).requestIdleCallback(fetchNotifications);
-    } else {
-      setTimeout(fetchNotifications, 0);
-    }
+    const cancelIdle = runWhenIdle(fetchNotifications);
     const interval = window.setInterval(fetchNotifications, 60000);
-    return () => window.clearInterval(interval);
+    return () => {
+      cancelIdle();
+      window.clearInterval(interval);
+    };
   }, [status, toast]);
 
   return null;

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -16,6 +16,7 @@ import { formatPrice } from "@/lib/utils";
 import { Skeleton } from "@/components/ui/skeleton";
 import { BarChart3 } from "lucide-react";
 import { fetchJson } from "@/lib/client-fetch";
+import { runWhenIdle } from "@/lib/browser-idle";
 import {
   AreaChart,
   Area,
@@ -26,34 +27,48 @@ import {
   CartesianGrid,
 } from "recharts";
 
+type GymOption = {
+  id: string;
+  name: string;
+};
+
+type CommissionRow = {
+  month: string;
+  totalBookings: number;
+  totalCommission: number;
+  commissionPercent: number;
+};
+
+type AnalyticsData = {
+  totalRevenue: number;
+  estimatedRevenue: number;
+  totalLeads: number;
+  leadsLast30Days: number;
+  bookingsCurrentWeek: number;
+  bookingsPreviousWeek: number;
+  revenueByMonth: Record<string, number>;
+  activeMembers: number;
+  totalMembers: number;
+  inactiveMembers: number;
+  newMembersByMonth: Record<string, number>;
+  planDistribution: Record<string, number>;
+  revenueByPlan: Record<string, number>;
+  paymentsByStatus: Record<string, number>;
+  avgRevenuePerMember: number;
+  duoRate: number;
+  activeDuos: number;
+  payments: Array<{ amount: number; createdAt: string }>;
+};
+
+const CHART_TOOLTIP_STYLE = { background: "hsl(var(--card))", border: "1px solid rgba(255,255,255,0.1)" };
+
 export default function OwnerAnalyticsPage() {
   const searchParams = useSearchParams();
-  const [gyms, setGyms] = useState<any[]>([]);
+  const [gyms, setGyms] = useState<GymOption[]>([]);
   const [selectedGymId, setSelectedGymId] = useState<string>("");
   const [error, setError] = useState<string | null>(null);
-  const [data, setData] = useState<{
-    totalRevenue: number;
-    estimatedRevenue: number;
-    totalLeads: number;
-    leadsLast30Days: number;
-    bookingsCurrentWeek: number;
-    bookingsPreviousWeek: number;
-    revenueByMonth: Record<string, number>;
-    activeMembers: number;
-    totalMembers: number;
-    inactiveMembers: number;
-    newMembersByMonth: Record<string, number>;
-    planDistribution: Record<string, number>;
-    revenueByPlan: Record<string, number>;
-    paymentsByStatus: Record<string, number>;
-    avgRevenuePerMember: number;
-    duoRate: number;
-    activeDuos: number;
-    payments: any[];
-  } | null>(null);
-  const [commissionReport, setCommissionReport] = useState<
-    Array<{ month: string; totalBookings: number; totalCommission: number; commissionPercent: number }>
-  >([]);
+  const [data, setData] = useState<AnalyticsData | null>(null);
+  const [commissionReport, setCommissionReport] = useState<CommissionRow[]>([]);
   const [reportLoading, setReportLoading] = useState(false);
   const [loading, setLoading] = useState(true);
   const [analyticsLoading, setAnalyticsLoading] = useState(false);
@@ -62,7 +77,12 @@ export default function OwnerAnalyticsPage() {
     let active = true;
     setLoading(true);
     setError(null);
-    fetchJson<{ gyms?: any[]; error?: string }>("/api/owner/gym?compact=1", { retries: 1 })
+    fetchJson<{ gyms?: GymOption[]; error?: string }>("/api/owner/gym?compact=1", {
+      retries: 1,
+      useCache: true,
+      cacheKey: "owner-gyms-compact",
+      cacheTtlMs: 30000,
+    })
       .then((result) => {
         if (!active) return;
         if (!result.ok) {
@@ -71,15 +91,15 @@ export default function OwnerAnalyticsPage() {
         const list = result.data?.gyms ?? [];
         setGyms(list);
         const q = searchParams.get("gymId");
-        if (q && list.some((g: any) => g.id === q)) setSelectedGymId(q);
+        if (q && list.some((g) => g.id === q)) setSelectedGymId(q);
         else if (list.length > 0) setSelectedGymId(list[0].id);
         else setSelectedGymId("");
       })
-      .catch((e: any) => {
+      .catch((e: unknown) => {
         if (!active) return;
         setGyms([]);
         setSelectedGymId("");
-        setError(e?.message ?? "Failed to load gyms");
+        setError(e instanceof Error ? e.message : "Failed to load gyms");
       })
       .finally(() => {
         if (active) setLoading(false);
@@ -98,7 +118,12 @@ export default function OwnerAnalyticsPage() {
     }
     let active = true;
     setAnalyticsLoading(true);
-    fetchJson<any>(`/api/owner/analytics?gymId=${selectedGymId}`, { retries: 1 })
+    fetchJson<AnalyticsData>(`/api/owner/analytics?gymId=${selectedGymId}`, {
+      retries: 1,
+      useCache: true,
+      cacheKey: `owner-analytics:${selectedGymId}`,
+      cacheTtlMs: 20000,
+    })
       .then((result) => {
         if (!active) return;
         if (!result.ok) {
@@ -107,10 +132,10 @@ export default function OwnerAnalyticsPage() {
         setData(result.data ?? null);
         setError(null);
       })
-      .catch((e: any) => {
+      .catch((e: unknown) => {
         if (!active) return;
         setData(null);
-        setError(e?.message ?? "Failed to load analytics");
+        setError(e instanceof Error ? e.message : "Failed to load analytics");
       })
       .finally(() => {
         if (active) setAnalyticsLoading(false);
@@ -118,9 +143,14 @@ export default function OwnerAnalyticsPage() {
 
     const loadCommission = () => {
       setReportLoading(true);
-      fetchJson<{ report?: Array<{ month: string; totalBookings: number; totalCommission: number; commissionPercent: number }>; error?: string }>(
+      fetchJson<{ report?: CommissionRow[]; error?: string }>(
         `/api/owner/commission-report?gymId=${selectedGymId}`,
-        { retries: 1 }
+        {
+          retries: 1,
+          useCache: true,
+          cacheKey: `owner-commission:${selectedGymId}`,
+          cacheTtlMs: 20000,
+        }
       )
         .then((result) => {
           if (!active) return;
@@ -139,14 +169,11 @@ export default function OwnerAnalyticsPage() {
         });
     };
 
-    if (typeof (window as any).requestIdleCallback === "function") {
-      (window as any).requestIdleCallback(loadCommission);
-    } else {
-      setTimeout(loadCommission, 0);
-    }
+    const cancelIdle = runWhenIdle(loadCommission);
 
     return () => {
       active = false;
+      cancelIdle();
     };
   }, [selectedGymId]);
 
@@ -181,17 +208,25 @@ export default function OwnerAnalyticsPage() {
     );
   }
 
-  const chartData = data?.revenueByMonth
-    ? Object.entries(data.revenueByMonth)
-        .map(([month, value]) => ({ month, revenue: value / 100 }))
-        .sort((a, b) => a.month.localeCompare(b.month))
-    : [];
+  const chartData = useMemo(
+    () =>
+      data?.revenueByMonth
+        ? Object.entries(data.revenueByMonth)
+            .map(([month, value]) => ({ month, revenue: value / 100 }))
+            .sort((a, b) => a.month.localeCompare(b.month))
+        : [],
+    [data?.revenueByMonth]
+  );
 
-  const membersData = data?.newMembersByMonth
-    ? Object.entries(data.newMembersByMonth)
-        .map(([month, value]) => ({ month, members: value }))
-        .sort((a, b) => a.month.localeCompare(b.month))
-    : [];
+  const membersData = useMemo(
+    () =>
+      data?.newMembersByMonth
+        ? Object.entries(data.newMembersByMonth)
+            .map(([month, value]) => ({ month, members: value }))
+            .sort((a, b) => a.month.localeCompare(b.month))
+        : [],
+    [data?.newMembersByMonth]
+  );
   const emptyCopy = "No data yet — go live to start tracking analytics.";
   const growthSignal = membersData.at(-1)?.members ?? 0;
 
@@ -490,7 +525,7 @@ export default function OwnerAnalyticsPage() {
                             <XAxis dataKey="month" stroke="rgba(255,255,255,0.5)" fontSize={12} />
                             <YAxis stroke="rgba(255,255,255,0.5)" fontSize={12} tickFormatter={(v) => `₹${v}`} />
                             <Tooltip
-                              contentStyle={{ background: "hsl(var(--card))", border: "1px solid rgba(255,255,255,0.1)" }}
+                              contentStyle={CHART_TOOLTIP_STYLE}
                               formatter={(value) => [`₹${value ?? 0}`, "Revenue"]}
                             />
                             <Area type="monotone" dataKey="revenue" stroke="hsl(var(--primary))" fill="url(#revenueGradient)" isAnimationActive={false} />

@@ -28,7 +28,10 @@ export async function GET() {
       },
       orderBy: { createdAt: "desc" },
     });
-    return NextResponse.json({ transactions });
+    return NextResponse.json(
+      { transactions },
+      { headers: { "Cache-Control": "private, max-age=15, stale-while-revalidate=30" } }
+    );
   } catch (error) {
     logServerError(error as Error, { route: "/api/owner/transactions", userId: uid });
     return jsonError("Failed to load transactions", 500);

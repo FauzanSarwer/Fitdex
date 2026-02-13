@@ -51,7 +51,10 @@ export async function GET(req: Request) {
       }))
       .sort((a, b) => a.month.localeCompare(b.month));
 
-    return NextResponse.json({ report });
+    return NextResponse.json(
+      { report },
+      { headers: { "Cache-Control": "private, max-age=15, stale-while-revalidate=30" } }
+    );
   } catch (error) {
     logServerError(error as Error, { route: "/api/owner/commission-report", userId: uid });
     return jsonError("Failed to load commission report", 500);

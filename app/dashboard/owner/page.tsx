@@ -29,6 +29,7 @@ import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import { isPaymentsEnabled, openRazorpayCheckout } from "@/lib/razorpay-checkout";
 import { Progress } from "@/components/ui/progress";
+import { runWhenIdle } from "@/lib/browser-idle";
 
 type Transaction = {
   id: string;
@@ -74,8 +75,14 @@ export default function OwnerDashboardPage() {
 
   useEffect(() => {
     let active = true;
+    let cancelIdle: () => void = () => {};
 
-    fetchJson<{ gyms?: any[]; error?: string }>("/api/owner/gym", { retries: 1 })
+    fetchJson<{ gyms?: any[]; error?: string }>("/api/owner/gym", {
+      retries: 1,
+      useCache: true,
+      cacheKey: "owner-gyms-full",
+      cacheTtlMs: 30000,
+    })
       .then((gymResult) => {
         if (!active) return;
         if (!gymResult.ok) {
@@ -96,12 +103,27 @@ export default function OwnerDashboardPage() {
 
     const loadExtras = () => {
       Promise.all([
-        fetchJson<{ transactions?: Transaction[]; error?: string }>("/api/owner/transactions", { retries: 1 }),
+        fetchJson<{ transactions?: Transaction[]; error?: string }>("/api/owner/transactions", {
+          retries: 1,
+          useCache: true,
+          cacheKey: "owner-transactions",
+          cacheTtlMs: 15000,
+        }),
         fetchJson<{ leads?: Array<{ gymId: string; gymName: string; totalLeads: number; leadsLast30Days: number }>; error?: string }>(
           "/api/owner/leads",
-          { retries: 1 }
+          {
+            retries: 1,
+            useCache: true,
+            cacheKey: "owner-leads",
+            cacheTtlMs: 15000,
+          }
         ),
-        fetchJson<{ gyms?: any[]; error?: string }>("/api/owner/explore", { retries: 1 }),
+        fetchJson<{ gyms?: any[]; error?: string }>("/api/owner/explore", {
+          retries: 1,
+          useCache: true,
+          cacheKey: "owner-explore-gyms",
+          cacheTtlMs: 20000,
+        }),
       ])
         .then(([txResult, leadsResult, exploreResult]) => {
           if (!active) return;
@@ -117,14 +139,11 @@ export default function OwnerDashboardPage() {
         });
     };
 
-    if (typeof (window as any).requestIdleCallback === "function") {
-      (window as any).requestIdleCallback(loadExtras);
-    } else {
-      setTimeout(loadExtras, 0);
-    }
+    cancelIdle = runWhenIdle(loadExtras);
 
     return () => {
       active = false;
+      cancelIdle();
     };
   }, []);
 

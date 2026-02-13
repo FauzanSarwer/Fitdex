@@ -37,7 +37,12 @@ export default function OwnerVerificationPage() {
     let active = true;
     setLoading(true);
     setError(null);
-    fetchJson<{ gyms?: any[]; error?: string }>("/api/owner/gym?compact=1", { retries: 1 })
+    fetchJson<{ gyms?: any[]; error?: string }>("/api/owner/gym?compact=1", {
+      retries: 1,
+      useCache: true,
+      cacheKey: "owner-gyms-compact",
+      cacheTtlMs: 30000,
+    })
       .then((result) => {
         if (!active) return;
         if (!result.ok) {

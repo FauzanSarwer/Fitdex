@@ -3,6 +3,7 @@ import { twMerge } from "tailwind-merge";
 
 const CURRENCY_SYMBOL = "₹"; // Default currency symbol for price formatting
 const DEFAULT_SLUG = "gym";
+const INDIAN_NUMBER_FORMATTER = new Intl.NumberFormat("en-IN");
 
 export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
@@ -13,7 +14,7 @@ export function formatPrice(paise: number): string {
     console.warn("Invalid value for paise in formatPrice:", paise);
     paise = 0;
   }
-  return `${CURRENCY_SYMBOL}${(paise / 100).toLocaleString("en-IN")}`;
+  return `${CURRENCY_SYMBOL}${INDIAN_NUMBER_FORMATTER.format(paise / 100)}`;
 }
 
 function sanitizeSlug(value: string): string {

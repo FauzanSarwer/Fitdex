@@ -35,7 +35,10 @@ export async function GET(req: Request) {
         user: { select: { id: true, name: true, email: true } },
       },
     });
-    return NextResponse.json({ members: memberships });
+    return NextResponse.json(
+      { members: memberships },
+      { headers: { "Cache-Control": "private, max-age=15, stale-while-revalidate=30" } }
+    );
   } catch (error) {
     logServerError(error as Error, { route: "/api/owner/members", userId: uid });
     return jsonError("Failed to load members", 500);

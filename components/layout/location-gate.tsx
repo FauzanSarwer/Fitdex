@@ -41,7 +41,12 @@ export function LocationGate({ children }: { children: React.ReactNode }) {
       try {
         const result = await fetchJson<{ location?: { latitude?: number; longitude?: number; city?: string } }>(
           "/api/location",
-          { retries: 1 }
+          {
+            retries: 1,
+            useCache: true,
+            cacheKey: "user-location",
+            cacheTtlMs: 15000,
+          }
         );
         const serverLocation = result.data?.location;
         if (
