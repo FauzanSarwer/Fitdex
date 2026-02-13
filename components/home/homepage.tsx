@@ -54,6 +54,10 @@ export function HomePageView(): JSX.Element {
   const heroBgRef = useRef<HTMLDivElement | null>(null);
   const heroHeadingRef = useRef<HTMLHeadingElement | null>(null);
   const heroWordmarkShellRef = useRef<HTMLSpanElement | null>(null);
+  const heroStarsLayerRef = useRef<HTMLDivElement | null>(null);
+  const heroStreakLayerRef = useRef<HTMLDivElement | null>(null);
+  const heroAuraRef = useRef<HTMLDivElement | null>(null);
+  const heroContentRef = useRef<HTMLDivElement | null>(null);
   const heroSubRef = useRef<HTMLParagraphElement | null>(null);
   const heroCtaRef = useRef<HTMLAnchorElement | null>(null);
   const heroArrowRef = useRef<HTMLSpanElement | null>(null);
@@ -74,39 +78,309 @@ export function HomePageView(): JSX.Element {
   const partnerMagnetTarget = useRef({ x: 0, y: 0 });
   const partnerMagnetCurrent = useRef({ x: 0, y: 0 });
   const partnerHovering = useRef(false);
-  const wordmarkPressAnimationRef = useRef<Animation | null>(null);
 
   const { scrollProgress, scrollVelocity } = useScrollEngine();
 
-  const handleWordmarkPress = () => {
-    const wordmarkNode = heroWordmarkShellRef.current;
-    if (!wordmarkNode) return;
-    if (wordmarkPressAnimationRef.current) {
-      wordmarkPressAnimationRef.current.cancel();
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+
+    const heroSection = heroSectionRef.current;
+    const wordmark = heroWordmarkShellRef.current;
+    const streakLayer = heroStreakLayerRef.current;
+    const starsLayer = heroStarsLayerRef.current;
+    const aura = heroAuraRef.current;
+    const heroContent = heroContentRef.current;
+
+    if (!heroSection || !wordmark || !streakLayer || !starsLayer || !aura || !heroContent) return;
+
+    const reduceMotionMedia = window.matchMedia("(prefers-reduced-motion: reduce)");
+    const introEase = "cubic-bezier(0.22,1,0.36,1)";
+    const introTimers: number[] = [];
+    const streakAnimations: Animation[] = [];
+
+    let introDestroyed = false;
+    let parallaxRafId = 0;
+    const origin = { x: 0, y: 0 };
+
+    const clearChildren = (node: HTMLElement) => {
+      while (node.firstChild) {
+        node.removeChild(node.firstChild);
+      }
+    };
+
+    const syncOriginPoint = () => {
+      const heroRect = heroSection.getBoundingClientRect();
+      const wordmarkRect = wordmark.getBoundingClientRect();
+      origin.x = wordmarkRect.left + wordmarkRect.width * 0.5 - heroRect.left;
+      origin.y = wordmarkRect.top + wordmarkRect.height * 0.5 - heroRect.top;
+      aura.style.left = `${origin.x.toFixed(2)}px`;
+      aura.style.top = `${origin.y.toFixed(2)}px`;
+    };
+
+    const createStar = (x: number, y: number, mode: "entry" | "ambient" | "static") => {
+      const star = document.createElement("span");
+      const size = 1.6 + Math.random() * 3.3;
+      const baseOpacity = mode === "entry" ? 0.16 + Math.random() * 0.08 : 0.08 + Math.random() * 0.08;
+      const peakOpacity = Math.min(baseOpacity + 0.12 + Math.random() * 0.12, 0.42);
+
+      star.className = "fitdex-hero-star";
+      star.style.left = `calc(${origin.x.toFixed(2)}px + ${x.toFixed(2)}px)`;
+      star.style.top = `calc(${origin.y.toFixed(2)}px + ${y.toFixed(2)}px)`;
+      star.style.width = `${size.toFixed(2)}px`;
+      star.style.height = `${size.toFixed(2)}px`;
+      star.style.setProperty("--fitdex-star-min", baseOpacity.toFixed(3));
+      star.style.setProperty("--fitdex-star-max", peakOpacity.toFixed(3));
+      star.style.setProperty("--fitdex-star-duration", `${(7 + Math.random() * 5).toFixed(2)}s`);
+      star.style.setProperty("--fitdex-star-delay", `${(Math.random() * 4).toFixed(2)}s`);
+      starsLayer.appendChild(star);
+
+      if (mode === "static") {
+        star.style.opacity = baseOpacity.toFixed(3);
+        return;
+      }
+
+      if (mode === "ambient") {
+        star.style.opacity = baseOpacity.toFixed(3);
+        star.classList.add("fitdex-hero-star-twinkle");
+        return;
+      }
+
+      star.style.opacity = "0";
+      star.style.transform = "translate3d(-50%, -50%, 0) scale(0.46)";
+      star.style.filter = "blur(4px)";
+      star.style.transition = `opacity 620ms ${introEase}, transform 620ms ${introEase}, filter 620ms ${introEase}`;
+      const revealTimer = window.setTimeout(() => {
+        if (introDestroyed) return;
+        star.style.opacity = baseOpacity.toFixed(3);
+        star.style.transform = "translate3d(-50%, -50%, 0) scale(1)";
+        star.style.filter = "blur(0px)";
+      }, 16);
+      introTimers.push(revealTimer);
+      const twinkleTimer = window.setTimeout(() => {
+        if (introDestroyed) return;
+        star.style.transition = "none";
+        star.classList.add("fitdex-hero-star-twinkle");
+      }, 660);
+      introTimers.push(twinkleTimer);
+    };
+
+    const seedStarField = (count: number, mode: "ambient" | "static") => {
+      const maxRadius = Math.min(window.innerWidth * 0.45, 470);
+      for (let index = 0; index < count; index += 1) {
+        const angle = Math.random() * Math.PI * 2;
+        const radius = 120 + Math.random() * maxRadius;
+        const x = Math.cos(angle) * radius;
+        const y = Math.sin(angle) * (radius * 0.56);
+        createStar(x, y, mode);
+      }
+    };
+
+    const applyStaticHero = () => {
+      syncOriginPoint();
+      clearChildren(streakLayer);
+      clearChildren(starsLayer);
+      wordmark.style.transition = "none";
+      wordmark.style.opacity = "1";
+      wordmark.style.filter = "blur(0px)";
+      wordmark.style.transform = "translate3d(0, 0, 0) scale(1)";
+      wordmark.style.willChange = "auto";
+      aura.classList.remove("fitdex-hero-aura-active");
+      aura.style.opacity = "0.16";
+      aura.style.filter = "blur(32px)";
+      aura.style.backgroundPosition = "50% 50%";
+      aura.style.transform = "translate3d(-50%, -50%, 0) scale(1)";
+      starsLayer.style.transform = "translate3d(0, 0, 0)";
+      heroContent.style.transform = "translate3d(0, 0, 0)";
+      seedStarField(12, "static");
+    };
+
+    const runParallax = () => {
+      parallaxRafId = 0;
+      if (reduceMotionMedia.matches) return;
+      const travel = clamp(window.scrollY, 0, window.innerHeight * 1.12);
+      const starsY = travel * 0.055;
+      const auraY = travel * 0.09;
+      const auraScale = 1 + Math.min(travel / (window.innerHeight * 32), 0.035);
+      starsLayer.style.transform = `translate3d(0, ${starsY.toFixed(2)}px, 0)`;
+      aura.style.transform = `translate3d(-50%, calc(-50% + ${auraY.toFixed(2)}px), 0) scale(${auraScale.toFixed(3)})`;
+      heroContent.style.transform = "translate3d(0, 0, 0)";
+    };
+
+    const requestParallaxFrame = () => {
+      if (parallaxRafId) return;
+      parallaxRafId = window.requestAnimationFrame(runParallax);
+    };
+
+    if (reduceMotionMedia.matches) {
+      applyStaticHero();
+      return;
     }
-    const pressAnimation = wordmarkNode.animate(
-      [
-        { transform: "translate3d(0, 0, 0) scale(1)" },
-        { transform: "translate3d(0, 0, 0) scale(0.98)", offset: 0.45 },
-        { transform: "translate3d(0, 0, 0) scale(1)" },
-      ],
-      {
-        duration: 180,
-        easing: "cubic-bezier(0.22,1,0.36,1)",
-      }
-    );
-    wordmarkPressAnimationRef.current = pressAnimation;
-    pressAnimation.onfinish = () => {
-      if (wordmarkPressAnimationRef.current === pressAnimation) {
-        wordmarkPressAnimationRef.current = null;
-      }
+
+    syncOriginPoint();
+    clearChildren(streakLayer);
+    clearChildren(starsLayer);
+
+    wordmark.style.opacity = "0";
+    wordmark.style.filter = "blur(10px)";
+    wordmark.style.transform = "translate3d(0, 0, 0) scale(0.96)";
+    wordmark.style.willChange = "transform, opacity, filter";
+    wordmark.style.transition = "none";
+
+    aura.classList.remove("fitdex-hero-aura-active");
+    aura.style.opacity = "0";
+    aura.style.filter = "blur(36px)";
+    aura.style.backgroundPosition = "50% 50%";
+    aura.style.transform = "translate3d(-50%, -50%, 0) scale(0.94)";
+
+    const wordmarkRevealTimer = window.setTimeout(() => {
+      if (introDestroyed) return;
+      wordmark.style.transition = `opacity 1200ms ${introEase}, transform 1200ms ${introEase}, filter 1200ms ${introEase}`;
+      wordmark.style.opacity = "1";
+      wordmark.style.filter = "blur(0px)";
+      wordmark.style.transform = "translate3d(0, 0, 0) scale(1)";
+    }, 16);
+    introTimers.push(wordmarkRevealTimer);
+
+    const releaseWordmarkWillChange = window.setTimeout(() => {
+      if (introDestroyed) return;
+      wordmark.style.willChange = "auto";
+    }, 1420);
+    introTimers.push(releaseWordmarkWillChange);
+
+    const streakCount = 8;
+    const baseRadius = Math.min(window.innerWidth * 0.28, 320);
+    let finishedStreaks = 0;
+
+    const activateCalmState = () => {
+      aura.classList.add("fitdex-hero-aura-active");
+      seedStarField(10, "ambient");
     };
-    pressAnimation.oncancel = () => {
-      if (wordmarkPressAnimationRef.current === pressAnimation) {
-        wordmarkPressAnimationRef.current = null;
-      }
+
+    for (let index = 0; index < streakCount; index += 1) {
+      const streak = document.createElement("span");
+      const length = 118 + Math.random() * 112;
+      const thickness = 1 + Math.random() * 0.8;
+      const angle = (360 / streakCount) * index + (Math.random() * 24 - 12);
+      const radians = (angle * Math.PI) / 180;
+      const distance = baseRadius + Math.random() * 170;
+      const dx = Math.cos(radians) * distance;
+      const dy = Math.sin(radians) * distance * 0.62;
+      const perpX = -Math.sin(radians);
+      const perpY = Math.cos(radians);
+      const curve = (12 + Math.random() * 20) * (index % 2 === 0 ? 1 : -1);
+      const bendX = dx * 0.56 + perpX * curve;
+      const bendY = dy * 0.56 + perpY * curve;
+      const endX = dx + perpX * curve * 0.78;
+      const endY = dy + perpY * curve * 0.78;
+      const duration = 900 + Math.random() * 300;
+      const delay = 280 + index * 58 + Math.random() * 120;
+
+      const streakGradient =
+        index % 3 === 0
+          ? "linear-gradient(90deg, rgba(255,255,255,0) 0%, rgba(129,140,248,0.9) 42%, rgba(56,189,248,0.62) 74%, rgba(255,255,255,0) 100%)"
+          : index % 3 === 1
+            ? "linear-gradient(90deg, rgba(255,255,255,0) 0%, rgba(56,189,248,0.9) 40%, rgba(99,102,241,0.6) 72%, rgba(255,255,255,0) 100%)"
+            : "linear-gradient(90deg, rgba(255,255,255,0) 0%, rgba(217,70,239,0.82) 38%, rgba(129,140,248,0.58) 72%, rgba(255,255,255,0) 100%)";
+
+      streak.className = "fitdex-hero-streak";
+      streak.style.left = `${origin.x.toFixed(2)}px`;
+      streak.style.top = `${origin.y.toFixed(2)}px`;
+      streak.style.width = `${length.toFixed(2)}px`;
+      streak.style.height = `${thickness.toFixed(2)}px`;
+      streak.style.backgroundImage = streakGradient;
+      streakLayer.appendChild(streak);
+
+      const streakAnimation = streak.animate(
+        [
+          {
+            transform: `translate3d(0px, 0px, 0) rotate(${angle.toFixed(2)}deg) scaleX(0.2)`,
+            opacity: 0,
+            filter: "blur(1.8px)",
+          },
+          {
+            offset: 0.2,
+            transform: `translate3d(${(dx * 0.2).toFixed(2)}px, ${(dy * 0.2).toFixed(2)}px, 0) rotate(${(angle + curve * 0.02).toFixed(2)}deg) scaleX(0.68)`,
+            opacity: 0.94,
+            filter: "blur(0.6px)",
+          },
+          {
+            offset: 0.62,
+            transform: `translate3d(${bendX.toFixed(2)}px, ${bendY.toFixed(2)}px, 0) rotate(${(angle + curve * 0.14).toFixed(2)}deg) scaleX(1.02)`,
+            opacity: 0.52,
+            filter: "blur(1px)",
+          },
+          {
+            transform: `translate3d(${endX.toFixed(2)}px, ${endY.toFixed(2)}px, 0) rotate(${(angle + curve * 0.2).toFixed(2)}deg) scaleX(1.06)`,
+            opacity: 0,
+            filter: "blur(1.8px)",
+          },
+        ],
+        {
+          duration,
+          delay,
+          easing: introEase,
+          fill: "forwards",
+        }
+      );
+
+      streakAnimations.push(streakAnimation);
+      streakAnimation.onfinish = () => {
+        streak.remove();
+        if (introDestroyed) return;
+        createStar(endX, endY, "entry");
+        finishedStreaks += 1;
+        if (finishedStreaks === streakCount) {
+          const auraTimer = window.setTimeout(() => {
+            if (introDestroyed) return;
+            activateCalmState();
+          }, 120);
+          introTimers.push(auraTimer);
+        }
+      };
+      streakAnimation.oncancel = () => {
+        streak.remove();
+      };
+    }
+
+    window.addEventListener("scroll", requestParallaxFrame, { passive: true });
+    const handleResize = () => {
+      syncOriginPoint();
+      requestParallaxFrame();
     };
-  };
+    window.addEventListener("resize", handleResize, { passive: true });
+    requestParallaxFrame();
+
+    const handleMotionChange = (event: MediaQueryListEvent) => {
+      if (!event.matches) return;
+      introDestroyed = true;
+      streakAnimations.forEach((animation) => animation.cancel());
+      introTimers.forEach((timer) => window.clearTimeout(timer));
+      if (parallaxRafId) {
+        window.cancelAnimationFrame(parallaxRafId);
+        parallaxRafId = 0;
+      }
+      window.removeEventListener("scroll", requestParallaxFrame);
+      window.removeEventListener("resize", handleResize);
+      applyStaticHero();
+    };
+
+    reduceMotionMedia.addEventListener("change", handleMotionChange);
+
+    return () => {
+      introDestroyed = true;
+      introTimers.forEach((timer) => window.clearTimeout(timer));
+      streakAnimations.forEach((animation) => animation.cancel());
+      reduceMotionMedia.removeEventListener("change", handleMotionChange);
+      window.removeEventListener("scroll", requestParallaxFrame);
+      window.removeEventListener("resize", handleResize);
+      if (parallaxRafId) {
+        window.cancelAnimationFrame(parallaxRafId);
+      }
+      wordmark.style.willChange = "auto";
+      clearChildren(streakLayer);
+      clearChildren(starsLayer);
+    };
+  }, []);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -116,37 +390,7 @@ export function HomePageView(): JSX.Element {
     let reduceMotion = reduceMotionMedia.matches;
     let mobileFallback = coarsePointerMedia.matches || window.innerWidth < 900;
 
-    const heroSub = heroSubRef.current;
-    const heroCta = heroCtaRef.current;
     const flowSection = flowSectionRef.current;
-
-    const introTargets = [heroSub, heroCta];
-    introTargets.forEach((node, index) => {
-      if (!node) return;
-      if (reduceMotion) {
-        node.style.opacity = "1";
-        node.style.transform = "translate3d(0, 0, 0) scale(1)";
-        node.style.filter = "none";
-        node.style.transition = "none";
-        return;
-      }
-      node.style.opacity = "0";
-      node.style.transform = "translate3d(0, 28px, 0) scale(0.97)";
-      node.style.filter = "blur(8px)";
-      node.style.willChange = "opacity, transform, filter";
-      window.setTimeout(() => {
-        window.requestAnimationFrame(() => {
-          if (!node) return;
-          node.style.transition = "opacity 900ms cubic-bezier(0.22,1,0.36,1), transform 900ms cubic-bezier(0.22,1,0.36,1), filter 900ms cubic-bezier(0.22,1,0.36,1)";
-          node.style.opacity = "1";
-          node.style.transform = "translate3d(0, 0, 0) scale(1)";
-          node.style.filter = "blur(0px)";
-        });
-      }, 160 + index * 160);
-      window.setTimeout(() => {
-        if (node) node.style.willChange = "auto";
-      }, 1300 + index * 160);
-    });
 
     if (flowSection && reduceMotion) {
       flowSection.style.opacity = "1";
@@ -170,7 +414,6 @@ export function HomePageView(): JSX.Element {
     let sceneTime = performance.now();
     let lastFrameTime = sceneTime;
     const initialIntroProgress = Math.min(window.scrollY / (window.innerHeight * 0.88), 1);
-    let heroParallaxY = Math.min(window.scrollY * 0.16, 84);
     let flowYCurrent = 140 * (1 - initialIntroProgress);
     let flowScaleCurrent = 0.94 + initialIntroProgress * 0.06;
     let flowOpacityCurrent = 0.36 + initialIntroProgress * 0.64;
@@ -181,7 +424,6 @@ export function HomePageView(): JSX.Element {
 
       const scrollY = window.scrollY;
       const introProgress = Math.min(scrollY / (window.innerHeight * 0.88), 1);
-      const heroFade = 1 - introProgress * 0.65;
       const simpleMotion = reduceMotion || mobileFallback;
 
       if (!simpleMotion) {
@@ -214,17 +456,6 @@ export function HomePageView(): JSX.Element {
         }
       }
 
-      if (heroBgRef.current) {
-        const targetY = Math.min(scrollY * 0.16, 84);
-        const parallaxLerp = simpleMotion ? 1 : clamp((0.07 + timeScale * 0.06) * (dt / 16), 0.05, 0.3);
-        heroParallaxY = lerp(heroParallaxY, targetY, parallaxLerp);
-        heroBgRef.current.style.transform = `translate3d(0, ${heroParallaxY.toFixed(2)}px, 0) scale(1.06)`;
-      }
-
-      if (heroSectionRef.current) {
-        heroSectionRef.current.style.opacity = reduceMotion ? "1" : heroFade.toFixed(3);
-      }
-
       if (flowSectionRef.current && !reduceMotion) {
         const targetY = 140 * (1 - introProgress);
         const targetScale = 0.94 + introProgress * 0.06;
@@ -238,12 +469,6 @@ export function HomePageView(): JSX.Element {
         const settleDepthCorrection = settleFactor * 3.4;
         flowSectionRef.current.style.transform = `translate3d(0, ${(flowYCurrent - settleDepthCorrection).toFixed(2)}px, 0) scale(${flowScaleCurrent.toFixed(3)})`;
         flowSectionRef.current.style.opacity = flowOpacityCurrent.toFixed(3);
-      }
-
-      if (heroArrowRef.current && !reduceMotion) {
-        const floatY = Math.sin(animationTime * 0.0032) * 6;
-        const pulse = 1 + Math.sin(animationTime * 0.004) * 0.08;
-        heroArrowRef.current.style.transform = `translate3d(0, ${floatY.toFixed(2)}px, 0) scale(${pulse.toFixed(3)})`;
       }
 
       if (calculatorPanelRef.current && !reduceMotion) {
@@ -289,10 +514,6 @@ export function HomePageView(): JSX.Element {
 
     rafId = window.requestAnimationFrame(update);
     return () => {
-      if (wordmarkPressAnimationRef.current) {
-        wordmarkPressAnimationRef.current.cancel();
-        wordmarkPressAnimationRef.current = null;
-      }
       window.removeEventListener("resize", syncMotionPreferences);
       reduceMotionMedia.removeEventListener("change", syncMotionPreferences);
       coarsePointerMedia.removeEventListener("change", syncMotionPreferences);
@@ -401,7 +622,7 @@ export function HomePageView(): JSX.Element {
 
   return (
     <div className="w-full">
-      <section ref={heroSectionRef} className="relative isolate min-h-[calc(100vh-4rem)] overflow-hidden">
+      <section ref={heroSectionRef} className="fitdex-hero relative isolate min-h-[calc(100vh-4rem)] overflow-hidden">
         <div
           ref={heroBgRef}
           className="absolute inset-0"
@@ -422,13 +643,22 @@ export function HomePageView(): JSX.Element {
           <div className="absolute right-[18%] top-[26%] h-24 w-24 rounded-full bg-accent/16 blur-3xl" />
           <div className="absolute bottom-[18%] left-[45%] h-20 w-20 rounded-full bg-white/12 blur-3xl" />
         </div>
-        <div className="relative mx-auto flex min-h-[calc(100vh-4rem)] w-full max-w-6xl flex-col items-center justify-center px-4 text-center sm:px-6 lg:px-8">
+        <div ref={heroStarsLayerRef} aria-hidden="true" className="fitdex-hero-stars pointer-events-none absolute inset-0 z-[2] overflow-hidden" />
+        <div ref={heroStreakLayerRef} aria-hidden="true" className="fitdex-hero-streaks pointer-events-none absolute inset-0 z-[3] overflow-hidden" />
+        <div
+          ref={heroAuraRef}
+          aria-hidden="true"
+          className="fitdex-hero-aura pointer-events-none absolute left-1/2 top-1/2 z-[2] h-[34rem] w-[34rem] -translate-x-1/2 -translate-y-1/2 opacity-0"
+        />
+        <div
+          ref={heroContentRef}
+          className="relative z-[5] mx-auto flex min-h-[calc(100vh-4rem)] w-full max-w-6xl flex-col items-center justify-center px-4 text-center sm:px-6 lg:px-8"
+        >
           <div className="space-y-6">
             <h1 ref={heroHeadingRef} className="relative mx-auto flex w-full justify-center text-6xl font-semibold leading-[0.94] text-white sm:text-7xl">
               <span
                 ref={heroWordmarkShellRef}
-                onPointerDown={handleWordmarkPress}
-                className="group/wordmark relative mx-auto inline-flex cursor-pointer select-none items-center justify-center overflow-hidden rounded-[0.08em] px-[0.025em] text-center align-middle tracking-[-0.048em] opacity-100 transform-gpu transition-transform duration-500 ease-[cubic-bezier(0.22,1,0.36,1)] hover:scale-[1.022]"
+                className="group/wordmark relative mx-auto inline-flex cursor-pointer select-none items-center justify-center overflow-hidden rounded-[0.08em] px-[0.025em] text-center align-middle tracking-[-0.048em] opacity-100 transform-gpu transition-transform duration-500 ease-[cubic-bezier(0.22,1,0.36,1)] hover:scale-[1.03]"
                 style={{ transform: "translate3d(0, 0, 0) scale(1)" }}
               >
                 <span
@@ -708,6 +938,93 @@ export function HomePageView(): JSX.Element {
           </div>
         </Reveal>
       </section>
+      <style jsx global>{`
+        .fitdex-hero .fitdex-hero-stars,
+        .fitdex-hero .fitdex-hero-streaks {
+          contain: layout paint;
+          transform: translate3d(0, 0, 0);
+          will-change: transform;
+        }
+
+        .fitdex-hero .fitdex-hero-streak {
+          position: absolute;
+          left: 50%;
+          top: 50%;
+          border-radius: 999px;
+          transform-origin: 0% 50%;
+          filter: blur(1px);
+          mix-blend-mode: screen;
+          opacity: 0;
+          pointer-events: none;
+          will-change: transform, opacity, filter;
+        }
+
+        .fitdex-hero .fitdex-hero-star {
+          position: absolute;
+          border-radius: 999px;
+          transform: translate3d(-50%, -50%, 0) scale(1);
+          background-image: radial-gradient(
+            circle at center,
+            rgba(255, 255, 255, 0.96) 0%,
+            rgba(186, 230, 253, 0.78) 48%,
+            rgba(129, 140, 248, 0) 100%
+          );
+          box-shadow: 0 0 14px rgba(129, 140, 248, 0.32);
+          pointer-events: none;
+          will-change: opacity, transform;
+        }
+
+        .fitdex-hero .fitdex-hero-star-twinkle {
+          animation: fitdexHeroStarTwinkle var(--fitdex-star-duration, 8.4s) ease-in-out var(--fitdex-star-delay, 0s) infinite;
+        }
+
+        .fitdex-hero .fitdex-hero-aura {
+          background-image:
+            radial-gradient(circle at 50% 48%, rgba(129, 140, 248, 0.27) 0%, rgba(56, 189, 248, 0.14) 34%, rgba(59, 130, 246, 0.06) 52%, rgba(59, 130, 246, 0) 74%),
+            radial-gradient(circle at 48% 58%, rgba(217, 70, 239, 0.12) 0%, rgba(217, 70, 239, 0) 66%);
+          background-position: 50% 50%;
+          background-size: 132% 132%;
+          filter: blur(34px);
+          transition: opacity 900ms cubic-bezier(0.22, 1, 0.36, 1), filter 900ms cubic-bezier(0.22, 1, 0.36, 1);
+          will-change: transform, opacity, filter, background-position;
+        }
+
+        .fitdex-hero .fitdex-hero-aura-active {
+          opacity: 0.26;
+          animation: fitdexHeroAuraBreath 9.6s ease-in-out infinite;
+        }
+
+        @keyframes fitdexHeroStarTwinkle {
+          0%,
+          100% {
+            opacity: var(--fitdex-star-min, 0.1);
+          }
+          50% {
+            opacity: var(--fitdex-star-max, 0.3);
+          }
+        }
+
+        @keyframes fitdexHeroAuraBreath {
+          0%,
+          100% {
+            opacity: 0.2;
+            filter: blur(34px);
+            background-position: 48% 52%;
+          }
+          50% {
+            opacity: 0.3;
+            filter: blur(30px);
+            background-position: 52% 48%;
+          }
+        }
+
+        @media (prefers-reduced-motion: reduce) {
+          .fitdex-hero .fitdex-hero-star-twinkle,
+          .fitdex-hero .fitdex-hero-aura-active {
+            animation: none !important;
+          }
+        }
+      `}</style>
     </div>
   );
 }
