@@ -11,6 +11,9 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { accentRgb, accents, type AccentName } from "@/lib/theme/accents";
 
 const lerp = (from: number, to: number, alpha: number) => from + (to - from) * alpha;
+const clamp = (value: number, min: number, max: number) => Math.min(max, Math.max(min, value));
+const easeOutCubic = (value: number) => 1 - (1 - value) ** 3;
+const wordmarkLetters = ["F", "i", "t", "d", "e", "x"] as const;
 
 const featureCards: Array<{
   title: string;
@@ -49,6 +52,12 @@ export function HomePageView(): JSX.Element {
   const heroSectionRef = useRef<HTMLElement | null>(null);
   const heroBgRef = useRef<HTMLDivElement | null>(null);
   const heroHeadingRef = useRef<HTMLHeadingElement | null>(null);
+  const heroWordmarkRef = useRef<HTMLSpanElement | null>(null);
+  const heroBlurNearRef = useRef<HTMLSpanElement | null>(null);
+  const heroBlurFarRef = useRef<HTMLSpanElement | null>(null);
+  const heroTrailRef = useRef<HTMLSpanElement | null>(null);
+  const heroTrailLetterRefs = useRef<Array<HTMLSpanElement | null>>([]);
+  const heroDepthLetterRefs = useRef<Array<HTMLSpanElement | null>>([]);
   const heroSubRef = useRef<HTMLParagraphElement | null>(null);
   const heroCtaRef = useRef<HTMLAnchorElement | null>(null);
   const heroSweepRef = useRef<HTMLSpanElement | null>(null);
@@ -71,16 +80,24 @@ export function HomePageView(): JSX.Element {
   const partnerMagnetCurrent = useRef({ x: 0, y: 0 });
   const partnerHovering = useRef(false);
 
-  const { scrollProgress } = useScrollEngine();
+  const { scrollProgress, scrollVelocity } = useScrollEngine();
 
   useEffect(() => {
     if (typeof window === "undefined") return;
 
-    const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    const reduceMotionMedia = window.matchMedia("(prefers-reduced-motion: reduce)");
+    const coarsePointerMedia = window.matchMedia("(pointer: coarse)");
+    let reduceMotion = reduceMotionMedia.matches;
+    let mobileFallback = coarsePointerMedia.matches || window.innerWidth < 900;
+
     const heroHeading = heroHeadingRef.current;
     const heroSub = heroSubRef.current;
     const heroCta = heroCtaRef.current;
     const flowSection = flowSectionRef.current;
+    const heroWordmark = heroWordmarkRef.current;
+    const heroBlurNear = heroBlurNearRef.current;
+    const heroBlurFar = heroBlurFarRef.current;
+    const heroTrail = heroTrailRef.current;
 
     if (heroHeading && !reduceMotion) {
       heroHeading.style.opacity = "0";
@@ -131,15 +148,165 @@ export function HomePageView(): JSX.Element {
       flowSection.style.transform = "translate3d(0, 0, 0) scale(1)";
     }
 
+    if (heroBlurNear) {
+      heroBlurNear.style.opacity = "0";
+      heroBlurNear.style.transform = "translate3d(0, 0, 0)";
+    }
+    if (heroBlurFar) {
+      heroBlurFar.style.opacity = "0";
+      heroBlurFar.style.transform = "translate3d(0, 0, 0)";
+    }
+    if (heroTrail) {
+      heroTrail.style.opacity = "0";
+      heroTrail.style.transform = "translate3d(0, 0, 0)";
+    }
+
+    const clearWordmarkEffects = () => {
+      if (heroWordmark) {
+        heroWordmark.style.transform = "translate3d(0, 0, 0)";
+      }
+      if (heroBlurNear) {
+        heroBlurNear.style.opacity = "0";
+        heroBlurNear.style.transform = "translate3d(0, 0, 0)";
+        heroBlurNear.style.filter = "blur(0px)";
+      }
+      if (heroBlurFar) {
+        heroBlurFar.style.opacity = "0";
+        heroBlurFar.style.transform = "translate3d(0, 0, 0)";
+        heroBlurFar.style.filter = "blur(0px)";
+      }
+      if (heroTrail) {
+        heroTrail.style.opacity = "0";
+        heroTrail.style.transform = "translate3d(0, 0, 0)";
+        heroTrail.style.filter = "blur(0px)";
+      }
+      heroTrailLetterRefs.current.forEach((letter) => {
+        if (!letter) return;
+        letter.style.opacity = "0";
+        letter.style.transform = "translate3d(0, 0, 0)";
+      });
+      heroDepthLetterRefs.current.forEach((letter, index) => {
+        if (!letter) return;
+        const centered = index - (wordmarkLetters.length - 1) * 0.5;
+        letter.style.transform = `translate3d(0, ${(centered * 0.24).toFixed(2)}px, 0)`;
+      });
+    };
+
+    const syncMotionPreferences = () => {
+      reduceMotion = reduceMotionMedia.matches;
+      mobileFallback = coarsePointerMedia.matches || window.innerWidth < 900;
+      if (reduceMotion || mobileFallback) {
+        clearWordmarkEffects();
+      }
+    };
+
+    reduceMotionMedia.addEventListener("change", syncMotionPreferences);
+    coarsePointerMedia.addEventListener("change", syncMotionPreferences);
+    window.addEventListener("resize", syncMotionPreferences, { passive: true });
+
+    const cursorVelocity = { x: 0, y: 0, speed: 0 };
+    const cursorDirection = { x: 1, y: 0 };
+    const cursorLast = { x: window.innerWidth * 0.5, y: window.innerHeight * 0.5, time: performance.now() };
+    const onPointerMove = (event: PointerEvent) => {
+      if (reduceMotion || mobileFallback || event.pointerType !== "mouse") return;
+      const now = performance.now();
+      const dt = Math.max(now - cursorLast.time, 12);
+      const dx = event.clientX - cursorLast.x;
+      const dy = event.clientY - cursorLast.y;
+      const nextVX = (dx / dt) * 1000;
+      const nextVY = (dy / dt) * 1000;
+      cursorVelocity.x = lerp(cursorVelocity.x, nextVX, 0.42);
+      cursorVelocity.y = lerp(cursorVelocity.y, nextVY, 0.42);
+      cursorVelocity.speed = Math.hypot(cursorVelocity.x, cursorVelocity.y);
+      if (cursorVelocity.speed > 16) {
+        const inverseSpeed = 1 / cursorVelocity.speed;
+        cursorDirection.x = cursorVelocity.x * inverseSpeed;
+        cursorDirection.y = cursorVelocity.y * inverseSpeed;
+      }
+      cursorLast.x = event.clientX;
+      cursorLast.y = event.clientY;
+      cursorLast.time = now;
+    };
+    const onPointerLeave = () => {
+      cursorVelocity.x = 0;
+      cursorVelocity.y = 0;
+      cursorVelocity.speed = 0;
+    };
+    window.addEventListener("pointermove", onPointerMove, { passive: true });
+    window.addEventListener("pointerleave", onPointerLeave, { passive: true });
+
     let rafId = 0;
+    let clearWillChangeTimer = 0;
+    let interactionWillChange = false;
+    let blurEnergy = 0;
+    let trailEnergy = 0;
+    let wasScrolling = false;
+    let settling = false;
+    let settleStart = 0;
+    let timeScale = 1;
+    let sceneTime = performance.now();
+    let lastFrameTime = sceneTime;
+    let wordmarkClearedForSimple = false;
+    const initialIntroProgress = Math.min(window.scrollY / (window.innerHeight * 0.88), 1);
+    let heroParallaxY = Math.min(window.scrollY * 0.16, 84);
+    let flowYCurrent = 140 * (1 - initialIntroProgress);
+    let flowScaleCurrent = 0.94 + initialIntroProgress * 0.06;
+    let flowOpacityCurrent = 0.36 + initialIntroProgress * 0.64;
+
+    const updateWordmarkWillChange = (active: boolean) => {
+      if (interactionWillChange === active) return;
+      interactionWillChange = active;
+      const nextWillChange = active ? "transform, opacity, filter" : "auto";
+      if (heroWordmark) heroWordmark.style.willChange = nextWillChange;
+      if (heroBlurNear) heroBlurNear.style.willChange = nextWillChange;
+      if (heroBlurFar) heroBlurFar.style.willChange = nextWillChange;
+      if (heroTrail) heroTrail.style.willChange = nextWillChange;
+    };
+
     const update = (time: number) => {
+      const dt = clamp(time - lastFrameTime, 8, 34);
+      lastFrameTime = time;
+
       const scrollY = window.scrollY;
       const introProgress = Math.min(scrollY / (window.innerHeight * 0.88), 1);
       const heroFade = 1 - introProgress * 0.65;
+      const simpleMotion = reduceMotion || mobileFallback;
+
+      if (!simpleMotion) {
+        const scrollSpeed = Math.abs(scrollVelocity.current);
+        const scrollNorm = clamp(scrollSpeed / 1800, 0, 1);
+        const scrollActive = scrollSpeed > 10;
+        const targetTimeScale = scrollActive ? 0.9 + scrollNorm * 0.34 : 1;
+
+        if (!scrollActive && wasScrolling) {
+          settling = true;
+          settleStart = time;
+        }
+        wasScrolling = scrollActive;
+        timeScale = lerp(timeScale, targetTimeScale, scrollActive ? 0.14 : 0.08);
+      } else {
+        wasScrolling = false;
+        settling = false;
+        timeScale = 1;
+      }
+
+      sceneTime += dt * timeScale;
+      const animationTime = simpleMotion ? time : sceneTime;
+
+      let settleFactor = 0;
+      if (settling) {
+        const settleProgress = clamp((time - settleStart) / 520, 0, 1);
+        settleFactor = 1 - easeOutCubic(settleProgress);
+        if (settleProgress >= 1) {
+          settling = false;
+        }
+      }
 
       if (heroBgRef.current) {
-        const y = Math.min(scrollY * 0.16, 84);
-        heroBgRef.current.style.transform = `translate3d(0, ${y.toFixed(2)}px, 0) scale(1.06)`;
+        const targetY = Math.min(scrollY * 0.16, 84);
+        const parallaxLerp = simpleMotion ? 1 : clamp((0.07 + timeScale * 0.06) * (dt / 16), 0.05, 0.3);
+        heroParallaxY = lerp(heroParallaxY, targetY, parallaxLerp);
+        heroBgRef.current.style.transform = `translate3d(0, ${heroParallaxY.toFixed(2)}px, 0) scale(1.06)`;
       }
 
       if (heroSectionRef.current) {
@@ -147,31 +314,133 @@ export function HomePageView(): JSX.Element {
       }
 
       if (flowSectionRef.current && !reduceMotion) {
-        const yOffset = 140 * (1 - introProgress);
-        const scale = 0.94 + introProgress * 0.06;
-        flowSectionRef.current.style.transform = `translate3d(0, ${yOffset.toFixed(2)}px, 0) scale(${scale.toFixed(3)})`;
-        flowSectionRef.current.style.opacity = (0.36 + introProgress * 0.64).toFixed(3);
+        const targetY = 140 * (1 - introProgress);
+        const targetScale = 0.94 + introProgress * 0.06;
+        const targetOpacity = 0.36 + introProgress * 0.64;
+        const flowLerp = simpleMotion ? 0.16 : clamp((0.09 + timeScale * 0.04) * (dt / 16), 0.08, 0.24);
+
+        flowYCurrent = lerp(flowYCurrent, targetY, flowLerp);
+        flowScaleCurrent = lerp(flowScaleCurrent, targetScale, flowLerp);
+        flowOpacityCurrent = lerp(flowOpacityCurrent, targetOpacity, flowLerp);
+
+        const settleDepthCorrection = settleFactor * 3.4;
+        flowSectionRef.current.style.transform = `translate3d(0, ${(flowYCurrent - settleDepthCorrection).toFixed(2)}px, 0) scale(${flowScaleCurrent.toFixed(3)})`;
+        flowSectionRef.current.style.opacity = flowOpacityCurrent.toFixed(3);
       }
 
       if (heroSweepRef.current && !reduceMotion) {
-        const sweep = ((time * 0.03) % 240) - 120;
+        const sweep = ((animationTime * 0.03) % 240) - 120;
+        const pulseAmplitude = simpleMotion ? 0.025 : 0.06 * (1 - settleFactor * 0.82);
+        const pulse = 0.32 + Math.sin(animationTime * 0.0032) * pulseAmplitude;
         heroSweepRef.current.style.backgroundPosition = `${sweep.toFixed(2)}% 50%`;
+        heroSweepRef.current.style.opacity = clamp(pulse, 0.24, 0.4).toFixed(3);
+        heroSweepRef.current.style.filter = `blur(${(16 + (1 - settleFactor) * 2).toFixed(2)}px)`;
       }
 
       if (heroArrowRef.current && !reduceMotion) {
-        const floatY = Math.sin(time * 0.0032) * 6;
-        const pulse = 1 + Math.sin(time * 0.004) * 0.08;
+        const floatY = Math.sin(animationTime * 0.0032) * 6;
+        const pulse = 1 + Math.sin(animationTime * 0.004) * 0.08;
         heroArrowRef.current.style.transform = `translate3d(0, ${floatY.toFixed(2)}px, 0) scale(${pulse.toFixed(3)})`;
       }
 
       if (calculatorPanelRef.current && !reduceMotion) {
-        const sweep = (time * 0.008 + scrollProgress.current * 90) % 220;
+        const sweep = (animationTime * 0.008 + scrollProgress.current * 90) % 220;
         calculatorPanelRef.current.style.backgroundPosition = `${sweep.toFixed(2)}% 50%`;
       }
 
       if (calculatorImageRef.current && !reduceMotion) {
         const rotate = scrollProgress.current * 24;
         calculatorImageRef.current.style.transform = `translate3d(0, 0, 0) rotate(${rotate.toFixed(2)}deg)`;
+      }
+
+      if (!simpleMotion) {
+        wordmarkClearedForSimple = false;
+        const blurDecay = Math.exp(-dt / 220);
+        const trailDecay = Math.exp(-dt / 125);
+        const speedNorm = clamp(cursorVelocity.speed / 1800, 0, 1);
+        blurEnergy = Math.max(blurEnergy * blurDecay, speedNorm);
+
+        const trailKick = speedNorm > 0.54 ? (speedNorm - 0.54) / 0.46 : 0;
+        trailEnergy = Math.max(trailEnergy * trailDecay, trailKick);
+
+        if (settling) {
+          blurEnergy *= Math.exp(-dt / 90);
+          trailEnergy *= Math.exp(-dt / 72);
+        }
+
+        cursorVelocity.x *= blurDecay;
+        cursorVelocity.y *= blurDecay;
+        cursorVelocity.speed = Math.hypot(cursorVelocity.x, cursorVelocity.y);
+
+        const directionMag = Math.hypot(cursorDirection.x, cursorDirection.y) || 1;
+        const dirX = cursorDirection.x / directionMag;
+        const dirY = cursorDirection.y / directionMag;
+        const angle = (Math.atan2(dirY, dirX) * 180) / Math.PI;
+        const stretch = 1 + blurEnergy * 0.08;
+        const nearOffset = blurEnergy * 7.5;
+        const farOffset = blurEnergy * 12.5;
+        const trailOffsetScale = (0.92 + timeScale * 0.2) * trailEnergy;
+        const depthNudge = settleFactor * 0.55;
+
+        if (heroWordmark) {
+          heroWordmark.style.transform = `translate3d(${(dirX * depthNudge).toFixed(2)}px, ${(dirY * depthNudge).toFixed(2)}px, 0)`;
+        }
+        if (heroBlurNear) {
+          heroBlurNear.style.opacity = (blurEnergy * 0.26).toFixed(3);
+          heroBlurNear.style.filter = `blur(${(0.5 + blurEnergy * 2.4).toFixed(2)}px)`;
+          heroBlurNear.style.transform = `translate3d(${(dirX * nearOffset).toFixed(2)}px, ${(dirY * nearOffset).toFixed(2)}px, 0) rotate(${angle.toFixed(2)}deg) scale3d(${stretch.toFixed(3)}, 1, 1) rotate(${(-angle).toFixed(2)}deg)`;
+        }
+        if (heroBlurFar) {
+          heroBlurFar.style.opacity = (blurEnergy * 0.18).toFixed(3);
+          heroBlurFar.style.filter = `blur(${(1.1 + blurEnergy * 4.2).toFixed(2)}px)`;
+          heroBlurFar.style.transform = `translate3d(${(dirX * farOffset).toFixed(2)}px, ${(dirY * farOffset).toFixed(2)}px, 0) rotate(${angle.toFixed(2)}deg) scale3d(${(stretch + blurEnergy * 0.05).toFixed(3)}, 1, 1) rotate(${(-angle).toFixed(2)}deg)`;
+        }
+        if (heroTrail) {
+          heroTrail.style.opacity = (trailEnergy * 0.22).toFixed(3);
+          heroTrail.style.filter = `blur(${(0.4 + trailEnergy * 1.6).toFixed(2)}px)`;
+          heroTrail.style.transform = "translate3d(0, 0, 0)";
+        }
+
+        heroDepthLetterRefs.current.forEach((letter, index) => {
+          if (!letter) return;
+          const centered = index - (wordmarkLetters.length - 1) * 0.5;
+          const depth = centered * 0.24 * (1 + blurEnergy * 0.45) - settleFactor * 0.08;
+          letter.style.transform = `translate3d(0, ${depth.toFixed(2)}px, 0)`;
+        });
+
+        heroTrailLetterRefs.current.forEach((letter, index) => {
+          if (!letter) return;
+          const drift = (4.6 + index * 0.75) * trailOffsetScale;
+          const opacity = clamp((0.34 - index * 0.032) * trailEnergy, 0, 0.22);
+          letter.style.transform = `translate3d(${(dirX * drift).toFixed(2)}px, ${(dirY * drift).toFixed(2)}px, 0)`;
+          letter.style.opacity = opacity.toFixed(3);
+        });
+
+        const highVelocity = speedNorm > 0.38 || blurEnergy > 0.08 || trailEnergy > 0.04;
+        if (highVelocity) {
+          if (clearWillChangeTimer) {
+            window.clearTimeout(clearWillChangeTimer);
+            clearWillChangeTimer = 0;
+          }
+          updateWordmarkWillChange(true);
+        } else if (!clearWillChangeTimer && interactionWillChange) {
+          clearWillChangeTimer = window.setTimeout(() => {
+            updateWordmarkWillChange(false);
+            clearWillChangeTimer = 0;
+          }, 240);
+        }
+      } else {
+        blurEnergy = 0;
+        trailEnergy = 0;
+        if (clearWillChangeTimer) {
+          window.clearTimeout(clearWillChangeTimer);
+          clearWillChangeTimer = 0;
+        }
+        updateWordmarkWillChange(false);
+        if (!wordmarkClearedForSimple) {
+          clearWordmarkEffects();
+          wordmarkClearedForSimple = true;
+        }
       }
 
       calculatorTiltCurrent.current.x = lerp(calculatorTiltCurrent.current.x, calculatorTiltTarget.current.x, 0.14);
@@ -207,11 +476,19 @@ export function HomePageView(): JSX.Element {
 
     rafId = window.requestAnimationFrame(update);
     return () => {
+      if (clearWillChangeTimer) {
+        window.clearTimeout(clearWillChangeTimer);
+      }
+      window.removeEventListener("pointermove", onPointerMove);
+      window.removeEventListener("pointerleave", onPointerLeave);
+      window.removeEventListener("resize", syncMotionPreferences);
+      reduceMotionMedia.removeEventListener("change", syncMotionPreferences);
+      coarsePointerMedia.removeEventListener("change", syncMotionPreferences);
       if (rafId) {
         window.cancelAnimationFrame(rafId);
       }
     };
-  }, [scrollProgress]);
+  }, [scrollProgress, scrollVelocity]);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -336,8 +613,63 @@ export function HomePageView(): JSX.Element {
         <div className="relative mx-auto flex min-h-[calc(100vh-4rem)] w-full max-w-6xl flex-col items-center justify-center px-4 text-center sm:px-6 lg:px-8">
           <div className="space-y-6">
             <h1 ref={heroHeadingRef} className="relative text-6xl font-semibold tracking-[0.08em] text-white sm:text-7xl">
-              <span className="bg-gradient-to-r from-white via-white to-white/70 bg-clip-text text-transparent">
-                Fitdex
+              <span className="relative inline-flex">
+                <span ref={heroWordmarkRef} className="bg-gradient-to-r from-white via-white to-white/70 bg-clip-text text-transparent">
+                  Fitdex
+                </span>
+                <span
+                  ref={heroBlurNearRef}
+                  aria-hidden="true"
+                  className="pointer-events-none absolute inset-0 inline-flex items-center justify-center text-white/80 opacity-0 mix-blend-screen"
+                  style={{ filter: "blur(0px)", transform: "translate3d(0, 0, 0)" }}
+                >
+                  {wordmarkLetters.map((letter, index) => {
+                    const centered = index - (wordmarkLetters.length - 1) * 0.5;
+                    return (
+                      <span
+                        key={`near-${index}`}
+                        ref={(node) => {
+                          heroDepthLetterRefs.current[index] = node;
+                        }}
+                        className="inline-block"
+                        style={{ transform: `translate3d(0, ${(centered * 0.24).toFixed(2)}px, 0)` }}
+                      >
+                        {letter}
+                      </span>
+                    );
+                  })}
+                </span>
+                <span
+                  ref={heroBlurFarRef}
+                  aria-hidden="true"
+                  className="pointer-events-none absolute inset-0 inline-flex items-center justify-center text-white/60 opacity-0 mix-blend-screen"
+                  style={{ filter: "blur(0px)", transform: "translate3d(0, 0, 0)" }}
+                >
+                  {wordmarkLetters.map((letter, index) => (
+                    <span key={`far-${index}`} className="inline-block">
+                      {letter}
+                    </span>
+                  ))}
+                </span>
+                <span
+                  ref={heroTrailRef}
+                  aria-hidden="true"
+                  className="pointer-events-none absolute inset-0 inline-flex items-center justify-center text-white/55 opacity-0 mix-blend-screen"
+                  style={{ filter: "blur(0px)", transform: "translate3d(0, 0, 0)" }}
+                >
+                  {wordmarkLetters.map((letter, index) => (
+                    <span
+                      key={`trail-${index}`}
+                      ref={(node) => {
+                        heroTrailLetterRefs.current[index] = node;
+                      }}
+                      className="inline-block opacity-0"
+                      style={{ transform: "translate3d(0, 0, 0)" }}
+                    >
+                      {letter}
+                    </span>
+                  ))}
+                </span>
               </span>
               <span
                 ref={heroSweepRef}
