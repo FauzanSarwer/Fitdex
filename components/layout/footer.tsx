@@ -1,49 +1,39 @@
-"use client";
-
 import Link from "next/link";
-import { motion } from "framer-motion";
 import Image from "next/image";
-import { usePathname } from "next/navigation";
 import { cn } from "@/lib/utils";
 
 const SEO_CITY_LINKS = [
-  { label: "Gyms in Delhi", href: "/gyms-in-delhi" },
-  { label: "Gyms in Gurugram", href: "/gyms-in-gurugram" },
-  { label: "Gyms in Noida", href: "/gyms-in-noida" },
-  { label: "Gyms in Mumbai", href: "/gyms-in-mumbai" },
-  { label: "Gyms in Pune", href: "/gyms-in-pune" },
-  { label: "Gyms in Bangalore", href: "/gyms-in-bangalore" },
-  { label: "Gyms in Hyderabad", href: "/gyms-in-hyderabad" },
-  { label: "Gyms in Jaipur", href: "/gyms-in-jaipur" },
-  { label: "Gyms in Kolkata", href: "/gyms-in-kolkata" },
-  { label: "Gyms in Lucknow", href: "/gyms-in-lucknow" },
+  { label: "Gyms in Delhi", city: "Delhi" },
+  { label: "Gyms in Gurugram", city: "Gurugram" },
+  { label: "Gyms in Noida", city: "Noida" },
+  { label: "Gyms in Mumbai", city: "Mumbai" },
+  { label: "Gyms in Pune", city: "Pune" },
+  { label: "Gyms in Bangalore", city: "Bangalore" },
+  { label: "Gyms in Hyderabad", city: "Hyderabad" },
+  { label: "Gyms in Jaipur", city: "Jaipur" },
+  { label: "Gyms in Kolkata", city: "Kolkata" },
+  { label: "Gyms in Lucknow", city: "Lucknow" },
 ];
 
-export function Footer() {
-  const pathname = usePathname();
-  const isDashboard = pathname?.startsWith("/dashboard");
-
+export function Footer({ className }: { className?: string }) {
   return (
-    <footer className={cn("mt-auto border-t border-border/60 bg-card/40 backdrop-blur", isDashboard && "md:pl-56")}>
+    <footer className={cn("mt-auto border-t border-border/60 bg-card/40 backdrop-blur", className)}>
       <div className="mx-auto w-full max-w-[1440px] px-4 py-10 sm:px-6 lg:px-10">
-        <motion.div
-          initial={{ opacity: 0, y: 10 }}
-          whileInView={{ opacity: 1, y: 0 }}
-          viewport={{ once: true }}
-          className="grid gap-8 lg:grid-cols-[1.2fr_0.9fr_0.9fr_1.4fr] lg:items-start"
-        >
-          <Link href="/" className="flex items-center gap-3">
-            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-card shadow-glow-sm">
+        <div className="grid gap-8 lg:grid-cols-[1.2fr_0.9fr_0.9fr_1.4fr] lg:items-start">
+          <Link href="/" className="group flex items-center gap-3 transition-transform duration-300 hover:-translate-y-0.5">
+            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-card shadow-glow-sm transition-all duration-300 group-hover:bg-card/95 group-hover:shadow-[0_12px_26px_rgba(0,0,0,0.24)]">
               <Image
                 src="/fitdex-logo.png"
                 alt="Fitdex"
                 width={28}
                 height={28}
-                className="h-7 w-7 object-contain rotate-0 skew-x-0 skew-y-0"
+                className="h-7 w-7 object-contain rotate-0 skew-x-0 skew-y-0 transition-transform duration-300 group-hover:scale-110 group-hover:-rotate-3"
               />
             </div>
             <div>
-              <div className="text-lg font-semibold">Fitdex</div>
+              <div className="text-lg font-semibold transition-all duration-300 group-hover:text-foreground group-hover:[text-shadow:0_0_16px_rgba(255,255,255,0.35)]">
+                Fitdex
+              </div>
               <div className="text-sm text-muted-foreground">Find the right gym, faster.</div>
             </div>
           </Link>
@@ -83,8 +73,8 @@ export function Footer() {
             <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
               {SEO_CITY_LINKS.map((city) => (
                 <Link
-                  key={city.href}
-                  href={city.href}
+                  key={city.city}
+                  href={`/explore?city=${encodeURIComponent(city.city)}`}
                   className="text-muted-foreground transition-colors hover:text-foreground"
                 >
                   {city.label}
@@ -92,7 +82,7 @@ export function Footer() {
               ))}
             </div>
           </div>
-        </motion.div>
+        </div>
         <div className="mt-8 text-xs text-muted-foreground">
           © {new Date().getFullYear()} Fitdex. All rights reserved.
         </div>

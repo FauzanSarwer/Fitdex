@@ -8,6 +8,7 @@ import { cityLabel, normalizeCityName } from "@/lib/seo/cities";
 import { SITE_NAME } from "@/lib/site";
 import { buildPageMetadata } from "@/lib/seo/config";
 import { breadcrumbSchema, faqSchema } from "@/lib/seo/schema";
+import { SiteShell } from "@/components/layout/site-shell";
 
 type Params = { city: string };
 type SearchParams = { page?: string };
@@ -189,15 +190,71 @@ export default async function CityGymsPage({
 
   if (gyms.length === 0) {
     return (
+      <SiteShell>
+        <main className="container mx-auto px-4 py-8">
+          <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(breadcrumbs) }} />
+          <header className="mb-6 space-y-2">
+            <h1 className="text-3xl font-bold">{city} Gyms</h1>
+            <p className="text-sm text-muted-foreground">No gyms found in this city yet.</p>
+          </header>
+          {cityLinks.length > 0 && (
+            <nav className="space-y-2" aria-label="Other cities">
+              <h2 className="text-lg font-semibold">Try nearby cities</h2>
+              <div className="flex flex-wrap gap-2">
+                {cityLinks.map((slug) => (
+                  <Link
+                    key={slug}
+                    href={`/gyms-in-${slug}`}
+                    className="rounded-full border border-white/10 px-3 py-1 text-sm text-muted-foreground hover:text-foreground"
+                  >
+                    {cityLabel(slug)}
+                  </Link>
+                ))}
+              </div>
+            </nav>
+          )}
+        </main>
+      </SiteShell>
+    );
+  }
+
+  return (
+    <SiteShell>
       <main className="container mx-auto px-4 py-8">
         <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(breadcrumbs) }} />
+        <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(cityFaqSchema) }} />
+
         <header className="mb-6 space-y-2">
           <h1 className="text-3xl font-bold">{city} Gyms</h1>
-          <p className="text-sm text-muted-foreground">No gyms found in this city yet.</p>
+          <p className="text-sm text-muted-foreground">Browse verified gyms and compare memberships in {city}.</p>
         </header>
+
+        <section className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+          {cards.map((gym) => (
+            <GymCard key={gym.id} gym={gym} />
+          ))}
+        </section>
+
+        {(hasPrev || hasNext) && (
+          <nav className="mt-8 flex items-center justify-between" aria-label="Pagination">
+            {hasPrev ? (
+              <Link rel="prev" href={`/gyms-in-${citySlug}?page=${page - 1}`} className="text-sm text-primary hover:underline">
+                Previous page
+              </Link>
+            ) : (
+              <span />
+            )}
+            {hasNext ? (
+              <Link rel="next" href={`/gyms-in-${citySlug}?page=${page + 1}`} className="text-sm text-primary hover:underline">
+                Next page
+              </Link>
+            ) : null}
+          </nav>
+        )}
+
         {cityLinks.length > 0 && (
-          <nav className="space-y-2" aria-label="Other cities">
-            <h2 className="text-lg font-semibold">Try nearby cities</h2>
+          <nav className="mt-8 space-y-2" aria-label="Other cities">
+            <h2 className="text-lg font-semibold">Explore other cities</h2>
             <div className="flex flex-wrap gap-2">
               {cityLinks.map((slug) => (
                 <Link
@@ -212,58 +269,6 @@ export default async function CityGymsPage({
           </nav>
         )}
       </main>
-    );
-  }
-
-  return (
-    <main className="container mx-auto px-4 py-8">
-      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(breadcrumbs) }} />
-      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(cityFaqSchema) }} />
-
-      <header className="mb-6 space-y-2">
-        <h1 className="text-3xl font-bold">{city} Gyms</h1>
-        <p className="text-sm text-muted-foreground">Browse verified gyms and compare memberships in {city}.</p>
-      </header>
-
-      <section className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-        {cards.map((gym) => (
-          <GymCard key={gym.id} gym={gym} />
-        ))}
-      </section>
-
-      {(hasPrev || hasNext) && (
-        <nav className="mt-8 flex items-center justify-between" aria-label="Pagination">
-          {hasPrev ? (
-            <Link rel="prev" href={`/gyms-in-${citySlug}?page=${page - 1}`} className="text-sm text-primary hover:underline">
-              Previous page
-            </Link>
-          ) : (
-            <span />
-          )}
-          {hasNext ? (
-            <Link rel="next" href={`/gyms-in-${citySlug}?page=${page + 1}`} className="text-sm text-primary hover:underline">
-              Next page
-            </Link>
-          ) : null}
-        </nav>
-      )}
-
-      {cityLinks.length > 0 && (
-        <nav className="mt-8 space-y-2" aria-label="Other cities">
-          <h2 className="text-lg font-semibold">Explore other cities</h2>
-          <div className="flex flex-wrap gap-2">
-            {cityLinks.map((slug) => (
-              <Link
-                key={slug}
-                href={`/gyms-in-${slug}`}
-                className="rounded-full border border-white/10 px-3 py-1 text-sm text-muted-foreground hover:text-foreground"
-              >
-                {cityLabel(slug)}
-              </Link>
-            ))}
-          </div>
-        </nav>
-      )}
-    </main>
+    </SiteShell>
   );
 }

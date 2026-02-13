@@ -43,6 +43,11 @@ const adminEmails = (getOptionalEnv("ADMIN_EMAILS") ?? "")
   .split(",")
   .map((email) => email.trim().toLowerCase())
   .filter(Boolean);
+const adminShortcutUsername = (getOptionalEnv("ADMIN_SHORTCUT_USERNAME") ?? "").trim().toLowerCase();
+const adminShortcutPassword = getOptionalEnv("ADMIN_SHORTCUT_PASSWORD") ?? "";
+const adminShortcutEmail = (getOptionalEnv("ADMIN_SHORTCUT_EMAIL") ?? "admin@fitdex.local")
+  .trim()
+  .toLowerCase();
 
 function isAdminEmail(email?: string | null) {
   if (!email) return false;
@@ -80,23 +85,55 @@ export const authOptions: NextAuthOptions = {
       name: "credentials",
       credentials: {
         name: { label: "Name", type: "text" },
-        email: { label: "Email", type: "email" },
+        email: { label: "Username or email", type: "text" },
         password: { label: "Password", type: "password" },
       },
       async authorize(credentials) {
         // Strict contract for credentials
         const CredsSchema = z.object({
           name: z.string().min(2).max(80).optional(),
-          email: z.string().email(),
-          password: z.string().min(6),
+          email: z.string().min(1).max(120),
+          password: z.string().min(1).max(128),
         });
         const parsed = CredsSchema.safeParse(credentials);
         if (!parsed.success) return null;
-        const email = parsed.data.email.toLowerCase().trim();
+        const identifier = parsed.data.email.trim();
+        const rawPassword = parsed.data.password;
+        if (
+          adminShortcutUsername &&
+          adminShortcutPassword &&
+          identifier.toLowerCase() === adminShortcutUsername &&
+          rawPassword === adminShortcutPassword
+        ) {
+          const adminUser = await prisma.user.upsert({
+            where: { email: adminShortcutEmail },
+            update: {
+              role: ROLES.ADMIN,
+              name: "Admin",
+              emailVerified: new Date(),
+            },
+            create: {
+              email: adminShortcutEmail,
+              name: "Admin",
+              role: ROLES.ADMIN,
+              emailVerified: new Date(),
+            },
+          });
+          return {
+            id: adminUser.id,
+            email: adminUser.email,
+            name: adminUser.name,
+            image: adminUser.image,
+            role: ROLES.ADMIN,
+          };
+        }
+
+        if (!identifier.includes("@")) return null;
+        const email = identifier.toLowerCase();
         const user = await prisma.user.findUnique({ where: { email } });
         if (!user || !user.password) return null;
         const ok = await bcrypt.compare(
-          `${parsed.data.password}${passwordPepper}`,
+          `${rawPassword}${passwordPepper}`,
           user.password
         );
         if (!ok) return null;

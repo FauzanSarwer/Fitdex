@@ -17,7 +17,7 @@ const buttonVariants = cva(
     variants: {
       variant: {
         default:
-          "bg-gradient-to-r from-primary to-accent text-primary-foreground shadow-glow-sm hover:-translate-y-0.5 hover:shadow-glow",
+          "fitdex-hero-explore-btn text-white hover:text-white",
         destructive:
           "bg-destructive text-primary-foreground hover:-translate-y-0.5 hover:opacity-95",
         outline:

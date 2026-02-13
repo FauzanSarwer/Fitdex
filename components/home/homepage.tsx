@@ -3,10 +3,9 @@
 import Image from "next/image";
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
-import { ArrowDown, BadgePercent, Building2, Calculator, ShieldCheck, Sparkles } from "lucide-react";
+import { BadgePercent, Building2, Calculator, ChevronDown, ShieldCheck, Sparkles } from "lucide-react";
 import { Reveal } from "@/components/motion/Reveal";
 import { useScrollEngine } from "@/components/motion/useScrollEngine";
-import { WebGLHero } from "@/components/hero/WebGLHero";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { accentRgb, accents, type AccentName } from "@/lib/theme/accents";
@@ -63,27 +62,56 @@ export function HomePageView(): JSX.Element {
   const heroCtaRef = useRef<HTMLAnchorElement | null>(null);
   const heroArrowRef = useRef<HTMLSpanElement | null>(null);
   const flowSectionRef = useRef<HTMLElement | null>(null);
-  const calculatorCardRef = useRef<HTMLDivElement | null>(null);
   const calculatorPanelRef = useRef<HTMLDivElement | null>(null);
   const calculatorImageRef = useRef<HTMLDivElement | null>(null);
+  const calculatorGlowRef = useRef<HTMLDivElement | null>(null);
   const partnerHeadingRef = useRef<HTMLHeadingElement | null>(null);
-  const partnerCtaRef = useRef<HTMLAnchorElement | null>(null);
 
   const headingRefs = useRef<Array<HTMLHeadingElement | null>>([]);
   const featureCardRefs = useRef<Array<HTMLDivElement | null>>([]);
 
-  const calculatorTiltTarget = useRef({ x: 0, y: 0 });
-  const calculatorTiltCurrent = useRef({ x: 0, y: 0 });
-  const calculatorHovering = useRef(false);
-
-  const partnerMagnetTarget = useRef({ x: 0, y: 0 });
-  const partnerMagnetCurrent = useRef({ x: 0, y: 0 });
-  const partnerHovering = useRef(false);
-
   const { scrollProgress, scrollVelocity } = useScrollEngine();
-  const [sceneReady, setSceneReady] = useState(false);
   const [reduceMotion, setReduceMotion] = useState(false);
   const [introDone, setIntroDone] = useState(false);
+
+  const getElementTranslateY = (element: HTMLElement) => {
+    const transform = window.getComputedStyle(element).transform;
+    if (!transform || transform === "none") return 0;
+
+    if (transform.startsWith("matrix3d(")) {
+      const values = transform
+        .slice("matrix3d(".length, -1)
+        .split(",")
+        .map((value) => Number.parseFloat(value.trim()));
+      return Number.isFinite(values[13]) ? values[13] : 0;
+    }
+
+    if (transform.startsWith("matrix(")) {
+      const values = transform
+        .slice("matrix(".length, -1)
+        .split(",")
+        .map((value) => Number.parseFloat(value.trim()));
+      return Number.isFinite(values[5]) ? values[5] : 0;
+    }
+
+    return 0;
+  };
+
+  const scrollToTopGyms = () => {
+    const section = nextSectionRef.current;
+    if (!section) return;
+
+    const header = document.querySelector("header");
+    const headerHeight = header instanceof HTMLElement ? header.getBoundingClientRect().height : 0;
+    const heading = headingRefs.current[0];
+    const sectionScrollMarginTop = Number.parseFloat(window.getComputedStyle(section).scrollMarginTop || "0");
+    const baseOffset = Math.max(headerHeight + 14, sectionScrollMarginTop * 0.5, 72);
+    const sectionVisualTop = section.getBoundingClientRect().top + window.scrollY;
+    const headingVisualTop = heading ? heading.getBoundingClientRect().top + window.scrollY : sectionVisualTop;
+    const sectionTranslateY = getElementTranslateY(section);
+    const targetTop = headingVisualTop - sectionTranslateY - baseOffset;
+    window.scrollTo({ top: Math.max(targetTop, 0), behavior: "smooth" });
+  };
 
   useEffect(() => {
     const media = window.matchMedia("(prefers-reduced-motion: reduce)");
@@ -94,18 +122,14 @@ export function HomePageView(): JSX.Element {
   }, []);
 
   useEffect(() => {
-    // If motion is reduced, show everything immediately
     if (reduceMotion) {
       setIntroDone(true);
       return;
     }
 
-    // Otherwise wait for scene to be ready, then wait 3200ms
-    if (sceneReady) {
-      const t = setTimeout(() => setIntroDone(true), 3200);
-      return () => clearTimeout(t);
-    }
-  }, [reduceMotion, sceneReady]);
+    const t = setTimeout(() => setIntroDone(true), 350);
+    return () => clearTimeout(t);
+  }, [reduceMotion]);
 
   // Standard Scroll Effects for other sections
   useEffect(() => {
@@ -197,29 +221,18 @@ export function HomePageView(): JSX.Element {
         flowSectionRef.current.style.opacity = flowOpacityCurrent.toFixed(3);
       }
 
-      if (calculatorPanelRef.current && !reduceMotion) {
-        const driftX = Math.sin(animationTime * 0.00048) * 3;
-        calculatorPanelRef.current.style.transform = `translate3d(${driftX.toFixed(2)}px, 0, 0)`;
-      }
-
       if (calculatorImageRef.current && !reduceMotion) {
-        const floatY = Math.sin(animationTime * 0.0011) * 2.4;
-        calculatorImageRef.current.style.transform = `translate3d(0, ${floatY.toFixed(2)}px, 0)`;
+        const driftY = Math.sin(animationTime * 0.00095) * 3.2;
+        const rotate = Math.sin(animationTime * 0.00105) * 2.6;
+        calculatorImageRef.current.style.transform = `translate3d(0, ${driftY.toFixed(2)}px, 0) rotate(${rotate.toFixed(2)}deg)`;
       }
 
-      calculatorTiltCurrent.current.x = lerp(calculatorTiltCurrent.current.x, calculatorTiltTarget.current.x, 0.14);
-      calculatorTiltCurrent.current.y = lerp(calculatorTiltCurrent.current.y, calculatorTiltTarget.current.y, 0.14);
-      if (calculatorCardRef.current) {
-        const scale = calculatorHovering.current ? 1.008 : 1;
-        const floatY = reduceMotion ? 0 : Math.sin(animationTime * 0.00105) * 2.6;
-        calculatorCardRef.current.style.transform = `translate3d(0, ${floatY.toFixed(2)}px, 0) scale(${scale.toFixed(3)})`;
-      }
-
-      partnerMagnetCurrent.current.x = lerp(partnerMagnetCurrent.current.x, partnerMagnetTarget.current.x, 0.2);
-      partnerMagnetCurrent.current.y = lerp(partnerMagnetCurrent.current.y, partnerMagnetTarget.current.y, 0.2);
-      if (partnerCtaRef.current && !reduceMotion) {
-        const scale = partnerHovering.current ? 1.02 : 1;
-        partnerCtaRef.current.style.transform = `translate3d(${partnerMagnetCurrent.current.x.toFixed(2)}px, ${partnerMagnetCurrent.current.y.toFixed(2)}px, 0) scale(${scale.toFixed(3)})`;
+      if (calculatorGlowRef.current && !reduceMotion) {
+        const pulse = 0.2 + ((Math.sin(animationTime * 0.00135) + 1) * 0.5) * 0.22;
+        const spin = Math.sin(animationTime * 0.00115) * 14;
+        const glowScale = 1 + ((Math.sin(animationTime * 0.00145) + 1) * 0.5) * 0.08;
+        calculatorGlowRef.current.style.opacity = pulse.toFixed(3);
+        calculatorGlowRef.current.style.transform = `rotate(${spin.toFixed(2)}deg) scale(${glowScale.toFixed(3)})`;
       }
 
       headingRefs.current.forEach((heading) => {
@@ -263,15 +276,14 @@ export function HomePageView(): JSX.Element {
       cards.forEach((card) => {
         card.style.opacity = "1";
         card.style.transform = "translate3d(0, 0, 0) scale(1)";
-        card.style.filter = "none";
       });
       return;
     }
 
     cards.forEach((card) => {
       card.style.opacity = "0";
-      card.style.transform = "translate3d(0, 52px, 0) scale(0.95)";
-      card.style.filter = "blur(7px)";
+      card.style.transform = "translate3d(0, 38px, 0) scale(0.985)";
+      card.style.willChange = "transform, opacity";
     });
 
     const timeoutIds: number[] = [];
@@ -281,24 +293,25 @@ export function HomePageView(): JSX.Element {
           if (!entry.isIntersecting) return;
           const node = entry.target as HTMLDivElement;
           const index = Number(node.dataset.index ?? "0");
-          const delay = index * 180;
-          node.style.willChange = "transform, opacity, filter";
+          const delay = 120 + index * 130;
           const timeoutId = window.setTimeout(() => {
-            node.style.transition = "opacity 900ms cubic-bezier(0.22,1,0.36,1), transform 900ms cubic-bezier(0.22,1,0.36,1), filter 900ms cubic-bezier(0.22,1,0.36,1)";
-            node.style.opacity = "1";
-            node.style.transform = "translate3d(0, 0, 0) scale(1)";
-            node.style.filter = "blur(0px)";
-            window.setTimeout(() => {
+            node.style.transition = "opacity 760ms cubic-bezier(0.22,1,0.36,1), transform 900ms cubic-bezier(0.22,1,0.36,1)";
+            window.requestAnimationFrame(() => {
+              node.style.opacity = "1";
+              node.style.transform = "translate3d(0, 0, 0) scale(1)";
+            });
+            const settleTimeoutId = window.setTimeout(() => {
               node.style.willChange = "auto";
-            }, 980);
+            }, 1120);
+            timeoutIds.push(settleTimeoutId);
           }, delay);
           timeoutIds.push(timeoutId);
           observer.unobserve(node);
         });
       },
       {
-        threshold: 0.2,
-        rootMargin: "0px 0px -8% 0px",
+        threshold: 0.16,
+        rootMargin: "0px 0px -6% 0px",
       }
     );
 
@@ -352,38 +365,29 @@ export function HomePageView(): JSX.Element {
   return (
     <div className="w-full">
       <section ref={heroSectionRef} className="fitdex-hero relative isolate min-h-[calc(100vh-4rem)] overflow-hidden">
-        {/* WebGL Hero Background & Content */}
-        {!reduceMotion && (
-          <div className={`absolute inset-0 z-0 transition-opacity duration-1000 ${sceneReady ? 'opacity-100' : 'opacity-0'}`}>
-            <WebGLHero onSceneReady={() => setSceneReady(true)} />
-          </div>
-        )}
-
-        {/* Static Fallback / Background layers (Reduced opacity or hidden if WebGL loads) */}
         <div
           ref={heroBgRef}
           className="absolute inset-0 -z-10"
           style={{ transform: "translate3d(0, 0, 0) scale(1.06)" }}
         >
-          {/* Keep image for potential fallback or underlying texture if transparent */}
           <Image
             src="/hero-bg.jpg"
             alt="Modern fitness studio"
             fill
             priority
             sizes="100vw"
-            className="object-cover object-center blur-[1.2px] opacity-20"
+            className="object-cover object-center blur-[2.2px] brightness-[0.68] opacity-24"
           />
         </div>
-        <div className="absolute inset-0 bg-gradient-to-b from-black/35 via-black/60 to-background/95 -z-10" />
+        <div className="absolute inset-0 bg-gradient-to-b from-black/52 via-black/78 to-background/96 -z-10" />
 
         {/* DOM Content Overlay */}
         <div
           ref={heroContentRef}
           className="relative z-[5] mx-auto flex min-h-[calc(100vh-4rem)] w-full max-w-6xl flex-col items-center justify-center px-4 text-center sm:px-6 lg:px-8"
-          style={{ pointerEvents: 'none' }} // Let clicks pass through to WebGL where appropriate, but buttons need pointer-events-auto
+          style={{ pointerEvents: "none" }}
         >
-          <div className="space-y-6" style={{ pointerEvents: 'auto' }}>
+          <div className="space-y-6" style={{ pointerEvents: "auto" }}>
             <h1
               ref={heroHeadingRef}
               className="relative mx-auto flex w-full justify-center text-[clamp(3.1rem,10vw,6.8rem)] font-semibold leading-[0.9] text-white"
@@ -392,20 +396,27 @@ export function HomePageView(): JSX.Element {
               <span
                 ref={heroWordmarkShellRef}
                 aria-hidden="true"
-                className={`fitdex-hero-wordmark ${sceneReady ? "opacity-90" : "opacity-100"}`}
+                className="fitdex-hero-wordmark fitdex-hero-wordmark-enter opacity-100"
                 style={{ fontFamily: "var(--font-inter)" }}
               >
-                <span className="fitdex-hero-wordmark-text">
+                <span className="fitdex-hero-wordmark-text" data-text="itdex">
                   {wordmarkLetters.map((letter, idx) => (
-                    <span key={`${letter}-${idx}`} className={wordmarkLetterClassName}>
-                      {letter}
+                    <span
+                      key={`${letter}-${idx}`}
+                      className={`${wordmarkLetterClassName} fitdex-hero-letter ${idx === 0 ? "fitdex-hero-letter-logo" : ""}`}
+                    >
+                      {idx === 0 ? (
+                        <span className="fitdex-hero-logo-f" aria-hidden="true" />
+                      ) : (
+                        letter
+                      )}
                     </span>
                   ))}
                 </span>
                 <span className="fitdex-hero-wordmark-sweep" />
               </span>
             </h1>
-            <p ref={heroSubRef} className={`mx-auto max-w-2xl text-base text-white/80 sm:text-xl transition-opacity duration-1000 ${introDone ? 'opacity-100' : 'opacity-0'}`}>
+            <p ref={heroSubRef} className={`fitdex-hero-subtext mx-auto max-w-2xl text-base text-white/80 sm:text-xl transition-opacity duration-1000 ${introDone ? 'opacity-100' : 'opacity-0'}`}>
               Find The Best Gyms Near You At The Best Prices
             </p>
             <Button
@@ -425,13 +436,13 @@ export function HomePageView(): JSX.Element {
           </div>
           <button
             type="button"
-            onClick={() => nextSectionRef.current?.scrollIntoView({ behavior: "smooth", block: "start" })}
+            onClick={scrollToTopGyms}
             aria-label="Scroll down"
             className={`absolute bottom-10 inline-flex h-11 w-11 items-center justify-center rounded-full border border-white/30 bg-white/10 text-white transition-all duration-1000 hover:bg-white/20 ${introDone ? 'opacity-100' : 'opacity-0'}`}
-            style={{ pointerEvents: 'auto' }}
+            style={{ pointerEvents: "auto" }}
           >
-            <span ref={heroArrowRef} className="inline-flex">
-              <ArrowDown className="h-5 w-5" />
+            <span ref={heroArrowRef} className="inline-flex animate-home-arrow">
+              <ChevronDown className="h-5 w-5" />
             </span>
           </button>
         </div>
@@ -442,7 +453,7 @@ export function HomePageView(): JSX.Element {
           nextSectionRef.current = node;
           flowSectionRef.current = node;
         }}
-        className="relative mx-auto w-full max-w-6xl px-4 py-20 text-center sm:px-6 lg:px-8"
+        className="relative mx-auto w-full max-w-6xl scroll-mt-28 px-4 py-20 text-center sm:px-6 lg:px-8"
       >
         <div
           className="pointer-events-none absolute inset-x-[22%] top-[-10%] h-44 opacity-[0.11]"
@@ -479,18 +490,19 @@ export function HomePageView(): JSX.Element {
                 data-index={index}
               >
                 <Card
-                  className="group relative h-full overflow-hidden border-white/10 bg-white/[0.04] transition-[transform,filter,opacity] duration-500 hover:-translate-y-[14px] hover:scale-[1.035] [filter:drop-shadow(0_16px_28px_rgba(0,0,0,0.18))] hover:[filter:drop-shadow(0_30px_48px_rgba(0,0,0,0.3))]"
+                  className="group relative h-full overflow-hidden border-white/10 bg-white/[0.04] shadow-[0_16px_28px_rgba(2,8,20,0.18)] transition-[transform,box-shadow,border-color] duration-700 hover:delay-100 hover:-translate-y-2 hover:scale-[1.01] hover:shadow-[0_24px_40px_rgba(2,8,20,0.26)]"
                   data-accent-color={accentRgb[feature.accent]}
+                  style={{ transitionTimingFunction: "cubic-bezier(0.22, 1, 0.36, 1)" }}
                 >
                   <div
-                    className="motion-border-sweep pointer-events-none absolute inset-x-0 top-0 h-px opacity-0 transition-opacity duration-500 group-hover:opacity-100"
+                    className="motion-border-sweep pointer-events-none absolute inset-x-0 top-0 h-px opacity-0 transition-opacity duration-500 group-hover:delay-100 group-hover:opacity-100"
                     style={{
                       backgroundImage: accent.borderGlow,
                       backgroundSize: "220% 100%",
                     }}
                   />
                   <div
-                    className="pointer-events-none absolute -top-14 left-1/2 h-36 w-36 -translate-x-1/2 opacity-0 transition-opacity duration-500 group-hover:opacity-100"
+                    className="pointer-events-none absolute -top-14 left-1/2 h-36 w-36 -translate-x-1/2 opacity-0 transition-opacity duration-500 group-hover:delay-150 group-hover:opacity-100"
                     style={{ backgroundImage: accent.softGlow, filter: "blur(34px)" }}
                   />
                   <CardHeader className="space-y-3">
@@ -510,6 +522,125 @@ export function HomePageView(): JSX.Element {
             );
           })}
         </div>
+      </section>
+
+      <section className="relative mx-auto w-full max-w-6xl px-4 pb-20 sm:px-6 lg:px-8">
+        <div
+          className="pointer-events-none absolute right-[8%] top-12 h-44 w-44 rounded-full opacity-[0.12]"
+          style={{ backgroundImage: accents.violet.softGlow, filter: "blur(64px)" }}
+        />
+        <Reveal>
+          <div
+            ref={calculatorPanelRef}
+            className="card-bevel relative overflow-hidden rounded-3xl border border-white/10 p-6 shadow-[0_14px_40px_rgba(0,0,0,0.22)] sm:p-8"
+            data-accent-color={accentRgb.violet}
+            style={{
+              backgroundImage: `linear-gradient(120deg, rgba(17,24,39,0.78) 0%, rgba(31,41,55,0.58) 42%, rgba(88,28,135,0.28) 100%), ${accents.violet.gradient}`,
+              backgroundSize: "100% 100%",
+            }}
+          >
+            <div className="grid gap-8 md:grid-cols-[1.3fr_0.7fr] md:items-center">
+              <div className="space-y-4">
+                <h3
+                  ref={(node) => {
+                    headingRefs.current[1] = node;
+                  }}
+                  className="motion-heading-highlight text-3xl font-semibold"
+                  data-accent-color={accentRgb.violet}
+                >
+                  AI Health Calculator
+                </h3>
+                <p className="max-w-2xl text-sm text-muted-foreground sm:text-base">
+                  Get an AI-powered health score, calorie baseline, and practical next steps to stay on track.
+                </p>
+                <Button
+                  asChild
+                  variant="ghost"
+                  className="rounded-xl px-6 motion-accent-button motion-accent-button-calc border border-white/15 text-white hover:bg-transparent"
+                >
+                  <Link
+                    href="/ai-health-calculator"
+                    data-accent-color={accentRgb.fuchsia}
+                    style={{ backgroundImage: "linear-gradient(120deg, rgba(139,92,246,0.92) 0%, rgba(217,70,239,0.86) 100%)" }}
+                  >
+                    Try AI calculator
+                  </Link>
+                </Button>
+              </div>
+              <div className="relative mx-auto h-36 w-36 rounded-3xl border border-white/10 bg-white/[0.04] p-4 shadow-inner shadow-black/20">
+                <div ref={calculatorGlowRef} className="absolute inset-3 rounded-2xl bg-violet-500/30 blur-2xl opacity-20" />
+                <div className="absolute -right-3 -top-3 h-16 w-16 rounded-full bg-primary/20 blur-2xl" />
+                <div className="absolute -bottom-4 -left-4 h-16 w-16 rounded-full bg-accent/20 blur-2xl" />
+                <div ref={calculatorImageRef} className="relative h-full w-full">
+                  <Image src="/icon.png" alt="Fitdex calculator" fill sizes="144px" className="rounded-2xl object-cover" />
+                </div>
+              </div>
+            </div>
+          </div>
+        </Reveal>
+      </section>
+
+      <section className="relative mx-auto w-full max-w-6xl px-4 pb-24 sm:px-6 lg:px-8">
+        <div
+          className="pointer-events-none absolute left-[18%] top-[-4%] h-52 w-52 rounded-full opacity-[0.07]"
+          style={{ backgroundImage: accents.indigo.softGlow, filter: "blur(72px)" }}
+        />
+        <div
+          className="pointer-events-none absolute right-[12%] bottom-[18%] h-52 w-52 rounded-full opacity-[0.07]"
+          style={{ backgroundImage: accents.cyan.softGlow, filter: "blur(80px)" }}
+        />
+        <Reveal>
+            <h2
+              ref={(node) => {
+                partnerHeadingRef.current = node;
+                headingRefs.current[2] = node;
+              }}
+              className="motion-heading-highlight-partner mb-5 text-3xl font-semibold sm:text-4xl"
+              data-accent-color={accentRgb.violet}
+              data-text="Become a partner with Fitdex"
+            >
+              Become a partner with Fitdex
+            </h2>
+          <div
+            className="card-bevel relative overflow-hidden rounded-3xl border border-white/10 bg-white/[0.04] p-6 [filter:drop-shadow(0_18px_32px_rgba(0,0,0,0.2))] sm:p-8"
+            data-accent-color={accentRgb.indigo}
+            style={{
+              backgroundImage:
+                "linear-gradient(122deg, rgba(15,23,42,0.86) 0%, rgba(30,41,59,0.74) 52%, rgba(51,65,85,0.62) 100%), linear-gradient(138deg, rgba(148,163,184,0.16) 0%, rgba(56,189,248,0.1) 100%)",
+              backgroundSize: "100% 100%",
+            }}
+          >
+            <div
+              className="pointer-events-none absolute inset-0 opacity-[0.12]"
+              style={{
+                backgroundImage: "linear-gradient(140deg, rgba(148,163,184,0.18) 0%, rgba(56,189,248,0.08) 72%)",
+                filter: "blur(48px)",
+              }}
+            />
+            <div className="relative flex flex-col gap-5 md:flex-row md:items-center md:justify-between">
+              <ul className="space-y-2 text-sm text-muted-foreground sm:text-base">
+                <li>Get quality leads from nearby members actively searching.</li>
+                <li>Showcase your plans, offers, and amenities with full control.</li>
+                <li>Grow visibility with transparent listings and verified trust.</li>
+              </ul>
+              <Button
+                asChild
+                size="lg"
+                variant="ghost"
+                className="rounded-xl px-7 motion-accent-button motion-accent-button-partner border border-white/15 text-white hover:bg-transparent"
+              >
+                <Link
+                  href="/owners"
+                  data-accent-color={accentRgb.amber}
+                  style={{ backgroundImage: accents.amber.gradient }}
+                >
+                  Know more
+                  <Calculator className="ml-2 h-4 w-4" />
+                </Link>
+              </Button>
+            </div>
+          </div>
+        </Reveal>
       </section>
     </div>
   );

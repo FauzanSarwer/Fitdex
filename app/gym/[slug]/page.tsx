@@ -9,6 +9,7 @@ import { SITE_NAME } from "@/lib/site";
 import { GymCard, type GymCardData } from "@/components/gyms/gym-card";
 import { buildPageMetadata } from "@/lib/seo/config";
 import { breadcrumbSchema, faqSchema } from "@/lib/seo/schema";
+import { SiteShell } from "@/components/layout/site-shell";
 
 export const revalidate = 300;
 
@@ -138,88 +139,90 @@ export default async function GymDetailPage({ params }: { params: Params }) {
   ]);
 
   return (
-    <main className="container mx-auto px-4 py-8">
-      <script
-        type="application/ld+json"
-        dangerouslySetInnerHTML={{ __html: JSON.stringify(localBusinessJsonLd) }}
-      />
-      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(breadcrumbs) }} />
-      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(gymFaqSchema) }} />
+    <SiteShell>
+      <main className="container mx-auto px-4 py-8">
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{ __html: JSON.stringify(localBusinessJsonLd) }}
+        />
+        <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(breadcrumbs) }} />
+        <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(gymFaqSchema) }} />
 
-      <article className="space-y-6">
-        <header className="space-y-2">
-          <h1 className="text-3xl font-bold">{gym.name}</h1>
-          <p className="text-sm text-muted-foreground">{gym.address || city}</p>
-          {citySlug && (
-            <Link href={`/gyms-in-${citySlug}`} className="text-sm text-primary hover:underline">
-              View all gyms in {city}
-            </Link>
-          )}
-        </header>
+        <article className="space-y-6">
+          <header className="space-y-2">
+            <h1 className="text-3xl font-bold">{gym.name}</h1>
+            <p className="text-sm text-muted-foreground">{gym.address || city}</p>
+            {citySlug && (
+              <Link href={`/gyms-in-${citySlug}`} className="text-sm text-primary hover:underline">
+                View all gyms in {city}
+              </Link>
+            )}
+          </header>
 
-        <div className="relative aspect-[16/7] w-full overflow-hidden rounded-2xl bg-white/5">
-          <Image
-            src={heroImage}
-            alt={`${gym.name} gym in ${city}`}
-            fill
-            priority
-            sizes="(max-width: 1024px) 100vw, 1200px"
-            className="object-cover"
-          />
-        </div>
-
-        <section className="grid gap-4 md:grid-cols-2">
-          <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
-            <h2 className="text-xs uppercase tracking-wide text-muted-foreground">Monthly</h2>
-            <p className="mt-1 text-2xl font-semibold">{formatPrice(gym.monthlyPrice)}</p>
+          <div className="relative aspect-[16/7] w-full overflow-hidden rounded-2xl bg-white/5">
+            <Image
+              src={heroImage}
+              alt={`${gym.name} gym in ${city}`}
+              fill
+              priority
+              sizes="(max-width: 1024px) 100vw, 1200px"
+              className="object-cover"
+            />
           </div>
-          <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
-            <h2 className="text-xs uppercase tracking-wide text-muted-foreground">Yearly</h2>
-            <p className="mt-1 text-2xl font-semibold">{formatPrice(gym.yearlyPrice)}</p>
-          </div>
-        </section>
 
-        <section className="space-y-3">
-          <h2 className="text-xl font-semibold">Amenities</h2>
-          {amenities.length > 0 ? (
-            <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
-              {amenities.map((amenity) => (
-                <div key={amenity} className="rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm">
-                  <h3>{amenity}</h3>
-                </div>
-              ))}
+          <section className="grid gap-4 md:grid-cols-2">
+            <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
+              <h2 className="text-xs uppercase tracking-wide text-muted-foreground">Monthly</h2>
+              <p className="mt-1 text-2xl font-semibold">{formatPrice(gym.monthlyPrice)}</p>
             </div>
-          ) : (
-            <p className="text-sm text-muted-foreground">Amenities not listed yet.</p>
-          )}
-        </section>
-
-        <div>
-          {gym.verificationStatus === "VERIFIED" ? (
-            <Link
-              href={`/dashboard/user/join/${gym.id}`}
-              className="inline-flex rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground"
-            >
-              Get Membership at {gym.name}
-            </Link>
-          ) : (
-            <span className="inline-flex rounded-lg border border-white/10 px-4 py-2 text-sm text-muted-foreground">
-              Membership unavailable until verification completes
-            </span>
-          )}
-        </div>
-
-        {relatedGyms.length > 0 && (
-          <section className="space-y-3">
-            <h2 className="text-xl font-semibold">Related gyms in {city}</h2>
-            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-              {relatedGyms.map((related) => (
-                <GymCard key={related.id} gym={related} />
-              ))}
+            <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
+              <h2 className="text-xs uppercase tracking-wide text-muted-foreground">Yearly</h2>
+              <p className="mt-1 text-2xl font-semibold">{formatPrice(gym.yearlyPrice)}</p>
             </div>
           </section>
-        )}
-      </article>
-    </main>
+
+          <section className="space-y-3">
+            <h2 className="text-xl font-semibold">Amenities</h2>
+            {amenities.length > 0 ? (
+              <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+                {amenities.map((amenity) => (
+                  <div key={amenity} className="rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm">
+                    <h3>{amenity}</h3>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <p className="text-sm text-muted-foreground">Amenities not listed yet.</p>
+            )}
+          </section>
+
+          <div>
+            {gym.verificationStatus === "VERIFIED" ? (
+              <Link
+                href={`/dashboard/user/join/${gym.id}`}
+                className="inline-flex rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground"
+              >
+                Get Membership at {gym.name}
+              </Link>
+            ) : (
+              <span className="inline-flex rounded-lg border border-white/10 px-4 py-2 text-sm text-muted-foreground">
+                Membership unavailable until verification completes
+              </span>
+            )}
+          </div>
+
+          {relatedGyms.length > 0 && (
+            <section className="space-y-3">
+              <h2 className="text-xl font-semibold">Related gyms in {city}</h2>
+              <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+                {relatedGyms.map((related) => (
+                  <GymCard key={related.id} gym={related} />
+                ))}
+              </div>
+            </section>
+          )}
+        </article>
+      </main>
+    </SiteShell>
   );
 }

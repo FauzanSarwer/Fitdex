@@ -14,7 +14,7 @@ export async function POST(req: Request) {
   const uid = (session!.user as { id: string }).id;
   const parsed = await safeJson<{
     gymId?: string;
-    action?: "APPROVE" | "REJECT" | "REQUEST_REUPLOAD" | "LINK_SUBACCOUNT";
+    action?: "APPROVE" | "REJECT" | "REQUEST_REUPLOAD" | "LINK_SUBACCOUNT" | "FORCE_VERIFY";
     notes?: string;
     razorpaySubAccountId?: string;
   }>(req);
@@ -78,6 +78,19 @@ export async function POST(req: Request) {
           verificationStatus: "PENDING",
           verificationNotes: parsed.data.notes ?? "Requesting re-upload",
           gstVerifiedAt: null,
+        },
+      });
+      return NextResponse.json({ ok: true, verificationStatus: updated.verificationStatus });
+    }
+
+    if (action === "FORCE_VERIFY") {
+      const updated = await prisma.gym.update({
+        where: { id: gymId },
+        data: {
+          verificationStatus: "VERIFIED",
+          gstVerifiedAt: gym.gstVerifiedAt ?? new Date(),
+          verificationNotes:
+            parsed.data.notes?.trim() || "Manually verified by admin via bypass flow.",
         },
       });
       return NextResponse.json({ ok: true, verificationStatus: updated.verificationStatus });

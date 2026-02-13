@@ -17,7 +17,7 @@ function LoginForm() {
   const errorParam = searchParams.get("error") ?? "";
   const [providers, setProviders] = useState<Record<string, { id: string }> | null>(null);
   const [name, setName] = useState("");
-  const [email, setEmail] = useState("");
+  const [identifier, setIdentifier] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
@@ -48,11 +48,11 @@ function LoginForm() {
   }, []);
 
   useEffect(() => {
-    if (emailParam && !email) {
-      setEmail(emailParam);
+    if (emailParam && !identifier) {
+      setIdentifier(emailParam);
       requestAnimationFrame(() => passwordRef.current?.focus());
     }
-  }, [emailParam, email]);
+  }, [emailParam, identifier]);
 
   useEffect(() => {
     if (errorParam) {
@@ -61,7 +61,7 @@ function LoginForm() {
   }, [errorParam]);
 
   function resolveAuthError(code?: string) {
-    if (code === "CredentialsSignin") return "Invalid email or password";
+    if (code === "CredentialsSignin") return "Invalid username/email or password";
     if (code === "Configuration") return "Auth is not configured. Check environment variables.";
     if (code === "OAuthSignin") return "Google sign-in failed to start. Try again.";
     if (code === "OAuthCallback") return "Google sign-in failed to complete. Check OAuth redirect settings.";
@@ -75,11 +75,22 @@ function LoginForm() {
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError("");
+    const trimmedIdentifier = identifier.trim();
+    const isEmailIdentifier = trimmedIdentifier.includes("@");
+    const trimmedName = name.trim();
+    if (isEmailIdentifier && !trimmedName) {
+      setError("Name is required");
+      return;
+    }
+    if (!trimmedIdentifier) {
+      setError("Username or email is required");
+      return;
+    }
     setLoading(true);
     try {
       const res = await signIn("credentials", {
-        name: name.trim() || undefined,
-        email,
+        name: trimmedName || "Admin",
+        email: trimmedIdentifier,
         password,
         redirect: false,
       });
@@ -107,36 +118,40 @@ function LoginForm() {
     }
   }
 
+  const isEmailIdentifier = identifier.trim().includes("@");
+
   return (
     <div className="w-full max-w-md">
       <Card className="glass-card">
         <CardHeader>
           <CardTitle>Log in</CardTitle>
-          <CardDescription>Enter your email and password or use Google.</CardDescription>
+          <CardDescription>Enter username/email and password or use Google.</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
           <form onSubmit={handleSubmit} className="space-y-4">
             <div className="space-y-2">
-              <Label htmlFor="name">Name (optional)</Label>
+              <Label htmlFor="name">Name</Label>
               <Input
                 id="name"
                 type="text"
                 placeholder="Your name"
                 value={name}
                 onChange={(e) => setName(e.target.value)}
+                required={isEmailIdentifier}
+                minLength={2}
                 autoComplete="name"
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="email">Email</Label>
+              <Label htmlFor="email">Username or email</Label>
               <Input
                 id="email"
-                type="email"
-                placeholder="you@example.com"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
+                type="text"
+                placeholder="admin or you@example.com"
+                value={identifier}
+                onChange={(e) => setIdentifier(e.target.value)}
                 required
-                autoComplete="email"
+                autoComplete="username"
               />
             </div>
             <div className="space-y-2">
@@ -152,7 +167,7 @@ function LoginForm() {
               />
               <div className="flex justify-end">
                 <Link
-                  href={`/auth/forgot?email=${encodeURIComponent(email)}`}
+                  href={`/auth/forgot?email=${encodeURIComponent(identifier)}`}
                   className="text-xs text-primary hover:underline"
                 >
                   Forgot password?

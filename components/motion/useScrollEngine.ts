@@ -21,6 +21,7 @@ const createScrollEngineStore = (): ScrollEngineStore => {
 
   let frameId = 0;
   let ticking = false;
+  let running = false;
   let lastScrollY = 0;
   let lastTimestamp = 0;
 
@@ -42,37 +43,56 @@ const createScrollEngineStore = (): ScrollEngineStore => {
 
     lastScrollY = scrollY;
     lastTimestamp = timestamp;
-    runListeners();
+
+    if (listeners.size > 0) {
+      runListeners();
+    }
   };
 
   const requestTick = () => {
-    if (ticking) return;
+    if (!running || ticking) return;
     ticking = true;
     frameId = window.requestAnimationFrame(update);
   };
 
   const onScroll = () => requestTick();
 
-  lastScrollY = window.scrollY;
-  lastTimestamp = performance.now();
-  requestTick();
+  const start = () => {
+    if (running) return;
+    running = true;
+    lastScrollY = window.scrollY;
+    lastTimestamp = performance.now();
+    window.addEventListener("scroll", onScroll, { passive: true });
+    window.addEventListener("resize", onScroll, { passive: true });
+    requestTick();
+  };
 
-  window.addEventListener("scroll", onScroll, { passive: true });
-  window.addEventListener("resize", onScroll, { passive: true });
+  const stop = () => {
+    if (!running) return;
+    running = false;
+    window.removeEventListener("scroll", onScroll);
+    window.removeEventListener("resize", onScroll);
+    if (frameId) {
+      window.cancelAnimationFrame(frameId);
+      frameId = 0;
+    }
+    ticking = false;
+  };
 
   return {
     scrollProgress,
     scrollVelocity,
     subscribe(listener: ScrollListener) {
       listeners.add(listener);
+      if (listeners.size === 1) {
+        start();
+      }
       listener();
 
       return () => {
         listeners.delete(listener);
-        if (listeners.size === 0 && frameId) {
-          window.cancelAnimationFrame(frameId);
-          frameId = 0;
-          ticking = false;
+        if (listeners.size === 0) {
+          stop();
         }
       };
     },

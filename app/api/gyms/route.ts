@@ -6,6 +6,51 @@ import { jsonError, safeJson } from "@/lib/api";
 import { computeDiscount } from "@/lib/discounts";
 import { logServerError } from "@/lib/logger";
 import { getGymTierRank, isGymFeatured } from "@/lib/gym-utils";
+import { cityLabel, normalizeCityName } from "@/lib/seo/cities";
+
+const CITY_EQUIVALENT_SLUGS: Record<string, string[]> = {
+  delhi: ["delhi", "new-delhi"],
+  "new-delhi": ["delhi", "new-delhi"],
+  gurugram: ["gurugram", "gurgaon"],
+  gurgaon: ["gurugram", "gurgaon"],
+  bangalore: ["bangalore", "bengaluru"],
+  bengaluru: ["bangalore", "bengaluru"],
+};
+
+function resolveCityFilterNames(rawCity: string | null): string[] {
+  const slug = normalizeCityName(rawCity ?? "");
+  if (!slug) return [];
+  const slugs = CITY_EQUIVALENT_SLUGS[slug] ?? [slug];
+  const labels = slugs.map((value) => cityLabel(value));
+  return Array.from(new Set(labels));
+}
+
+function buildCityFilter(rawCity: string | null) {
+  const cityNames = resolveCityFilterNames(rawCity);
+  if (cityNames.length === 0) return {};
+  return {
+    OR: cityNames.flatMap((name) => [
+      {
+        city: {
+          equals: name,
+          mode: "insensitive" as const,
+        },
+      },
+      {
+        city: {
+          contains: name,
+          mode: "insensitive" as const,
+        },
+      },
+      {
+        address: {
+          contains: name,
+          mode: "insensitive" as const,
+        },
+      },
+    ]),
+  };
+}
 
 function haversine(
   lat1: number,
@@ -32,10 +77,12 @@ export async function GET(req: Request) {
     const { searchParams } = new URL(req.url);
     const lat = searchParams.get("lat");
     const lng = searchParams.get("lng");
+    const cityFilter = buildCityFilter(searchParams.get("city"));
     const gyms = await prisma.gym.findMany({
       where: {
         verificationStatus: { not: "REJECTED" },
         suspendedAt: null,
+        ...cityFilter,
       },
       select: {
         id: true,

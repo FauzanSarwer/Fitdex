@@ -5,7 +5,6 @@ import { SpeedInsights } from "@vercel/speed-insights/next";
 import React, { Suspense } from "react";
 import { organizationSchema } from "@/lib/seo/schema";
 import { rootMetadata } from "@/lib/seo/config";
-import { Footer } from "@/components/layout/footer";
 import { Inter, Poppins } from "next/font/google";
 
 const inter = Inter({
@@ -56,7 +55,6 @@ export default function RootLayout({
           <Suspense fallback={<div className="p-8 text-center text-muted-foreground">Loading...</div>}>
             {children}
           </Suspense>
-          <Footer />
         </Providers>
         <SpeedInsights />
       </body>

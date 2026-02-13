@@ -1,9 +1,11 @@
 "use client";
 
 import { useMemo, useState, useEffect, useDeferredValue, useRef, type CSSProperties } from "react";
+import dynamic from "next/dynamic";
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 import { useSession } from "next-auth/react";
-import { MapPin, List, LayoutGrid, Search, ArrowRight, Heart, SlidersHorizontal, ArrowDownUp } from "lucide-react";
+import { MapPin, List, LayoutGrid, ArrowRight, Heart, SlidersHorizontal, ArrowDownUp } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -16,7 +18,6 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { MapView } from "@/components/maps/MapView";
 import Image from "next/image";
 import { buildGymSlug, cn, formatPrice } from "@/lib/utils";
 import { getGymTierRank, isGymFeatured } from "@/lib/gym-utils";
@@ -24,7 +25,13 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { getGymOpenStatus } from "@/lib/gym-hours";
 import { fetchJson } from "@/lib/client-fetch";
 import { getAmenityEmoji } from "@/lib/amenities";
+import { cityLabel, normalizeCityName } from "@/lib/seo/cities";
 import { accentByIndex, accentRgb, accents } from "@/lib/theme/accents";
+
+const MapView = dynamic(() => import("@/components/maps/MapView").then((mod) => mod.MapView), {
+  ssr: false,
+  loading: () => <Skeleton className="h-full w-full rounded-2xl" />,
+});
 
 type ViewMode = "map" | "list";
 
@@ -63,15 +70,6 @@ const SORT_LABELS: Record<SortOption, string> = {
   distance: "Nearby first",
   newest: "Newest",
 };
-
-const SERVICEABLE_CITIES = [
-  "Delhi",
-  "New Delhi",
-  "Gurugram",
-  "Noida",
-  "Ghaziabad",
-  "Faridabad",
-];
 
 const normalize = (value: string) => value.toLowerCase().replace(/[^a-z0-9]/g, "");
 
@@ -118,7 +116,7 @@ function GymImageCarousel({ images, name }: { images: string[]; name: string }) 
         alt={name}
         fill
         sizes="(max-width: 768px) 100vw, 50vw"
-        className="h-full w-full object-cover transition-transform duration-700 ease-[cubic-bezier(0.22,1,0.36,1)] group-hover:scale-[1.12]"
+        className="h-full w-full object-cover transition-transform duration-500 ease-[cubic-bezier(0.22,1,0.36,1)] group-hover:scale-[1.05]"
       />
       {images.length > 1 && (
         <div className="absolute bottom-2 left-1/2 -translate-x-1/2 flex items-center gap-1">
@@ -138,6 +136,7 @@ function GymImageCarousel({ images, name }: { images: string[]; name: string }) 
 }
 
 export default function ExplorePage() {
+  const searchParams = useSearchParams();
   const [view, setView] = useState<ViewMode>("list");
   const [gyms, setGyms] = useState<Gym[]>([]);
   const [loading, setLoading] = useState(true);
@@ -145,11 +144,8 @@ export default function ExplorePage() {
   const [loadFailed, setLoadFailed] = useState(false);
   const [userLat, setUserLat] = useState<number | null>(null);
   const [userLng, setUserLng] = useState<number | null>(null);
-  const [locationGate, setLocationGate] = useState(true);
   const [locationLoading, setLocationLoading] = useState(false);
-  const [locationError, setLocationError] = useState<string | null>(null);
   const [query, setQuery] = useState("");
-  const inputRef = useRef<HTMLInputElement>(null);
   const [maxPrice, setMaxPrice] = useState<string>("");
   const [maxDistance, setMaxDistance] = useState<string>("");
   const [sortBy, setSortBy] = useState<SortOption>("distance");
@@ -162,6 +158,12 @@ export default function ExplorePage() {
   const deferredMaxDistance = useDeferredValue(maxDistance);
   const headingRef = useRef<HTMLHeadingElement | null>(null);
   const cardRefs = useRef<Array<HTMLDivElement | null>>([]);
+  const cityQueryParam = searchParams.get("city") ?? "";
+  const queryFromNav = searchParams.get("q") ?? "";
+  const exploreCity = useMemo(() => {
+    const normalized = normalizeCityName(cityQueryParam);
+    return normalized ? cityLabel(normalized) : "";
+  }, [cityQueryParam]);
 
   const mapCenter = useMemo(() => {
     if (userLat != null && userLng != null) {
@@ -196,11 +198,6 @@ export default function ExplorePage() {
 
   const requestLocation = () => {
     if (!navigator.geolocation) {
-      setLocationError("Location is not supported on this device.");
-      setLocationGate(false);
-      try {
-        localStorage.setItem("fitdex_explore_skip", "true");
-      } catch {}
       loadGyms("/api/gyms");
       return;
     }
@@ -211,7 +208,6 @@ export default function ExplorePage() {
         const lng = pos.coords.longitude;
         setUserLat(lat);
         setUserLng(lng);
-        setLocationGate(false);
         setLocationLoading(false);
         loadGyms(`/api/gyms?lat=${lat}&lng=${lng}`);
         try {
@@ -219,51 +215,54 @@ export default function ExplorePage() {
             "fitdex_location",
             JSON.stringify({ latitude: lat, longitude: lng, serviceable: true })
           );
-          localStorage.removeItem("fitdex_explore_skip");
         } catch {}
       },
       () => {
-        setLocationError("Location access denied. Showing gyms without distance sorting.");
-        setLocationGate(false);
         setLocationLoading(false);
-        try {
-          localStorage.setItem("fitdex_explore_skip", "true");
-        } catch {}
         loadGyms("/api/gyms");
       }
     );
   };
 
   useEffect(() => {
-    try {
-      const skip = localStorage.getItem("fitdex_explore_skip");
-      if (skip === "true") {
-        setLocationGate(false);
-        loadGyms("/api/gyms");
-        return;
-      }
-      const cached = localStorage.getItem("fitdex_location");
-      if (cached) {
-        const parsed = JSON.parse(cached);
-        if (parsed?.latitude && parsed?.longitude) {
-          setUserLat(parsed.latitude);
-          setUserLng(parsed.longitude);
-          setLocationGate(false);
-          loadGyms(`/api/gyms?lat=${parsed.latitude}&lng=${parsed.longitude}`);
-          return;
+    if (exploreCity) {
+      setUserLat(null);
+      setUserLng(null);
+      loadGyms(`/api/gyms?city=${encodeURIComponent(exploreCity)}`);
+      try {
+        localStorage.setItem("fitdex_selected_city", exploreCity);
+        const cached = localStorage.getItem("fitdex_location");
+        const parsed = cached ? JSON.parse(cached) : {};
+        localStorage.setItem(
+          "fitdex_location",
+          JSON.stringify({
+            ...parsed,
+            city: exploreCity,
+            serviceable: true,
+          })
+        );
+      } catch {}
+    } else {
+      try {
+        const cached = localStorage.getItem("fitdex_location");
+        if (cached) {
+          const parsed = JSON.parse(cached);
+          if (parsed?.latitude && parsed?.longitude) {
+            setUserLat(parsed.latitude);
+            setUserLng(parsed.longitude);
+            loadGyms(`/api/gyms?lat=${parsed.latitude}&lng=${parsed.longitude}`);
+            return;
+          }
         }
-      }
-    } catch {}
-    if (typeof window !== "undefined" && window.innerWidth > 768 && inputRef.current) {
-      inputRef.current.focus();
+      } catch {}
+      requestLocation();
     }
-  }, []);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [exploreCity]);
 
   useEffect(() => {
-    if (!locationGate && gyms.length === 0 && !loading) {
-      loadGyms("/api/gyms");
-    }
-  }, [locationGate]);
+    setQuery((current) => (current === queryFromNav ? current : queryFromNav));
+  }, [queryFromNav]);
 
   useEffect(() => {
     if (status !== "authenticated") return;
@@ -450,108 +449,35 @@ export default function ExplorePage() {
 
   return (
     <div className="mx-auto w-full max-w-[1560px] px-4 py-10 sm:px-6 lg:px-10">
-      {locationGate && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
-          <div className="glass-card border border-white/10 p-6 rounded-2xl max-w-md w-full text-center space-y-4">
-            <h2 className="text-xl font-semibold">Find gyms near you</h2>
-            <p className="text-sm text-muted-foreground">
-              Show nearby verified gyms first, with transparent pricing and duo-friendly deals. You can explore without
-              sharing your location.
-            </p>
-            {locationError && <p className="text-xs text-amber-400">{locationError}</p>}
-            <div className="flex flex-col sm:flex-row gap-3 justify-center">
-              <Button onClick={requestLocation} disabled={locationLoading}>
-                {locationLoading ? "Locating…" : "Show gyms near me"}
-              </Button>
-              <Button
-                variant="outline"
-                onClick={() => {
-                  setLocationGate(false);
-                  try {
-                    localStorage.setItem("fitdex_explore_skip", "true");
-                  } catch {}
-                  loadGyms("/api/gyms");
-                }}
-              >
-                Continue without location
-              </Button>
-            </div>
-          </div>
-        </div>
-      )}
-      <div className={locationGate ? "pointer-events-none blur-sm" : ""}>
-        <section
-          className="relative mb-6 rounded-3xl border border-white/10 bg-white/[0.04] p-4 shadow-glow-sm md:p-5"
-          data-accent-color={accentRgb.indigo}
-        >
-          <div
-            className="pointer-events-none absolute -right-12 top-[-22%] h-48 w-48 opacity-[0.11]"
-            style={{ backgroundImage: accents.indigo.softGlow, filter: "blur(64px)" }}
-          />
-          <div className="flex flex-col gap-4">
-            <div className="space-y-2">
-              <h1
-                ref={headingRef}
-                className="motion-heading-highlight text-2xl font-semibold tracking-tight sm:text-3xl lg:text-4xl"
-              >
-                Explore gyms in your city
-              </h1>
-              <p className="max-w-3xl text-xs text-muted-foreground sm:text-sm">
-                Search by gym name, compare pricing, and shortlist trusted options with cleaner discovery controls.
-              </p>
-            </div>
-            <div className="flex flex-col gap-2.5 lg:flex-row lg:items-center lg:justify-between">
-              <div className="relative w-full lg:max-w-2xl">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                <Input
-                  ref={inputRef}
-                  placeholder="Search gyms in your city..."
-                  value={query}
-                  onChange={(e) => setQuery(e.target.value)}
-                  className="h-10 pl-9 text-sm"
-                />
-              </div>
-              <div className="flex items-center gap-2">
-                <Button onClick={requestLocation} className="transition-colors whitespace-nowrap" variant="secondary">
-                  Find gyms near me
-                </Button>
-                <div className="flex rounded-xl border border-white/10 overflow-hidden">
-                  <Button
-                    variant={view === "list" ? "secondary" : "ghost"}
-                    size="sm"
-                    className="rounded-none"
-                    onClick={() => setView("list")}
-                  >
-                    <List className="h-4 w-4 mr-1" />
-                    List
-                  </Button>
-                  <Button
-                    variant={view === "map" ? "secondary" : "ghost"}
-                    size="sm"
-                    className="rounded-none"
-                    onClick={() => setView("map")}
-                  >
-                    <LayoutGrid className="h-4 w-4 mr-1" />
-                    Map
-                  </Button>
-                </div>
-              </div>
-            </div>
-            <div className="flex flex-wrap gap-2">
-              {SERVICEABLE_CITIES.map((city) => (
-                <Link
-                  key={city}
-                  href={`/gyms-in-${city.toLowerCase().replace(/\s+/g, "-")}`}
-                  className="rounded-full border border-white/10 bg-white/5 px-3 py-1 text-xs text-primary hover:bg-primary/10 hover:text-primary-foreground transition-colors"
-                >
-                  {city}
-                </Link>
-              ))}
-            </div>
-          </div>
-        </section>
+      <div>
         <section className="mb-5 w-full rounded-xl border border-white/10 bg-white/[0.03] px-3 py-2 backdrop-blur-md">
-          <div className="flex min-h-9 items-center justify-end gap-2">
+          <div className="flex min-h-9 flex-wrap items-center justify-between gap-2">
+            <div className="flex items-center gap-2">
+              <Button onClick={requestLocation} className="transition-colors whitespace-nowrap" variant="secondary">
+                {locationLoading ? "Locating..." : "Find gyms near me"}
+              </Button>
+              <div className="flex overflow-hidden rounded-xl border border-white/10">
+                <Button
+                  variant={view === "list" ? "secondary" : "ghost"}
+                  size="sm"
+                  className="rounded-none"
+                  onClick={() => setView("list")}
+                >
+                  <List className="mr-1 h-4 w-4" />
+                  List
+                </Button>
+                <Button
+                  variant={view === "map" ? "secondary" : "ghost"}
+                  size="sm"
+                  className="rounded-none"
+                  onClick={() => setView("map")}
+                >
+                  <LayoutGrid className="mr-1 h-4 w-4" />
+                  Map
+                </Button>
+              </div>
+            </div>
+            <div className="flex items-center gap-2">
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <Button variant="outline" size="sm" className="h-8 gap-2 rounded-lg px-3 text-xs">
@@ -642,6 +568,7 @@ export default function ExplorePage() {
                 </div>
               </DropdownMenuContent>
             </DropdownMenu>
+            </div>
           </div>
         </section>
 
@@ -692,9 +619,11 @@ export default function ExplorePage() {
             }}>
               Clear filters
             </Button>
-            <Button variant="outline" asChild>
-              <Link href="/owners">List your gym (owners)</Link>
-            </Button>
+            {!exploreCity && (
+              <Button variant="outline" asChild>
+                <Link href="/owners">List your gym (owners)</Link>
+              </Button>
+            )}
           </div>
         </Card>
         ) : (
@@ -721,7 +650,7 @@ export default function ExplorePage() {
             >
               <Card
                 className={cn(
-                    "motion-gym-card group glass-card relative flex h-full min-h-[380px] flex-col overflow-hidden transition-[transform,filter,opacity] duration-500 hover:-translate-y-[14px] hover:scale-[1.03] [filter:drop-shadow(0_16px_28px_rgba(0,0,0,0.18))] hover:[filter:drop-shadow(0_32px_48px_rgba(0,0,0,0.28))]",
+                    "motion-gym-card group glass-card relative flex h-full min-h-[380px] flex-col overflow-hidden transition-[transform,filter,opacity] duration-400 hover:-translate-y-[4px] hover:scale-[1.008] [filter:drop-shadow(0_10px_18px_rgba(0,0,0,0.16))] hover:[filter:drop-shadow(0_16px_26px_rgba(0,0,0,0.22))]",
                   isFeatured && "border-primary/40",
                   isPremium && "motion-gym-card-premium"
                 )}
@@ -733,8 +662,8 @@ export default function ExplorePage() {
                 }
               >
                   <div
-                    className="pointer-events-none absolute -top-16 left-1/2 h-40 w-40 -translate-x-1/2 opacity-0 transition-opacity duration-500 group-hover:opacity-100"
-                    style={{ backgroundImage: accent.softGlow, filter: "blur(44px)" }}
+                    className="pointer-events-none absolute -top-16 left-1/2 h-40 w-40 -translate-x-1/2 opacity-0 transition-opacity duration-400 group-hover:opacity-70"
+                    style={{ backgroundImage: accent.softGlow, filter: "blur(36px)" }}
                   />
                   {isPremium && (
                     <div

@@ -6,6 +6,7 @@ import { LocationGate } from "@/components/layout/location-gate";
 import { DashboardNav } from "@/components/layout/dashboard-nav";
 import { prisma } from "@/lib/prisma";
 import { buildPageMetadata } from "@/lib/seo/config";
+import { Footer } from "@/components/layout/footer";
 
 export const metadata: Metadata = buildPageMetadata({
   title: "Dashboard",
@@ -48,6 +49,7 @@ export default async function DashboardLayout({
         </div>
         <DashboardNav role={role ?? "USER"} isOwner={isOwner} showVerification={showVerification} />
         <main className="pl-0 md:pl-56 pt-16 flex-1">{children}</main>
+        <Footer className="md:pl-56" />
       </div>
     </LocationGate>
   );

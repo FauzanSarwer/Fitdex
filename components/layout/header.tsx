@@ -2,13 +2,16 @@
 
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useSession, signOut } from "next-auth/react";
 import { isOwner } from "@/lib/permissions";
 import Image from "next/image";
-import { MapPin, User, LayoutDashboard, LogOut, ShieldCheck } from "lucide-react";
+import { MapPin, User, LayoutDashboard, LogOut, ShieldCheck, Search } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { ThemeToggle } from "@/components/layout/theme-toggle";
 import { accentRgb, accents } from "@/lib/theme/accents";
+import { cityLabel, normalizeCityName } from "@/lib/seo/cities";
 import { useScrollEngine } from "@/components/motion/useScrollEngine";
 import { EmailVerificationBanner } from "@/components/layout/email-verification-banner";
 import {
@@ -40,6 +43,9 @@ type LocationPayload = {
 };
 
 export function Header() {
+  const pathname = usePathname();
+  const router = useRouter();
+  const searchParams = useSearchParams();
   const { data: session, status } = useSession();
   const headerRef = useRef<HTMLElement | null>(null);
   const barRef = useRef<HTMLDivElement | null>(null);
@@ -50,16 +56,19 @@ export function Header() {
   const owner = status === "authenticated" && isOwner(session);
   const [selectedCity, setSelectedCity] = useState("Select city");
   const [locatingCity, setLocatingCity] = useState(false);
+  const [exploreQuery, setExploreQuery] = useState("");
+  const isExplorePage = pathname === "/explore";
+  const cityFromQueryParam = searchParams.get("city") ?? "";
 
   const displayName = session?.user?.name ?? "Account";
   const primaryNav =
-    status !== "authenticated"
-      ? { href: "/explore", label: "Explore", icon: MapPin }
-      : role === "ADMIN"
+    status === "authenticated"
+      ? role === "ADMIN"
         ? { href: "/dashboard/admin", label: "Admin panel", icon: ShieldCheck }
         : owner
           ? { href: "/dashboard/owner", label: "Owner panel", icon: LayoutDashboard }
-          : { href: "/dashboard/user", label: "Dashboard", icon: LayoutDashboard };
+          : { href: "/dashboard/user", label: "Dashboard", icon: LayoutDashboard }
+      : null;
 
   const persistCity = (city: string, latitude?: number, longitude?: number) => {
     setSelectedCity(city);
@@ -142,6 +151,42 @@ export function Header() {
   }, []);
 
   useEffect(() => {
+    if (!isExplorePage) {
+      setExploreQuery("");
+      return;
+    }
+    setExploreQuery(searchParams.get("q") ?? "");
+  }, [isExplorePage, searchParams]);
+
+  useEffect(() => {
+    if (!isExplorePage) return;
+    const normalized = normalizeCityName(cityFromQueryParam);
+    if (!normalized) return;
+    const city = cityLabel(normalized);
+    if (selectedCity.trim().toLowerCase() === city.toLowerCase()) return;
+    persistCity(city);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [cityFromQueryParam, isExplorePage, selectedCity]);
+
+  useEffect(() => {
+    if (!isExplorePage || typeof window === "undefined") return;
+    const currentQuery = searchParams.get("q") ?? "";
+    if (exploreQuery === currentQuery) return;
+    const timeoutId = window.setTimeout(() => {
+      const params = new URLSearchParams(searchParams.toString());
+      const nextQuery = exploreQuery.trim();
+      if (nextQuery) {
+        params.set("q", nextQuery);
+      } else {
+        params.delete("q");
+      }
+      const queryString = params.toString();
+      router.replace(queryString ? `/explore?${queryString}` : "/explore", { scroll: false });
+    }, 220);
+    return () => window.clearTimeout(timeoutId);
+  }, [exploreQuery, isExplorePage, router, searchParams]);
+
+  useEffect(() => {
     if (typeof window === "undefined") return;
 
     const header = headerRef.current;
@@ -221,28 +266,43 @@ export function Header() {
       />
       <EmailVerificationBanner />
       <div ref={barRef} className="container relative mx-auto flex h-16 items-center px-4">
-        <Link href="/" className="flex items-center gap-2">
-          <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-card/80 shadow-glow-sm">
+        <Link href="/" className="group flex items-center gap-2">
+          <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-card/80 shadow-glow-sm transition-all duration-300 group-hover:bg-card group-hover:shadow-[0_10px_22px_rgba(0,0,0,0.24)]">
             <Image
               src="/fitdex-logo.png"
               alt="Fitdex"
               width={24}
               height={24}
-              className="h-6 w-6 object-contain rotate-0 skew-x-0 skew-y-0"
+              className="h-6 w-6 object-contain rotate-0 skew-x-0 skew-y-0 transition-transform duration-300 group-hover:scale-110 group-hover:-rotate-3"
               priority
             />
           </div>
         </Link>
         <div className="pointer-events-none absolute inset-y-0 left-1/2 hidden -translate-x-1/2 md:flex items-center">
-          <nav className="pointer-events-auto">
-            <Link
-              href={primaryNav.href}
-              className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors flex items-center gap-1"
-            >
-              <primaryNav.icon className="h-4 w-4" />
-              {primaryNav.label}
-            </Link>
-          </nav>
+          {isExplorePage ? (
+            <div className="pointer-events-auto w-[min(46vw,520px)]">
+              <div className="relative">
+                <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground/80" />
+                <Input
+                  value={exploreQuery}
+                  onChange={(event) => setExploreQuery(event.target.value)}
+                  placeholder="Search gyms..."
+                  aria-label="Search gyms"
+                  className="h-9 rounded-full border border-white/15 bg-white/[0.08] pl-9 text-sm backdrop-blur-md"
+                />
+              </div>
+            </div>
+          ) : primaryNav ? (
+            <nav className="pointer-events-auto">
+              <Link
+                href={primaryNav.href}
+                className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors flex items-center gap-1"
+              >
+                <primaryNav.icon className="h-4 w-4" />
+                {primaryNav.label}
+              </Link>
+            </nav>
+          ) : null}
         </div>
         <div className="ml-auto flex items-center gap-3">
           <ThemeToggle />

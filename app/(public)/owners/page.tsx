@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { motion } from "framer-motion";
 import {
   BarChart3,
   Headphones,
@@ -217,11 +216,7 @@ export default function OwnersPage() {
 
   return (
     <div className="container mx-auto px-4 py-16">
-      <motion.div
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        className="text-center max-w-3xl mx-auto mb-16"
-      >
+      <div className="text-center max-w-3xl mx-auto mb-16">
         <div className="inline-flex items-center gap-2 rounded-full border border-primary/30 bg-primary/10 px-4 py-1.5 text-sm text-primary mb-6">
           <Dumbbell className="h-4 w-4" />
           For Gym Owners • Start today
@@ -243,15 +238,10 @@ export default function OwnersPage() {
         <p className="text-xs text-muted-foreground mt-3">
           Start free, upgrade when you see results.
         </p>
-      </motion.div>
+      </div>
 
       {/* Benefits */}
-      <motion.section
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.1 }}
-        className="mb-20"
-      >
+      <section className="mb-20">
         <h2 className="text-2xl font-bold text-center mb-4">Why list on Fitdex?</h2>
         <p className="text-center text-sm text-muted-foreground mb-10">
           Trusted by growing gyms across Delhi NCR.
@@ -271,16 +261,10 @@ export default function OwnersPage() {
             </Card>
           ))}
         </div>
-      </motion.section>
+      </section>
 
       {/* Pricing */}
-      <motion.section
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.2 }}
-        className="mb-20"
-        id="pricing"
-      >
+      <section className="mb-20" id="pricing">
         <h2 className="text-2xl font-bold text-center mb-2">Simple pricing</h2>
         <p className="text-muted-foreground text-center mb-10">
           Pick a plan based on outcomes, not features. No hidden fees.
@@ -369,15 +353,10 @@ export default function OwnersPage() {
             to create one.
           </p>
         )}
-      </motion.section>
+      </section>
 
       {/* CTA - Login to owner dashboard */}
-      <motion.section
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.3 }}
-        className="text-center"
-      >
+      <section className="text-center">
         <Card className="glass-card border-primary/30 max-w-xl mx-auto p-8">
           <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-primary/20 mx-auto mb-4">
             <Headphones className="h-7 w-7 text-primary" />
@@ -413,7 +392,7 @@ export default function OwnersPage() {
             </div>
           )}
         </Card>
-      </motion.section>
+      </section>
     </div>
   );
 }
