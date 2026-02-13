@@ -14,6 +14,7 @@ const lerp = (from: number, to: number, alpha: number) => from + (to - from) * a
 const clamp = (value: number, min: number, max: number) => Math.min(max, Math.max(min, value));
 const easeOutCubic = (value: number) => 1 - (1 - value) ** 3;
 const wordmarkLetters = ["F", "i", "t", "d", "e", "x"] as const;
+const wordmarkLetterClassName = "inline-block ml-[-0.05em] first:ml-0";
 
 const featureCards: Array<{
   title: string;
@@ -52,15 +53,16 @@ export function HomePageView(): JSX.Element {
   const heroSectionRef = useRef<HTMLElement | null>(null);
   const heroBgRef = useRef<HTMLDivElement | null>(null);
   const heroHeadingRef = useRef<HTMLHeadingElement | null>(null);
+  const heroWordmarkShellRef = useRef<HTMLSpanElement | null>(null);
   const heroWordmarkRef = useRef<HTMLSpanElement | null>(null);
   const heroBlurNearRef = useRef<HTMLSpanElement | null>(null);
   const heroBlurFarRef = useRef<HTMLSpanElement | null>(null);
   const heroTrailRef = useRef<HTMLSpanElement | null>(null);
+  const heroWordmarkLetterRefs = useRef<Array<HTMLSpanElement | null>>([]);
   const heroTrailLetterRefs = useRef<Array<HTMLSpanElement | null>>([]);
   const heroDepthLetterRefs = useRef<Array<HTMLSpanElement | null>>([]);
   const heroSubRef = useRef<HTMLParagraphElement | null>(null);
   const heroCtaRef = useRef<HTMLAnchorElement | null>(null);
-  const heroSweepRef = useRef<HTMLSpanElement | null>(null);
   const heroArrowRef = useRef<HTMLSpanElement | null>(null);
   const flowSectionRef = useRef<HTMLElement | null>(null);
   const calculatorCardRef = useRef<HTMLDivElement | null>(null);
@@ -79,8 +81,40 @@ export function HomePageView(): JSX.Element {
   const partnerMagnetTarget = useRef({ x: 0, y: 0 });
   const partnerMagnetCurrent = useRef({ x: 0, y: 0 });
   const partnerHovering = useRef(false);
+  const wordmarkIntroHasRun = useRef(false);
+  const wordmarkPressAnimationRef = useRef<Animation | null>(null);
 
   const { scrollProgress, scrollVelocity } = useScrollEngine();
+
+  const handleWordmarkPress = () => {
+    const wordmarkNode = heroWordmarkShellRef.current;
+    if (!wordmarkNode) return;
+    if (wordmarkPressAnimationRef.current) {
+      wordmarkPressAnimationRef.current.cancel();
+    }
+    const pressAnimation = wordmarkNode.animate(
+      [
+        { transform: "translate3d(0, 0, 0) scale(1)" },
+        { transform: "translate3d(0, 0, 0) scale(0.97)", offset: 0.45 },
+        { transform: "translate3d(0, 0, 0) scale(1)" },
+      ],
+      {
+        duration: 200,
+        easing: "cubic-bezier(0.22,1,0.36,1)",
+      }
+    );
+    wordmarkPressAnimationRef.current = pressAnimation;
+    pressAnimation.onfinish = () => {
+      if (wordmarkPressAnimationRef.current === pressAnimation) {
+        wordmarkPressAnimationRef.current = null;
+      }
+    };
+    pressAnimation.oncancel = () => {
+      if (wordmarkPressAnimationRef.current === pressAnimation) {
+        wordmarkPressAnimationRef.current = null;
+      }
+    };
+  };
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -90,29 +124,58 @@ export function HomePageView(): JSX.Element {
     let reduceMotion = reduceMotionMedia.matches;
     let mobileFallback = coarsePointerMedia.matches || window.innerWidth < 900;
 
-    const heroHeading = heroHeadingRef.current;
+    const heroWordmarkShell = heroWordmarkShellRef.current;
     const heroSub = heroSubRef.current;
     const heroCta = heroCtaRef.current;
     const flowSection = flowSectionRef.current;
     const heroWordmark = heroWordmarkRef.current;
+    const heroWordmarkLetters = heroWordmarkLetterRefs.current.filter((node): node is HTMLSpanElement => !!node);
     const heroBlurNear = heroBlurNearRef.current;
     const heroBlurFar = heroBlurFarRef.current;
     const heroTrail = heroTrailRef.current;
+    let wordmarkIntroTimer = 0;
 
-    if (heroHeading && !reduceMotion) {
-      heroHeading.style.opacity = "0";
-      heroHeading.style.transform = "translate3d(0, 0, 0) scale(0.9)";
-      heroHeading.style.filter = "blur(18px)";
-      heroHeading.style.willChange = "opacity, transform, filter";
-      window.requestAnimationFrame(() => {
-        heroHeading.style.transition = "opacity 1600ms cubic-bezier(0.22,1,0.36,1), transform 1600ms cubic-bezier(0.22,1,0.36,1), filter 1600ms cubic-bezier(0.22,1,0.36,1)";
-        heroHeading.style.opacity = "1";
-        heroHeading.style.transform = "translate3d(0, 0, 0) scale(1)";
-        heroHeading.style.filter = "blur(0px)";
-      });
-      window.setTimeout(() => {
-        if (heroHeading) heroHeading.style.willChange = "auto";
-      }, 1720);
+    if (heroWordmarkShell && !wordmarkIntroHasRun.current) {
+      wordmarkIntroHasRun.current = true;
+      if (reduceMotion) {
+        heroWordmarkShell.style.opacity = "1";
+        heroWordmarkShell.style.transform = "translate3d(0, 0, 0) scale(1)";
+        heroWordmarkShell.style.filter = "blur(0px)";
+        heroWordmarkLetters.forEach((letter) => {
+          letter.style.opacity = "1";
+          letter.style.transform = "translate3d(0, 0, 0) scale(1)";
+        });
+      } else {
+        heroWordmarkShell.style.opacity = "0";
+        heroWordmarkShell.style.transform = "translate3d(0, 0, 0) scale(0.94)";
+        heroWordmarkShell.style.filter = "blur(14px)";
+        heroWordmarkShell.style.willChange = "opacity, transform, filter";
+        heroWordmarkLetters.forEach((letter) => {
+          letter.style.opacity = "0";
+          letter.style.transform = "translate3d(0, 10px, 0) scale(0.98)";
+          letter.style.willChange = "opacity, transform";
+        });
+        window.requestAnimationFrame(() => {
+          heroWordmarkShell.style.transition =
+            "opacity 1200ms cubic-bezier(0.22,1,0.36,1), transform 1200ms cubic-bezier(0.22,1,0.36,1), filter 1200ms cubic-bezier(0.22,1,0.36,1)";
+          heroWordmarkShell.style.opacity = "1";
+          heroWordmarkShell.style.transform = "translate3d(0, 0, 0) scale(1)";
+          heroWordmarkShell.style.filter = "blur(0px)";
+
+          heroWordmarkLetters.forEach((letter, index) => {
+            const letterDelay = 70 + index * 40;
+            letter.style.transition = `opacity 720ms cubic-bezier(0.22,1,0.36,1) ${letterDelay}ms, transform 720ms cubic-bezier(0.22,1,0.36,1) ${letterDelay}ms`;
+            letter.style.opacity = "1";
+            letter.style.transform = "translate3d(0, 0, 0) scale(1)";
+          });
+        });
+        wordmarkIntroTimer = window.setTimeout(() => {
+          heroWordmarkShell.style.willChange = "auto";
+          heroWordmarkLetters.forEach((letter) => {
+            letter.style.willChange = "auto";
+          });
+        }, 1320);
+      }
     }
 
     const introTargets = [heroSub, heroCta];
@@ -162,6 +225,9 @@ export function HomePageView(): JSX.Element {
     }
 
     const clearWordmarkEffects = () => {
+      if (heroWordmarkShell) {
+        heroWordmarkShell.style.transform = "translate3d(0, 0, 0) scale(1)";
+      }
       if (heroWordmark) {
         heroWordmark.style.transform = "translate3d(0, 0, 0)";
       }
@@ -328,15 +394,6 @@ export function HomePageView(): JSX.Element {
         flowSectionRef.current.style.opacity = flowOpacityCurrent.toFixed(3);
       }
 
-      if (heroSweepRef.current && !reduceMotion) {
-        const sweep = ((animationTime * 0.03) % 240) - 120;
-        const pulseAmplitude = simpleMotion ? 0.025 : 0.06 * (1 - settleFactor * 0.82);
-        const pulse = 0.32 + Math.sin(animationTime * 0.0032) * pulseAmplitude;
-        heroSweepRef.current.style.backgroundPosition = `${sweep.toFixed(2)}% 50%`;
-        heroSweepRef.current.style.opacity = clamp(pulse, 0.24, 0.4).toFixed(3);
-        heroSweepRef.current.style.filter = `blur(${(16 + (1 - settleFactor) * 2).toFixed(2)}px)`;
-      }
-
       if (heroArrowRef.current && !reduceMotion) {
         const floatY = Math.sin(animationTime * 0.0032) * 6;
         const pulse = 1 + Math.sin(animationTime * 0.004) * 0.08;
@@ -476,8 +533,15 @@ export function HomePageView(): JSX.Element {
 
     rafId = window.requestAnimationFrame(update);
     return () => {
+      if (wordmarkIntroTimer) {
+        window.clearTimeout(wordmarkIntroTimer);
+      }
       if (clearWillChangeTimer) {
         window.clearTimeout(clearWillChangeTimer);
+      }
+      if (wordmarkPressAnimationRef.current) {
+        wordmarkPressAnimationRef.current.cancel();
+        wordmarkPressAnimationRef.current = null;
       }
       window.removeEventListener("pointermove", onPointerMove);
       window.removeEventListener("pointerleave", onPointerLeave);
@@ -612,15 +676,38 @@ export function HomePageView(): JSX.Element {
         </div>
         <div className="relative mx-auto flex min-h-[calc(100vh-4rem)] w-full max-w-6xl flex-col items-center justify-center px-4 text-center sm:px-6 lg:px-8">
           <div className="space-y-6">
-            <h1 ref={heroHeadingRef} className="relative text-6xl font-semibold tracking-[0.08em] text-white sm:text-7xl">
-              <span className="relative inline-flex">
-                <span ref={heroWordmarkRef} className="bg-gradient-to-r from-white via-white to-white/70 bg-clip-text text-transparent">
-                  Fitdex
+            <h1 ref={heroHeadingRef} className="relative mx-auto flex w-full justify-center text-6xl font-semibold text-white sm:text-7xl">
+              <span
+                ref={heroWordmarkShellRef}
+                onPointerDown={handleWordmarkPress}
+                className="group/wordmark relative mx-auto inline-flex cursor-pointer select-none items-center justify-center overflow-hidden rounded-[0.1em] px-[0.02em] text-center align-middle tracking-[-0.03em] transform-gpu transition-[transform,opacity] duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] hover:scale-[1.03]"
+                style={{ transform: "translate3d(0, 0, 0) scale(1)" }}
+              >
+                <span
+                  ref={heroWordmarkRef}
+                  className="relative z-[2] inline-flex items-center justify-center bg-[linear-gradient(112deg,#ffffff_0%,#f7fbff_28%,#b5fff4_54%,#ffffff_80%,rgba(255,255,255,0.85)_100%)] bg-[length:180%_100%] bg-[position:20%_50%] bg-clip-text text-transparent transition-opacity duration-300 ease-[cubic-bezier(0.22,1,0.36,1)]"
+                >
+                  {wordmarkLetters.map((letter, index) => (
+                    <span
+                      key={`main-${index}`}
+                      ref={(node) => {
+                        heroWordmarkLetterRefs.current[index] = node;
+                      }}
+                      className={wordmarkLetterClassName}
+                      style={{ transform: "translate3d(0, 0, 0) scale(1)" }}
+                    >
+                      {letter}
+                    </span>
+                  ))}
                 </span>
+                <span
+                  aria-hidden="true"
+                  className="pointer-events-none absolute inset-0 z-[1] rounded-[0.18em] bg-cyan-100/50 opacity-0 blur-xl transition-opacity duration-300 ease-out group-hover/wordmark:opacity-35"
+                />
                 <span
                   ref={heroBlurNearRef}
                   aria-hidden="true"
-                  className="pointer-events-none absolute inset-0 inline-flex items-center justify-center text-white/80 opacity-0 mix-blend-screen"
+                  className="pointer-events-none absolute inset-0 z-[2] inline-flex items-center justify-center text-white/80 opacity-0 mix-blend-screen"
                   style={{ filter: "blur(0px)", transform: "translate3d(0, 0, 0)" }}
                 >
                   {wordmarkLetters.map((letter, index) => {
@@ -631,7 +718,7 @@ export function HomePageView(): JSX.Element {
                         ref={(node) => {
                           heroDepthLetterRefs.current[index] = node;
                         }}
-                        className="inline-block"
+                        className={wordmarkLetterClassName}
                         style={{ transform: `translate3d(0, ${(centered * 0.24).toFixed(2)}px, 0)` }}
                       >
                         {letter}
@@ -642,11 +729,11 @@ export function HomePageView(): JSX.Element {
                 <span
                   ref={heroBlurFarRef}
                   aria-hidden="true"
-                  className="pointer-events-none absolute inset-0 inline-flex items-center justify-center text-white/60 opacity-0 mix-blend-screen"
+                  className="pointer-events-none absolute inset-0 z-[2] inline-flex items-center justify-center text-white/60 opacity-0 mix-blend-screen"
                   style={{ filter: "blur(0px)", transform: "translate3d(0, 0, 0)" }}
                 >
                   {wordmarkLetters.map((letter, index) => (
-                    <span key={`far-${index}`} className="inline-block">
+                    <span key={`far-${index}`} className={wordmarkLetterClassName}>
                       {letter}
                     </span>
                   ))}
@@ -654,7 +741,7 @@ export function HomePageView(): JSX.Element {
                 <span
                   ref={heroTrailRef}
                   aria-hidden="true"
-                  className="pointer-events-none absolute inset-0 inline-flex items-center justify-center text-white/55 opacity-0 mix-blend-screen"
+                  className="pointer-events-none absolute inset-0 z-[2] inline-flex items-center justify-center text-white/55 opacity-0 mix-blend-screen"
                   style={{ filter: "blur(0px)", transform: "translate3d(0, 0, 0)" }}
                 >
                   {wordmarkLetters.map((letter, index) => (
@@ -663,24 +750,29 @@ export function HomePageView(): JSX.Element {
                       ref={(node) => {
                         heroTrailLetterRefs.current[index] = node;
                       }}
-                      className="inline-block opacity-0"
+                      className={`${wordmarkLetterClassName} opacity-0`}
                       style={{ transform: "translate3d(0, 0, 0)" }}
                     >
                       {letter}
                     </span>
                   ))}
                 </span>
+                <span
+                  aria-hidden="true"
+                  className="pointer-events-none absolute inset-0 z-[4] inline-flex items-center justify-center opacity-0 transition-opacity duration-200 ease-out group-hover/wordmark:opacity-100"
+                >
+                  <span className="inline-flex items-center justify-center transform-gpu -translate-x-[132%] transition-transform duration-500 ease-[cubic-bezier(0.22,1,0.36,1)] group-hover/wordmark:translate-x-[132%]">
+                    {wordmarkLetters.map((letter, index) => (
+                      <span
+                        key={`sweep-${index}`}
+                        className={`${wordmarkLetterClassName} bg-[linear-gradient(112deg,rgba(255,255,255,0)_24%,rgba(255,255,255,0.98)_50%,rgba(255,255,255,0)_76%)] bg-[length:200%_100%] bg-[position:50%_50%] bg-clip-text text-transparent`}
+                      >
+                        {letter}
+                      </span>
+                    ))}
+                  </span>
+                </span>
               </span>
-              <span
-                ref={heroSweepRef}
-                className="pointer-events-none absolute inset-0 opacity-35"
-                style={{
-                  backgroundImage: accents.cyan.gradient,
-                  backgroundSize: "240% 140%",
-                  backgroundPosition: "-120% 50%",
-                  filter: "blur(18px)",
-                }}
-              />
             </h1>
             <p ref={heroSubRef} className="mx-auto max-w-2xl text-base text-white/80 sm:text-xl">
               Find The Best Gyms Near You At The Best Prices
