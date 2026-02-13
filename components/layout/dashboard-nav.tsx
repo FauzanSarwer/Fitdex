@@ -19,6 +19,7 @@ import {
 import { cn } from "@/lib/utils";
 import { GlobalSearch } from "@/components/layout/global-search";
 import { ThemeToggle } from "@/components/layout/theme-toggle";
+import { EmailVerificationBanner } from "@/components/layout/email-verification-banner";
 
 const USER_LINKS = [
   { href: "/dashboard/user", label: "Overview", icon: LayoutDashboard },
@@ -85,11 +86,18 @@ export function DashboardNav({
   const adminActive = pathname?.startsWith("/dashboard/admin");
   const ownerActive = pathname?.startsWith("/dashboard/owner");
   const userActive = pathname?.startsWith("/dashboard/user");
+  const primaryNav =
+    navRole === "ADMIN"
+      ? { href: "/dashboard/admin", label: "Admin panel", icon: ShieldCheck }
+      : navRole === "OWNER"
+        ? { href: "/dashboard/owner", label: "Owner panel", icon: Compass }
+        : { href: "/dashboard/user", label: "Dashboard", icon: LayoutDashboard };
 
   return (
     <>
       <header className="fixed top-0 left-0 right-0 z-40 glass border-b border-border/60 md:pl-56">
-        <div className="flex h-16 items-center gap-4 px-4">
+        <EmailVerificationBanner />
+        <div className="relative flex h-16 items-center gap-4 px-4">
           <Link href="/" className="flex items-center gap-2">
             <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-card/80 shadow-glow-sm">
               <Image
@@ -97,18 +105,28 @@ export function DashboardNav({
                 alt="Fitdex"
                 width={24}
                 height={24}
-                className="h-6 w-6"
+                className="h-6 w-6 object-contain rotate-0 skew-x-0 skew-y-0"
                 priority
               />
             </div>
             <span className="text-lg font-bold">Fitdex</span>
           </Link>
-          <div className="hidden md:flex flex-1 justify-center">
-            <GlobalSearch className="w-full max-w-md" />
+          <div className="pointer-events-none absolute inset-y-0 left-1/2 hidden -translate-x-1/2 md:flex items-center">
+            <Link
+              href={primaryNav.href}
+              className="pointer-events-auto inline-flex items-center gap-1 text-sm font-medium text-muted-foreground transition-colors hover:text-foreground"
+            >
+              <primaryNav.icon className="h-4 w-4" />
+              {primaryNav.label}
+            </Link>
           </div>
-          <ThemeToggle />
-          {role === "ADMIN" && (
-            <div className="ml-auto flex items-center gap-2">
+          <div className="ml-auto flex items-center gap-2">
+            <div className="hidden xl:flex">
+              <GlobalSearch className="w-[20rem]" />
+            </div>
+            <ThemeToggle />
+            {role === "ADMIN" && (
+              <>
               <Link
                 href="/dashboard/admin"
                 className={cn(
@@ -142,8 +160,9 @@ export function DashboardNav({
               >
                 User dashboard
               </Link>
-            </div>
-          )}
+              </>
+            )}
+          </div>
         </div>
       </header>
       <aside className="fixed left-0 top-0 z-50 hidden h-full w-56 flex-col border-r border-border/60 bg-background/95 backdrop-blur md:flex">

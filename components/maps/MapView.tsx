@@ -12,6 +12,16 @@ interface MapViewProps {
   showUserMarker?: boolean;
 }
 
+const LABEL_MIN_ZOOM = 14;
+
+const escapeHtml = (value: string) =>
+  value
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;")
+    .replaceAll("'", "&#039;");
+
 export function MapView({ latitude, longitude, gyms = [], className, zoom = 13, showUserMarker = false }: MapViewProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<any>(null);
@@ -85,10 +95,10 @@ export function MapView({ latitude, longitude, gyms = [], className, zoom = 13, 
       attribution: '© OpenStreetMap contributors © CARTO',
     }).addTo(map);
 
+    mapRef.current = map;
     markersRef.current = L.layerGroup().addTo(map);
     updateMarkers();
-
-    mapRef.current = map;
+    map.on("zoomend", updateMarkers);
     setTimeout(() => map.invalidateSize(), 0);
   };
 
@@ -96,46 +106,56 @@ export function MapView({ latitude, longitude, gyms = [], className, zoom = 13, 
     if (!mapRef.current || !markersRef.current) return;
     const L = (window as any).L;
     if (!L) return;
-    const key = `${centerKey}|${gymsKey}`;
+    const currentZoom = mapRef.current?.getZoom?.() ?? zoom;
+    const key = `${centerKey}|${gymsKey}|${currentZoom}`;
     if (key === lastMarkersKeyRef.current) return;
     lastMarkersKeyRef.current = key;
     markersRef.current.clearLayers();
 
+    const createMarkerIcon = (type: "gym" | "user") =>
+      L.divIcon({
+        className: "fitdex-map-marker-host",
+        html:
+          type === "user"
+            ? '<span class="fitdex-map-marker fitdex-map-marker-user"><span class="fitdex-map-marker-core"></span></span>'
+            : '<span class="fitdex-map-marker fitdex-map-marker-gym"><span class="fitdex-map-marker-core"></span></span>',
+        iconSize: [18, 18],
+        iconAnchor: [9, 9],
+      });
+
     if (showUserMarker) {
       L.marker([latitude, longitude], {
         title: "You",
-        icon: L.icon({
-          iconUrl: "https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-blue.png",
-          shadowUrl: "https://cdnjs.cloudflare.com/ajax/libs/leaflet/0.7.7/images/marker-shadow.png",
-          iconSize: [25, 41],
-          iconAnchor: [12, 41],
-          popupAnchor: [1, -34],
-          shadowSize: [41, 41],
-        }),
+        icon: createMarkerIcon("user"),
       })
         .addTo(markersRef.current)
         .bindPopup("Your location");
     }
 
     // Add gym markers
+    const showLabels = currentZoom >= LABEL_MIN_ZOOM;
     gyms.forEach((gym) => {
-      L.marker([gym.latitude, gym.longitude], {
+      const marker = L.marker([gym.latitude, gym.longitude], {
         title: gym.name,
-        icon: L.icon({
-          iconUrl: "https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-red.png",
-          shadowUrl: "https://cdnjs.cloudflare.com/ajax/libs/leaflet/0.7.7/images/marker-shadow.png",
-          iconSize: [25, 41],
-          iconAnchor: [12, 41],
-          popupAnchor: [1, -34],
-          shadowSize: [41, 41],
-        }),
+        icon: createMarkerIcon("gym"),
       })
-        .addTo(markersRef.current)
-        .bindPopup(
-          gym.url
-            ? `<div style="display:flex;flex-direction:column;gap:4px"><strong>${gym.name}</strong><a href="${gym.url}" style="color:#22c55e;text-decoration:underline" target="_blank" rel="noreferrer">View gym</a></div>`
-            : gym.name
-        );
+        .addTo(markersRef.current);
+
+      if (showLabels) {
+        marker.bindTooltip(escapeHtml(gym.name), {
+          permanent: true,
+          direction: "top",
+          offset: [0, -14],
+          className: "fitdex-map-label",
+          opacity: 1,
+        });
+      }
+
+      marker.bindPopup(
+        gym.url
+          ? `<div style="display:flex;flex-direction:column;gap:4px"><strong>${escapeHtml(gym.name)}</strong><a href="${gym.url}" style="color:#22c55e;text-decoration:underline" target="_blank" rel="noreferrer">View gym</a></div>`
+          : escapeHtml(gym.name)
+      );
     });
   };
 

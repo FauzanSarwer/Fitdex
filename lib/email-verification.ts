@@ -33,7 +33,9 @@ export async function createEmailVerificationLinks(userId: string, email: string
   const expiresAt = new Date(Date.now() + TOKEN_EXPIRATION_MS);
 
   try {
-    await (prisma as PrismaWithEmailVerification).emailVerificationToken.deleteMany({ where: { userId } });
+    await (prisma as PrismaWithEmailVerification).emailVerificationToken.deleteMany({
+      where: { userId, purpose: { in: ["VERIFY", "DELETE"] } },
+    });
     await (prisma as PrismaWithEmailVerification).emailVerificationToken.createMany({
       data: [
         { userId, tokenHash: hashToken(verifyToken), purpose: "VERIFY", expiresAt },

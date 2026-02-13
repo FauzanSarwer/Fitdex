@@ -5,11 +5,12 @@ import { useEffect, useRef, useState } from "react";
 import { useSession, signOut } from "next-auth/react";
 import { isOwner } from "@/lib/permissions";
 import Image from "next/image";
-import { MapPin, User, LayoutDashboard, LogOut } from "lucide-react";
+import { MapPin, User, LayoutDashboard, LogOut, ShieldCheck } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ThemeToggle } from "@/components/layout/theme-toggle";
 import { accentRgb, accents } from "@/lib/theme/accents";
 import { useScrollEngine } from "@/components/motion/useScrollEngine";
+import { EmailVerificationBanner } from "@/components/layout/email-verification-banner";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -47,13 +48,18 @@ export function Header() {
   const { scrollVelocity } = useScrollEngine();
   const role = (session?.user as { role?: string })?.role;
   const owner = status === "authenticated" && isOwner(session);
-  const emailVerified = !!(session?.user as { emailVerified?: boolean })?.emailVerified;
-  const [sendingVerification, setSendingVerification] = useState(false);
-  const [verificationSent, setVerificationSent] = useState(false);
   const [selectedCity, setSelectedCity] = useState("Select city");
   const [locatingCity, setLocatingCity] = useState(false);
 
   const displayName = session?.user?.name ?? "Account";
+  const primaryNav =
+    status !== "authenticated"
+      ? { href: "/explore", label: "Explore", icon: MapPin }
+      : role === "ADMIN"
+        ? { href: "/dashboard/admin", label: "Admin panel", icon: ShieldCheck }
+        : owner
+          ? { href: "/dashboard/owner", label: "Owner panel", icon: LayoutDashboard }
+          : { href: "/dashboard/user", label: "Dashboard", icon: LayoutDashboard };
 
   const persistCity = (city: string, latitude?: number, longitude?: number) => {
     setSelectedCity(city);
@@ -213,32 +219,8 @@ export function Header() {
           backgroundSize: "200% 100%",
         }}
       />
-      {!emailVerified && session && (
-        <div className="bg-amber-500/20 border-b border-amber-500/30">
-          <div className="container mx-auto px-4 py-2 text-xs text-amber-100 flex flex-wrap items-center gap-2 justify-between">
-            <span>
-              Verify your email address. A link has been sent to {session.user.email ?? "your email"}.
-            </span>
-            <button
-              type="button"
-              disabled={sendingVerification}
-              className="text-amber-50 underline hover:text-white disabled:opacity-60"
-              onClick={async () => {
-                setSendingVerification(true);
-                try {
-                  const res = await fetch("/api/auth/verify", { method: "POST" });
-                  if (res.ok) setVerificationSent(true);
-                } finally {
-                  setSendingVerification(false);
-                }
-              }}
-            >
-              {sendingVerification ? "Sending…" : verificationSent ? "Link sent" : "Resend link"}
-            </button>
-          </div>
-        </div>
-      )}
-      <div ref={barRef} className="container mx-auto flex h-16 items-center justify-between px-4">
+      <EmailVerificationBanner />
+      <div ref={barRef} className="container relative mx-auto flex h-16 items-center px-4">
         <Link href="/" className="flex items-center gap-2">
           <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-card/80 shadow-glow-sm">
             <Image
@@ -246,29 +228,23 @@ export function Header() {
               alt="Fitdex"
               width={24}
               height={24}
-              className="h-6 w-6"
+              className="h-6 w-6 object-contain rotate-0 skew-x-0 skew-y-0"
               priority
             />
           </div>
         </Link>
-        <nav className="hidden md:flex items-center gap-4">
-          <Link
-            href="/explore"
-            className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors flex items-center gap-1"
-          >
-            <MapPin className="h-4 w-4" />
-            Explore
-          </Link>
-          {status === "authenticated" && (
+        <div className="pointer-events-none absolute inset-y-0 left-1/2 hidden -translate-x-1/2 md:flex items-center">
+          <nav className="pointer-events-auto">
             <Link
-              href="/dashboard"
-              className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors"
+              href={primaryNav.href}
+              className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors flex items-center gap-1"
             >
-              Dashboard
+              <primaryNav.icon className="h-4 w-4" />
+              {primaryNav.label}
             </Link>
-          )}
-        </nav>
-        <div className="flex items-center gap-3">
+          </nav>
+        </div>
+        <div className="ml-auto flex items-center gap-3">
           <ThemeToggle />
           <DropdownMenu>
             <DropdownMenuTrigger asChild>

@@ -39,7 +39,7 @@ export function Footer() {
                 alt="Fitdex"
                 width={28}
                 height={28}
-                className="h-7 w-7"
+                className="h-7 w-7 object-contain rotate-0 skew-x-0 skew-y-0"
               />
             </div>
             <div>

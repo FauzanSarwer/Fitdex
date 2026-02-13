@@ -16,7 +16,7 @@ export default function AuthLayout({
               alt="Fitdex"
               width={20}
               height={20}
-              className="h-5 w-5"
+              className="h-5 w-5 object-contain rotate-0 skew-x-0 skew-y-0"
               priority
             />
           </div>

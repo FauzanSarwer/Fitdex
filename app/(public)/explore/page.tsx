@@ -425,29 +425,6 @@ export default function ExplorePage() {
     return list;
   }, [gyms, deferredMaxDistance, deferredMaxPrice, deferredQuery, sortBy, onlyFeatured, onlyVerified]);
 
-  const activeFilters = useMemo(() => {
-    const filters: { label: string; onClear: () => void }[] = [];
-    if (query.trim()) {
-      filters.push({ label: `Search: ${query.trim()}`, onClear: () => setQuery("") });
-    }
-    if (Number(maxPrice) > 0) {
-      filters.push({ label: `Max ₹${maxPrice}/mo`, onClear: () => setMaxPrice("") });
-    }
-    if (Number(maxDistance) > 0) {
-      filters.push({ label: `Within ${maxDistance} km`, onClear: () => setMaxDistance("") });
-    }
-    if (sortBy !== "distance") {
-      filters.push({ label: SORT_LABELS[sortBy], onClear: () => setSortBy("distance") });
-    }
-    if (onlyFeatured) {
-      filters.push({ label: "Featured only", onClear: () => setOnlyFeatured(false) });
-    }
-    if (onlyVerified) {
-      filters.push({ label: "Verified only", onClear: () => setOnlyVerified(false) });
-    }
-    return filters;
-  }, [maxDistance, maxPrice, query, sortBy, onlyFeatured, onlyVerified]);
-
   const filterCount =
     (query.trim() ? 1 : 0) +
     (Number(maxPrice) > 0 ? 1 : 0) +
@@ -504,26 +481,26 @@ export default function ExplorePage() {
       )}
       <div className={locationGate ? "pointer-events-none blur-sm" : ""}>
         <section
-          className="relative mb-10 rounded-3xl border border-white/10 bg-white/[0.04] p-5 shadow-glow-sm md:p-8"
+          className="relative mb-6 rounded-3xl border border-white/10 bg-white/[0.04] p-4 shadow-glow-sm md:p-5"
           data-accent-color={accentRgb.indigo}
         >
           <div
             className="pointer-events-none absolute -right-12 top-[-22%] h-48 w-48 opacity-[0.11]"
             style={{ backgroundImage: accents.indigo.softGlow, filter: "blur(64px)" }}
           />
-          <div className="flex flex-col gap-6">
-            <div className="space-y-3">
+          <div className="flex flex-col gap-4">
+            <div className="space-y-2">
               <h1
                 ref={headingRef}
-                className="motion-heading-highlight text-3xl font-semibold tracking-tight sm:text-4xl lg:text-5xl"
+                className="motion-heading-highlight text-2xl font-semibold tracking-tight sm:text-3xl lg:text-4xl"
               >
                 Explore gyms in your city
               </h1>
-              <p className="max-w-3xl text-sm text-muted-foreground sm:text-base">
+              <p className="max-w-3xl text-xs text-muted-foreground sm:text-sm">
                 Search by gym name, compare pricing, and shortlist trusted options with cleaner discovery controls.
               </p>
             </div>
-            <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+            <div className="flex flex-col gap-2.5 lg:flex-row lg:items-center lg:justify-between">
               <div className="relative w-full lg:max-w-2xl">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                 <Input
@@ -531,7 +508,7 @@ export default function ExplorePage() {
                   placeholder="Search gyms in your city..."
                   value={query}
                   onChange={(e) => setQuery(e.target.value)}
-                  className="h-11 pl-9"
+                  className="h-10 pl-9 text-sm"
                 />
               </div>
               <div className="flex items-center gap-2">
@@ -573,135 +550,98 @@ export default function ExplorePage() {
             </div>
           </div>
         </section>
-        <section className="mb-6 rounded-2xl border border-white/10 bg-white/[0.03] p-4 md:p-5">
-          <div className="flex flex-col gap-4">
-            <div className="flex flex-wrap items-center justify-between gap-3">
-              <p className="text-sm text-muted-foreground">
-                {loading ? "Loading gyms..." : `${filteredGyms.length} gyms available`}
-              </p>
-              <p className="text-xs text-muted-foreground">
-                Sorted by <span className="text-foreground">{SORT_LABELS[sortBy]}</span>
-              </p>
-              {activeFilters.length > 0 && (
-                <div className="flex flex-wrap items-center gap-2">
-                  {activeFilters.map((filter) => (
-                    <button
-                      key={filter.label}
-                      type="button"
-                      onClick={filter.onClear}
-                      className="text-xs rounded-full border border-white/10 bg-white/5 px-3 py-1 text-muted-foreground hover:text-foreground"
-                    >
-                      {filter.label} ×
-                    </button>
-                  ))}
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setQuery("");
-                      setMaxPrice("");
-                      setMaxDistance("");
-                      setSortBy("distance");
-                      setOnlyFeatured(false);
-                      setOnlyVerified(false);
-                    }}
-                    className="text-xs rounded-full border border-primary/40 bg-primary/10 px-3 py-1 text-primary hover:bg-primary/20"
-                  >
-                    Clear all
-                  </button>
-                </div>
-              )}
-            </div>
-            <div className="flex flex-wrap items-center justify-end gap-2">
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <Button variant="outline" className="gap-2">
-                    <ArrowDownUp className="h-4 w-4" />
-                    Sort: {SORT_LABELS[sortBy]}
-                  </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end" className="w-56">
-                  <DropdownMenuLabel>Sort results</DropdownMenuLabel>
-                  <DropdownMenuSeparator />
-                  <DropdownMenuRadioGroup value={sortBy} onValueChange={(v) => setSortBy(v as SortOption)}>
-                    <DropdownMenuRadioItem value="distance">Nearby to farthest</DropdownMenuRadioItem>
-                    <DropdownMenuRadioItem value="price_asc">Price: low to high</DropdownMenuRadioItem>
-                    <DropdownMenuRadioItem value="price_desc">Price: high to low</DropdownMenuRadioItem>
-                    <DropdownMenuRadioItem value="newest">Newly added</DropdownMenuRadioItem>
-                  </DropdownMenuRadioGroup>
-                </DropdownMenuContent>
-              </DropdownMenu>
+        <section className="mb-5 w-full rounded-xl border border-white/10 bg-white/[0.03] px-3 py-2 backdrop-blur-md">
+          <div className="flex min-h-9 items-center justify-end gap-2">
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="outline" size="sm" className="h-8 gap-2 rounded-lg px-3 text-xs">
+                  <ArrowDownUp className="h-3.5 w-3.5" />
+                  Sort by
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-56">
+                <DropdownMenuLabel>Sort results</DropdownMenuLabel>
+                <DropdownMenuSeparator />
+                <DropdownMenuRadioGroup value={sortBy} onValueChange={(v) => setSortBy(v as SortOption)}>
+                  <DropdownMenuRadioItem value="distance">Nearby to farthest</DropdownMenuRadioItem>
+                  <DropdownMenuRadioItem value="price_asc">Price: low to high</DropdownMenuRadioItem>
+                  <DropdownMenuRadioItem value="price_desc">Price: high to low</DropdownMenuRadioItem>
+                  <DropdownMenuRadioItem value="newest">Newly added</DropdownMenuRadioItem>
+                </DropdownMenuRadioGroup>
+              </DropdownMenuContent>
+            </DropdownMenu>
 
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <Button variant={filterCount > 0 ? "secondary" : "outline"} className="gap-2">
-                    <SlidersHorizontal className="h-4 w-4" />
-                    Filters
-                    {filterCount > 0 && (
-                      <span className="ml-1 rounded-full bg-primary/20 px-2 py-0.5 text-[10px] text-primary">
-                        {filterCount}
-                      </span>
-                    )}
-                  </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end" className="w-72 p-3">
-                  <div className="space-y-4">
-                    <div className="space-y-2">
-                      <p className="text-sm font-semibold">Price & distance</p>
-                      <Input
-                        type="number"
-                        placeholder="Max price / month"
-                        value={maxPrice}
-                        onChange={(e) => setMaxPrice(e.target.value)}
-                      />
-                      <Input
-                        type="number"
-                        placeholder="Max distance (km)"
-                        value={maxDistance}
-                        onChange={(e) => setMaxDistance(e.target.value)}
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <p className="text-sm font-semibold">Badges</p>
-                      <button
-                        type="button"
-                        onClick={() => setOnlyFeatured((prev) => !prev)}
-                        className={`w-full rounded-lg border px-3 py-2 text-left text-sm ${
-                          onlyFeatured ? "border-primary/50 bg-primary/10 text-primary" : "border-white/10"
-                        }`}
-                      >
-                        Featured gyms
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => setOnlyVerified((prev) => !prev)}
-                        className={`w-full rounded-lg border px-3 py-2 text-left text-sm ${
-                          onlyVerified ? "border-emerald-400/50 bg-emerald-400/10 text-emerald-300" : "border-white/10"
-                        }`}
-                      >
-                        Verified gyms
-                      </button>
-                    </div>
-                    <div className="flex items-center justify-between gap-2">
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => {
-                          setMaxPrice("");
-                          setMaxDistance("");
-                          // name-only search
-                          setOnlyFeatured(false);
-                          setOnlyVerified(false);
-                        }}
-                      >
-                        Clear filters
-                      </Button>
-                      <span className="text-xs text-muted-foreground">Updates instantly</span>
-                    </div>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant={filterCount > 0 ? "secondary" : "outline"} size="sm" className="h-8 gap-2 rounded-lg px-3 text-xs">
+                  <SlidersHorizontal className="h-3.5 w-3.5" />
+                  Filters
+                  {filterCount > 0 && (
+                    <span className="ml-1 rounded-full bg-primary/20 px-1.5 py-0.5 text-[10px] text-primary">
+                      {filterCount}
+                    </span>
+                  )}
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-72 p-3">
+                <div className="space-y-4">
+                  <div className="space-y-2">
+                    <p className="text-sm font-semibold">Price & distance</p>
+                    <Input
+                      type="number"
+                      placeholder="Max price / month"
+                      value={maxPrice}
+                      onChange={(e) => setMaxPrice(e.target.value)}
+                    />
+                    <Input
+                      type="number"
+                      placeholder="Max distance (km)"
+                      value={maxDistance}
+                      onChange={(e) => setMaxDistance(e.target.value)}
+                    />
                   </div>
-                </DropdownMenuContent>
-              </DropdownMenu>
-            </div>
+                  <div className="space-y-2">
+                    <p className="text-sm font-semibold">Badges</p>
+                    <button
+                      type="button"
+                      onClick={() => setOnlyFeatured((prev) => !prev)}
+                      className={`w-full rounded-lg border px-3 py-2 text-left text-sm ${
+                        onlyFeatured ? "border-primary/50 bg-primary/10 text-primary" : "border-white/10"
+                      }`}
+                    >
+                      Featured gyms
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setOnlyVerified((prev) => !prev)}
+                      className={`w-full rounded-lg border px-3 py-2 text-left text-sm ${
+                        onlyVerified ? "border-emerald-400/50 bg-emerald-400/10 text-emerald-300" : "border-white/10"
+                      }`}
+                    >
+                      Verified gyms
+                    </button>
+                  </div>
+                  <div className="flex items-center justify-between gap-2">
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => {
+                        setQuery("");
+                        setMaxPrice("");
+                        setMaxDistance("");
+                        setSortBy("distance");
+                        setOnlyFeatured(false);
+                        setOnlyVerified(false);
+                      }}
+                    >
+                      Clear all
+                    </Button>
+                    <span className="text-xs text-muted-foreground">Updates instantly</span>
+                  </div>
+                </div>
+              </DropdownMenuContent>
+            </DropdownMenu>
           </div>
         </section>
 

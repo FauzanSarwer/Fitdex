@@ -19,11 +19,6 @@ function LoginForm() {
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [phoneNumber, setPhoneNumber] = useState("");
-  const [otp, setOtp] = useState("");
-  const [otpSent, setOtpSent] = useState(false);
-  const [otpLoading, setOtpLoading] = useState(false);
-  const [devOtp, setDevOtp] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const passwordRef = useRef<HTMLInputElement | null>(null);
@@ -112,60 +107,12 @@ function LoginForm() {
     }
   }
 
-  async function requestOtp() {
-    setError("");
-    setOtpLoading(true);
-    setDevOtp(null);
-    try {
-      const res = await fetch("/api/auth/phone/request-otp", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ phoneNumber }),
-      });
-      if (!res.ok) {
-        const data = await res.json().catch(() => ({}));
-        setError(data?.error ?? "Failed to send OTP");
-        setOtpLoading(false);
-        return;
-      }
-      const data = await res.json().catch(() => ({}));
-      if (data?.devOtp) {
-        setDevOtp(data.devOtp);
-      }
-      setOtpSent(true);
-    } catch {
-      setError("Failed to send OTP");
-    }
-    setOtpLoading(false);
-  }
-
-  async function verifyOtp() {
-    setError("");
-    setOtpLoading(true);
-    try {
-      const res = await signIn("phone-otp", {
-        phoneNumber,
-        otp,
-        redirect: false,
-      });
-      if (!res || res?.error || res?.ok === false) {
-        setError("Invalid OTP or phone number");
-        setOtpLoading(false);
-        return;
-      }
-      window.location.href = callbackUrl;
-    } catch {
-      setError("OTP sign-in failed");
-      setOtpLoading(false);
-    }
-  }
-
   return (
     <div className="w-full max-w-md">
       <Card className="glass-card">
         <CardHeader>
           <CardTitle>Log in</CardTitle>
-          <CardDescription>Enter your credentials or use Google.</CardDescription>
+          <CardDescription>Enter your email and password or use Google.</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
           <form onSubmit={handleSubmit} className="space-y-4">
@@ -226,36 +173,6 @@ function LoginForm() {
             <span className="relative flex justify-center text-xs text-muted-foreground">
               Or
             </span>
-          </div>
-          <div className="space-y-3 rounded-xl border border-white/10 p-4">
-            <div className="text-sm font-medium">Log in with phone</div>
-            <Input
-              id="phone"
-              type="tel"
-              placeholder="+91XXXXXXXXXX"
-              value={phoneNumber}
-              onChange={(e) => setPhoneNumber(e.target.value)}
-            />
-            {devOtp && (
-              <p className="text-xs text-amber-300">Dev OTP: {devOtp}</p>
-            )}
-            {otpSent && (
-              <Input
-                id="otp"
-                type="text"
-                placeholder="Enter OTP"
-                value={otp}
-                onChange={(e) => setOtp(e.target.value)}
-              />
-            )}
-            <div className="flex flex-col gap-2">
-              <Button type="button" variant="outline" onClick={requestOtp} disabled={otpLoading || !phoneNumber.trim()}>
-                {otpLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : "Send OTP"}
-              </Button>
-              <Button type="button" onClick={verifyOtp} disabled={otpLoading || !otpSent || otp.length < 4}>
-                {otpLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : "Verify & log in"}
-              </Button>
-            </div>
           </div>
           {providers?.google ? (
             <Button

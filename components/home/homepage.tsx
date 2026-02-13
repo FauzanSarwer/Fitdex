@@ -107,25 +107,6 @@ export function HomePageView(): JSX.Element {
     }
   }, [reduceMotion, sceneReady]);
 
-
-  // Standard Scroll Effects for other sections
-  useEffect(() => {
-    // ... existing scroll logic ... 
-    // I am not replacing the big scroll effect block, just inserting ABOVE slightly?
-    // Wait, replace_file_content replaces the BLOCK.
-    // I need to be careful not to delete the big scroll effect block if I target lines overlapping it.
-    // My previous edit replaced lines 83-102.
-    // Now I want to replace lines 83-102 again (or slightly more) to encompass new state.
-    // The previous edit ended at line 92 + whitespace.
-    // The "Standard Scroll Effects" starts at line 105.
-    // I will target the same block area.
-  }, []); // Wait, I cannot use "useEffect" as replacement content if I don't implement the body.
-
-  // Actually I'll use a precise target.
-
-
-
-
   // Standard Scroll Effects for other sections
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -217,20 +198,21 @@ export function HomePageView(): JSX.Element {
       }
 
       if (calculatorPanelRef.current && !reduceMotion) {
-        const sweep = (animationTime * 0.008 + scrollProgress.current * 90) % 220;
-        calculatorPanelRef.current.style.backgroundPosition = `${sweep.toFixed(2)}% 50%`;
+        const driftX = Math.sin(animationTime * 0.00048) * 3;
+        calculatorPanelRef.current.style.transform = `translate3d(${driftX.toFixed(2)}px, 0, 0)`;
       }
 
       if (calculatorImageRef.current && !reduceMotion) {
-        const rotate = scrollProgress.current * 24;
-        calculatorImageRef.current.style.transform = `translate3d(0, 0, 0) rotate(${rotate.toFixed(2)}deg)`;
+        const floatY = Math.sin(animationTime * 0.0011) * 2.4;
+        calculatorImageRef.current.style.transform = `translate3d(0, ${floatY.toFixed(2)}px, 0)`;
       }
 
       calculatorTiltCurrent.current.x = lerp(calculatorTiltCurrent.current.x, calculatorTiltTarget.current.x, 0.14);
       calculatorTiltCurrent.current.y = lerp(calculatorTiltCurrent.current.y, calculatorTiltTarget.current.y, 0.14);
       if (calculatorCardRef.current) {
-        const scale = calculatorHovering.current ? 1.012 : 1;
-        calculatorCardRef.current.style.transform = `translate3d(0, 0, 0) rotateX(${calculatorTiltCurrent.current.y.toFixed(2)}deg) rotateY(${calculatorTiltCurrent.current.x.toFixed(2)}deg) scale(${scale.toFixed(3)})`;
+        const scale = calculatorHovering.current ? 1.008 : 1;
+        const floatY = reduceMotion ? 0 : Math.sin(animationTime * 0.00105) * 2.6;
+        calculatorCardRef.current.style.transform = `translate3d(0, ${floatY.toFixed(2)}px, 0) scale(${scale.toFixed(3)})`;
       }
 
       partnerMagnetCurrent.current.x = lerp(partnerMagnetCurrent.current.x, partnerMagnetTarget.current.x, 0.2);
@@ -402,15 +384,25 @@ export function HomePageView(): JSX.Element {
           style={{ pointerEvents: 'none' }} // Let clicks pass through to WebGL where appropriate, but buttons need pointer-events-auto
         >
           <div className="space-y-6" style={{ pointerEvents: 'auto' }}>
-            <h1 ref={heroHeadingRef} className="relative mx-auto flex w-full justify-center text-6xl font-semibold leading-[0.94] text-white sm:text-7xl">
+            <h1
+              ref={heroHeadingRef}
+              className="relative mx-auto flex w-full justify-center text-[clamp(3.1rem,10vw,6.8rem)] font-semibold leading-[0.9] text-white"
+            >
               <span className="sr-only">Fitdex</span>
-              {/* Visual 3D Text is in WebGLHero */}
               <span
+                ref={heroWordmarkShellRef}
                 aria-hidden="true"
-                className={`font-inter font-bold tracking-tight transition-opacity duration-500 ${sceneReady ? 'opacity-0' : 'opacity-100'}`}
-                style={{ fontFamily: 'var(--font-inter)' }}
+                className={`fitdex-hero-wordmark ${sceneReady ? "opacity-90" : "opacity-100"}`}
+                style={{ fontFamily: "var(--font-inter)" }}
               >
-                Fitdex
+                <span className="fitdex-hero-wordmark-text">
+                  {wordmarkLetters.map((letter, idx) => (
+                    <span key={`${letter}-${idx}`} className={wordmarkLetterClassName}>
+                      {letter}
+                    </span>
+                  ))}
+                </span>
+                <span className="fitdex-hero-wordmark-sweep" />
               </span>
             </h1>
             <p ref={heroSubRef} className={`mx-auto max-w-2xl text-base text-white/80 sm:text-xl transition-opacity duration-1000 ${introDone ? 'opacity-100' : 'opacity-0'}`}>
@@ -419,13 +411,13 @@ export function HomePageView(): JSX.Element {
             <Button
               asChild
               size="lg"
-              className={`min-w-36 rounded-xl border border-white/15 text-white motion-accent-button transition-opacity duration-1000 ${introDone ? 'opacity-100' : 'opacity-0'}`}
+              variant="ghost"
+              className={`fitdex-hero-explore-btn min-w-36 rounded-xl text-white transition-opacity duration-1000 ${introDone ? "opacity-100" : "opacity-0"}`}
             >
               <Link
                 ref={heroCtaRef}
                 href="/explore"
                 data-accent-color={accentRgb.indigo}
-                style={{ backgroundImage: accents.indigo.gradient }}
               >
                 Explore
               </Link>
