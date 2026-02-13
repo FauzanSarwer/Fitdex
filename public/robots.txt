@@ -1,6 +1,9 @@
 User-agent: *
 Allow: /
 Disallow: /dashboard/
+Disallow: /admin/
 Disallow: /api/
+Disallow: /*?*sort=*
+Disallow: /*?*filter=*
 
-Sitemap: /sitemap.xml
+Sitemap: https://fitd3x.vercel.app/sitemap.xml

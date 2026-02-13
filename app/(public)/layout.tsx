@@ -1,5 +1,4 @@
 import { Header } from "@/components/layout/header";
-import { Footer } from "@/components/layout/footer";
 import { LocationGate } from "@/components/layout/location-gate";
 import { Suspense } from "react";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -30,7 +29,6 @@ export default function PublicLayout({
             {children}
           </Suspense>
         </main>
-        <Footer />
       </div>
     </LocationGate>
   );

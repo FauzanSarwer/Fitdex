@@ -3,48 +3,18 @@ import "./globals.css";
 import { Providers } from "@/components/providers";
 import { SpeedInsights } from "@vercel/speed-insights/next";
 import React, { Suspense } from "react";
-import { SITE_NAME, SITE_DESCRIPTION, getBaseUrl } from "@/lib/site";
+import localFont from "next/font/local";
+import { organizationSchema } from "@/lib/seo/schema";
+import { rootMetadata } from "@/lib/seo/config";
+import { Footer } from "@/components/layout/footer";
 
-const BASE_URL = getBaseUrl();
+const inter = localFont({
+  src: "../public/fonts/inter-variable.woff2",
+  variable: "--font-inter",
+  display: "swap",
+});
 
-export const metadata: Metadata = {
-  metadataBase: new URL(BASE_URL),
-  title: `${SITE_NAME} – Find Gyms Near You in India`,
-  description: SITE_DESCRIPTION,
-  openGraph: {
-    title: `${SITE_NAME} – Find Gyms Near You in India`,
-    description: SITE_DESCRIPTION,
-    url: BASE_URL,
-    siteName: SITE_NAME,
-    images: [
-      {
-        url: `${BASE_URL}/fitdex-og.png`,
-        width: 1200,
-        height: 630,
-        alt: SITE_NAME,
-      },
-    ],
-    locale: "en_IN",
-    type: "website",
-  },
-  twitter: {
-    card: "summary_large_image",
-    title: `${SITE_NAME} – Find Gyms Near You in India`,
-    description: SITE_DESCRIPTION,
-    images: [`${BASE_URL}/fitdex-og.png`],
-  },
-  alternates: {
-    canonical: `${BASE_URL}/`,
-  },
-};
-
-const organizationJsonLd = {
-  "@context": "https://schema.org",
-  "@type": "Organization",
-  name: SITE_NAME,
-  url: BASE_URL,
-  logo: `${BASE_URL}/fitdex-logo.png`,
-};
+export const metadata: Metadata = rootMetadata;
 
 const themeInitScript = `
 (() => {
@@ -70,15 +40,16 @@ export default function RootLayout({
       <head>
         <script dangerouslySetInnerHTML={{ __html: themeInitScript }} />
       </head>
-      <body className="font-sans min-h-screen bg-background antialiased">
+      <body className={`${inter.className} min-h-screen bg-background antialiased`}>
         <script
           type="application/ld+json"
-          dangerouslySetInnerHTML={{ __html: JSON.stringify(organizationJsonLd) }}
+          dangerouslySetInnerHTML={{ __html: JSON.stringify(organizationSchema()) }}
         />
         <Providers>
           <Suspense fallback={<div className="p-8 text-center text-muted-foreground">Loading...</div>}>
             {children}
           </Suspense>
+          <Footer />
         </Providers>
         <SpeedInsights />
       </body>

@@ -4,20 +4,68 @@ import { buildGymSlug } from "@/lib/utils";
 import { getBaseUrl } from "@/lib/site";
 import { normalizeCityName } from "@/lib/seo/cities";
 
-export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
+const CHUNK_SIZE = 5000;
+export const dynamic = "force-static";
+
+async function safeDbCall<T>(fn: () => Promise<T>, fallback: T): Promise<T> {
+  try {
+    return await fn();
+  } catch {
+    return fallback;
+  }
+}
+
+export async function generateSitemaps() {
+  const totalGyms = await safeDbCall(
+    () =>
+      prisma.gym.count({
+        where: {
+          suspendedAt: null,
+          verificationStatus: { not: "REJECTED" },
+        },
+      }),
+    0
+  );
+
+  const chunks = Math.max(1, Math.ceil(totalGyms / CHUNK_SIZE));
+  return Array.from({ length: chunks }, (_, id) => ({ id }));
+}
+
+export default async function sitemap({ id }: { id: number }): Promise<MetadataRoute.Sitemap> {
   const baseUrl = getBaseUrl();
 
-  const homepage: MetadataRoute.Sitemap = [
-    {
-      url: `${baseUrl}/`,
-      lastModified: new Date(),
-      changeFrequency: "daily",
-      priority: 1,
-    },
-  ];
+  const staticRoutes: MetadataRoute.Sitemap =
+    id === 0
+      ? [
+          {
+            url: `${baseUrl}/`,
+            lastModified: new Date(),
+            changeFrequency: "daily",
+            priority: 1,
+          },
+          {
+            url: `${baseUrl}/gyms-in-delhi`,
+            lastModified: new Date(),
+            changeFrequency: "daily",
+            priority: 0.9,
+          },
+          {
+            url: `${baseUrl}/gyms-in-noida`,
+            lastModified: new Date(),
+            changeFrequency: "daily",
+            priority: 0.9,
+          },
+          {
+            url: `${baseUrl}/gyms-in-gurgaon`,
+            lastModified: new Date(),
+            changeFrequency: "daily",
+            priority: 0.9,
+          },
+        ]
+      : [];
 
-  try {
-    const [gyms, cityRows] = await Promise.all([
+  const gyms = await safeDbCall(
+    () =>
       prisma.gym.findMany({
         where: {
           suspendedAt: null,
@@ -28,17 +76,29 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
           name: true,
           updatedAt: true,
         },
+        orderBy: { id: "asc" },
+        skip: id * CHUNK_SIZE,
+        take: CHUNK_SIZE,
       }),
-      prisma.gym.findMany({
-        where: {
-          suspendedAt: null,
-          verificationStatus: { not: "REJECTED" },
-          city: { not: null },
-        },
-        select: { city: true, updatedAt: true },
-        distinct: ["city"],
-      }),
-    ]);
+    []
+  );
+
+  const cityRows =
+    id === 0
+      ? await safeDbCall(
+          () =>
+            prisma.gym.findMany({
+              where: {
+                suspendedAt: null,
+                verificationStatus: { not: "REJECTED" },
+                city: { not: null },
+              },
+              select: { city: true, updatedAt: true },
+              distinct: ["city"],
+            }),
+          []
+        )
+      : [];
 
   const cityRoutes: MetadataRoute.Sitemap = cityRows
     .map((row) => {
@@ -60,8 +120,5 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     priority: 0.7,
   }));
 
-    return [...homepage, ...cityRoutes, ...gymRoutes];
-  } catch {
-    return homepage;
-  }
+  return [...staticRoutes, ...cityRoutes, ...gymRoutes];
 }

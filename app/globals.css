@@ -114,3 +114,17 @@
 .scrollbar-thin::-webkit-scrollbar-thumb {
   @apply rounded-full bg-muted-foreground/40;
 }
+
+@keyframes homeArrow {
+  0%,
+  100% {
+    transform: translateY(-2px);
+  }
+  50% {
+    transform: translateY(6px);
+  }
+}
+
+.animate-home-arrow {
+  animation: homeArrow 1.8s ease-in-out infinite;
+}

@@ -5,8 +5,10 @@ import { notFound, redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { buildGymSlug, formatPrice, parseGymIdFromSlug } from "@/lib/utils";
 import { cityLabel, normalizeCityName } from "@/lib/seo/cities";
-import { getBaseUrl, SITE_NAME } from "@/lib/site";
+import { SITE_NAME } from "@/lib/site";
 import { GymCard, type GymCardData } from "@/components/gyms/gym-card";
+import { buildPageMetadata } from "@/lib/seo/config";
+import { breadcrumbSchema, faqSchema } from "@/lib/seo/schema";
 
 export const revalidate = 300;
 
@@ -40,20 +42,19 @@ export async function generateMetadata({ params }: { params: Params }): Promise<
   if (!gym) {
     return {
       title: `Gym Not Found | ${SITE_NAME}`,
+      robots: { index: false, follow: false },
     };
   }
 
   const city = gym.city?.trim() ? cityLabel(normalizeCityName(gym.city)) : "India";
-  const baseUrl = getBaseUrl();
   const canonicalPath = `/gym/${buildGymSlug(gym.name, gym.id)}`;
 
-  return {
-    title: `${gym.name} – Gym in ${city} | ${SITE_NAME}`,
-    description: `Join ${gym.name} in ${city}. View pricing, amenities, and membership plans.`,
-    alternates: {
-      canonical: `${baseUrl}${canonicalPath}`,
-    },
-  };
+  return buildPageMetadata({
+    title: `${gym.name} Gym in ${city} – Membership, Amenities & Pricing`,
+    description: `Explore ${gym.name} in ${city}. Check membership pricing, amenities, and gym details before joining.`,
+    path: canonicalPath,
+    city,
+  });
 }
 
 export default async function GymDetailPage({ params }: { params: Params }) {
@@ -105,23 +106,36 @@ export default async function GymDetailPage({ params }: { params: Params }) {
     imageUrl: item.imageUrls?.[0] || item.coverImageUrl,
   }));
 
-  const baseUrl = getBaseUrl();
-  const gymUrl = `${baseUrl}/gym/${expectedSlug}`;
-
   const localBusinessJsonLd = {
     "@context": "https://schema.org",
     "@type": "HealthClub",
     name: gym.name,
-    image: heroImage.startsWith("http") ? heroImage : `${baseUrl}${heroImage}`,
+    image: heroImage,
     address: {
       "@type": "PostalAddress",
       addressLocality: city,
       streetAddress: gym.address,
       addressCountry: "IN",
     },
-    url: gymUrl,
     priceRange: `From ${formatPrice(gym.monthlyPrice)}`,
   };
+
+  const breadcrumbs = breadcrumbSchema([
+    { name: "Home", path: "/" },
+    { name: `${city} Gyms`, path: citySlug ? `/gyms-in-${citySlug}` : "/" },
+    { name: gym.name, path: `/gym/${expectedSlug}` },
+  ]);
+
+  const gymFaqSchema = faqSchema([
+    {
+      question: `What is the monthly membership price at ${gym.name}?`,
+      answer: `Memberships at ${gym.name} start from ${formatPrice(gym.monthlyPrice)} per month.`,
+    },
+    {
+      question: `What amenities are available at ${gym.name}?`,
+      answer: amenities.length > 0 ? amenities.join(", ") : "Amenities are being updated for this gym.",
+    },
+  ]);
 
   return (
     <main className="container mx-auto px-4 py-8">
@@ -129,6 +143,8 @@ export default async function GymDetailPage({ params }: { params: Params }) {
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: JSON.stringify(localBusinessJsonLd) }}
       />
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(breadcrumbs) }} />
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(gymFaqSchema) }} />
 
       <article className="space-y-6">
         <header className="space-y-2">
@@ -144,7 +160,7 @@ export default async function GymDetailPage({ params }: { params: Params }) {
         <div className="relative aspect-[16/7] w-full overflow-hidden rounded-2xl bg-white/5">
           <Image
             src={heroImage}
-            alt={gym.name}
+            alt={`${gym.name} gym in ${city}`}
             fill
             priority
             sizes="(max-width: 1024px) 100vw, 1200px"
@@ -154,11 +170,11 @@ export default async function GymDetailPage({ params }: { params: Params }) {
 
         <section className="grid gap-4 md:grid-cols-2">
           <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
-            <p className="text-xs uppercase tracking-wide text-muted-foreground">Monthly</p>
+            <h2 className="text-xs uppercase tracking-wide text-muted-foreground">Monthly</h2>
             <p className="mt-1 text-2xl font-semibold">{formatPrice(gym.monthlyPrice)}</p>
           </div>
           <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
-            <p className="text-xs uppercase tracking-wide text-muted-foreground">Yearly</p>
+            <h2 className="text-xs uppercase tracking-wide text-muted-foreground">Yearly</h2>
             <p className="mt-1 text-2xl font-semibold">{formatPrice(gym.yearlyPrice)}</p>
           </div>
         </section>
@@ -169,7 +185,7 @@ export default async function GymDetailPage({ params }: { params: Params }) {
             <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
               {amenities.map((amenity) => (
                 <div key={amenity} className="rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm">
-                  {amenity}
+                  <h3>{amenity}</h3>
                 </div>
               ))}
             </div>
@@ -184,7 +200,7 @@ export default async function GymDetailPage({ params }: { params: Params }) {
               href={`/dashboard/user/join/${gym.id}`}
               className="inline-flex rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground"
             >
-              Get Membership
+              Get Membership at {gym.name}
             </Link>
           ) : (
             <span className="inline-flex rounded-lg border border-white/10 px-4 py-2 text-sm text-muted-foreground">

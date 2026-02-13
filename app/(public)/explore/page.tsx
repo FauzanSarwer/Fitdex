@@ -24,7 +24,6 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { getGymOpenStatus } from "@/lib/gym-hours";
 import { fetchJson } from "@/lib/client-fetch";
 import { getAmenityEmoji } from "@/lib/amenities";
-import { GymCard, GymCardSkeleton, type GymCardData } from "@/components/gyms/gym-card";
 
 type ViewMode = "map" | "list";
 
@@ -403,7 +402,7 @@ export default function ExplorePage() {
   }
 
   return (
-    <div className="container mx-auto px-4 py-8">
+    <div className="mx-auto w-full max-w-[1440px] px-4 py-10 sm:px-6 lg:px-10">
       {locationGate && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
           <div className="glass-card border border-white/10 p-6 rounded-2xl max-w-md w-full text-center space-y-4">
@@ -434,26 +433,52 @@ export default function ExplorePage() {
         </div>
       )}
       <div className={locationGate ? "pointer-events-none blur-sm" : ""}>
-        <section className="mb-2 md:mb-4 rounded-3xl border border-white/10 bg-white/5 p-3 md:p-5 shadow-glow-sm flex flex-col gap-3 md:gap-4">
-          <div className="flex flex-col gap-2 md:gap-4">
-            <h1 className="text-2xl md:text-4xl font-bold text-foreground mb-1">Find gyms in your city</h1>
-            <div className="flex flex-col md:flex-row md:items-center gap-2 md:gap-4">
-              <div className="relative w-full md:max-w-lg">
+        <section className="mb-10 rounded-3xl border border-white/10 bg-white/[0.04] p-5 shadow-glow-sm md:p-8">
+          <div className="flex flex-col gap-6">
+            <div className="space-y-3">
+              <h1 className="text-3xl font-semibold tracking-tight sm:text-4xl lg:text-5xl">Explore gyms in your city</h1>
+              <p className="max-w-3xl text-sm text-muted-foreground sm:text-base">
+                Search by gym name, compare pricing, and shortlist trusted options with cleaner discovery controls.
+              </p>
+            </div>
+            <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+              <div className="relative w-full lg:max-w-2xl">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                 <Input
                   ref={inputRef}
                   placeholder="Search gyms in your city..."
                   value={query}
                   onChange={(e) => setQuery(e.target.value)}
-                  className="pl-9"
+                  className="h-11 pl-9"
                 />
               </div>
-              <Button onClick={requestLocation} className="transition-colors whitespace-nowrap" variant="secondary">
-                Find gyms near me
-              </Button>
+              <div className="flex items-center gap-2">
+                <Button onClick={requestLocation} className="transition-colors whitespace-nowrap" variant="secondary">
+                  Find gyms near me
+                </Button>
+                <div className="flex rounded-xl border border-white/10 overflow-hidden">
+                  <Button
+                    variant={view === "list" ? "secondary" : "ghost"}
+                    size="sm"
+                    className="rounded-none"
+                    onClick={() => setView("list")}
+                  >
+                    <List className="h-4 w-4 mr-1" />
+                    List
+                  </Button>
+                  <Button
+                    variant={view === "map" ? "secondary" : "ghost"}
+                    size="sm"
+                    className="rounded-none"
+                    onClick={() => setView("map")}
+                  >
+                    <LayoutGrid className="h-4 w-4 mr-1" />
+                    Map
+                  </Button>
+                </div>
+              </div>
             </div>
-            <p className="text-xs text-muted-foreground mt-1">Discover verified gyms across India.</p>
-            <div className="flex flex-wrap gap-2 pt-1">
+            <div className="flex flex-wrap gap-2">
               {SERVICEABLE_CITIES.map((city) => (
                 <Link
                   key={city}
@@ -466,268 +491,139 @@ export default function ExplorePage() {
             </div>
           </div>
         </section>
-        {/* Featured gyms section */}
-        <section className="mb-4">
-          <h2 className="text-lg font-semibold mb-2">Featured gyms</h2>
-          {loading ? (
-            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-              {[1, 2, 3, 4, 5, 6].map((i) => <GymCardSkeleton key={i} />)}
-            </div>
-          ) : (
-            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-              {(gyms.filter(isGymFeatured).length > 0 ? gyms.filter(isGymFeatured) : gyms)
-                .slice(0, 9)
-                .map((gym) => {
-                  const cardData: GymCardData = {
-                    id: gym.id,
-                    slug: buildGymSlug(gym.name, gym.id),
-                    name: gym.name,
-                    city: null,
-                    address: gym.address,
-                    monthlyPrice: gym.monthlyPrice,
-                    rating: null,
-                    amenities: gym.amenities,
-                    imageUrl: gym.coverImageUrl || gym.imageUrls?.[0] || null,
-                  };
-                  return <GymCard key={gym.id} gym={cardData} />;
-                })}
-            </div>
-          )}
-        </section>
-        <section className="mb-6 rounded-2xl border border-white/10 bg-white/5 p-4 md:p-5">
-          <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-            <div>
-              <p className="text-sm font-semibold">Duo discounts, pre-login</p>
-              <p className="text-xs text-muted-foreground">
-                Train with a partner and save more. Look for duo tags on gyms that support partner pricing.
+        <section className="mb-6 rounded-2xl border border-white/10 bg-white/[0.03] p-4 md:p-5">
+          <div className="flex flex-col gap-4">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <p className="text-sm text-muted-foreground">
+                {loading ? "Loading gyms..." : `${filteredGyms.length} gyms available`}
               </p>
-            </div>
-            <span className="text-xs rounded-full border border-indigo-400/30 bg-indigo-400/10 px-3 py-1 text-indigo-200">
-              Duo savings available
-            </span>
-          </div>
-        </section>
-        <section className="mb-8 grid gap-3 md:grid-cols-4">
-          {[
-            { title: "Verified gyms", body: "Profiles reviewed for trust." },
-            { title: "Transparent pricing", body: "See plans before you visit." },
-            { title: "Duo discounts", body: "Save more with a partner." },
-            { title: "Simple memberships", body: "Pick a plan, start fast." },
-          ].map((item) => (
-            <Card key={item.title} className="glass-card border border-white/10">
-              <CardHeader className="pb-2">
-                <CardTitle className="text-sm font-semibold">{item.title}</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <p className="text-xs text-muted-foreground">{item.body}</p>
-              </CardContent>
-            </Card>
-          ))}
-        </section>
-        <section className="mb-6">
-          <div className="mb-3 flex items-center justify-between">
-            <h2 className="text-lg font-semibold">How it works</h2>
-            <span className="text-xs text-muted-foreground">3 quick steps</span>
-          </div>
-          <div className="grid gap-4 md:grid-cols-3">
-            {[
-              { title: "Explore nearby gyms", body: "Use location or search any area." },
-              { title: "Compare pricing", body: "See plans, amenities, and open hours." },
-              { title: "Join solo or duo", body: "Unlock partner discounts when offered." },
-            ].map((item, index) => (
-              <Card key={item.title} className="glass-card border border-white/10">
-                <CardHeader className="pb-2">
-                  <CardTitle className="text-sm font-semibold">{index + 1}. {item.title}</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <p className="text-xs text-muted-foreground">{item.body}</p>
-                </CardContent>
-              </Card>
-            ))}
-          </div>
-        </section>
-        <section className="mb-8 flex flex-wrap gap-2">
-          {[
-            "Verified gyms",
-            "Secure payments",
-            "Cancel anytime",
-          ].map((item) => (
-            <span
-              key={item}
-              className="rounded-full border border-white/10 bg-white/5 px-3 py-1 text-xs text-muted-foreground"
-            >
-              {item}
-            </span>
-          ))}
-        </section>
-        <div className="flex flex-col gap-4 mb-6">
-        <div className="flex items-center justify-between">
-          <h2 className="text-xl font-semibold flex items-center gap-2 text-foreground">
-            <MapPin className="h-6 w-6 text-primary" />
-            Find gyms near you
-          </h2>
-          <div className="flex rounded-xl border border-white/10 overflow-hidden">
-            <Button
-              variant={view === "list" ? "secondary" : "ghost"}
-              size="sm"
-              className="rounded-none"
-              onClick={() => setView("list")}
-            >
-              <List className="h-4 w-4 mr-1" />
-              List
-            </Button>
-            <Button
-              variant={view === "map" ? "secondary" : "ghost"}
-              size="sm"
-              className="rounded-none"
-              onClick={() => setView("map")}
-            >
-              <LayoutGrid className="h-4 w-4 mr-1" />
-              Map
-            </Button>
-          </div>
-        </div>
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <p className="text-sm text-muted-foreground">
-            {loading ? "Loading gyms..." : `${filteredGyms.length} gyms available`}
-          </p>
-          <p className="text-xs text-muted-foreground">
-            Sorted by <span className="text-foreground">{SORT_LABELS[sortBy]}</span>
-          </p>
-          {activeFilters.length > 0 && (
-            <div className="flex flex-wrap items-center gap-2">
-              {activeFilters.map((filter) => (
-                <button
-                  key={filter.label}
-                  type="button"
-                  onClick={filter.onClear}
-                  className="text-xs rounded-full border border-white/10 bg-white/5 px-3 py-1 text-muted-foreground hover:text-foreground"
-                >
-                  {filter.label} ×
-                </button>
-              ))}
-              <button
-                type="button"
-                onClick={() => {
-                  setQuery("");
-                  setMaxPrice("");
-                  setMaxDistance("");
-                  setSortBy("distance");
-                  setOnlyFeatured(false);
-                  setOnlyVerified(false);
-                }}
-                className="text-xs rounded-full border border-primary/40 bg-primary/10 px-3 py-1 text-primary hover:bg-primary/20"
-              >
-                Clear all
-              </button>
-            </div>
-          )}
-        </div>
-        <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-          <div className="relative w-full md:max-w-lg">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-            <Input
-              placeholder="Search gyms by name"
-              value={query}
-              onChange={(e) => setQuery(e.target.value)}
-              className="pl-9"
-            />
-          </div>
-          <div className="flex flex-wrap items-center gap-2">
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button variant="outline" className="gap-2">
-                  <ArrowDownUp className="h-4 w-4" />
-                  Sort: {SORT_LABELS[sortBy]}
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="w-56">
-                <DropdownMenuLabel>Sort results</DropdownMenuLabel>
-                <DropdownMenuSeparator />
-                <DropdownMenuRadioGroup value={sortBy} onValueChange={(v) => setSortBy(v as SortOption)}>
-                  <DropdownMenuRadioItem value="distance">Nearby to farthest</DropdownMenuRadioItem>
-                  <DropdownMenuRadioItem value="price_asc">Price: low to high</DropdownMenuRadioItem>
-                  <DropdownMenuRadioItem value="price_desc">Price: high to low</DropdownMenuRadioItem>
-                  <DropdownMenuRadioItem value="newest">Newly added</DropdownMenuRadioItem>
-                </DropdownMenuRadioGroup>
-              </DropdownMenuContent>
-            </DropdownMenu>
-
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button variant={filterCount > 0 ? "secondary" : "outline"} className="gap-2">
-                  <SlidersHorizontal className="h-4 w-4" />
-                  Filters
-                  {filterCount > 0 && (
-                    <span className="ml-1 rounded-full bg-primary/20 px-2 py-0.5 text-[10px] text-primary">
-                      {filterCount}
-                    </span>
-                  )}
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="w-72 p-3">
-                <div className="space-y-4">
-                  <div className="space-y-2">
-                    <p className="text-sm font-semibold">Price & distance</p>
-                    <Input
-                      type="number"
-                      placeholder="Max price / month"
-                      value={maxPrice}
-                      onChange={(e) => setMaxPrice(e.target.value)}
-                    />
-                    <Input
-                      type="number"
-                      placeholder="Max distance (km)"
-                      value={maxDistance}
-                      onChange={(e) => setMaxDistance(e.target.value)}
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <p className="text-sm font-semibold">Badges</p>
+              <p className="text-xs text-muted-foreground">
+                Sorted by <span className="text-foreground">{SORT_LABELS[sortBy]}</span>
+              </p>
+              {activeFilters.length > 0 && (
+                <div className="flex flex-wrap items-center gap-2">
+                  {activeFilters.map((filter) => (
                     <button
+                      key={filter.label}
                       type="button"
-                      onClick={() => setOnlyFeatured((prev) => !prev)}
-                      className={`w-full rounded-lg border px-3 py-2 text-left text-sm ${
-                        onlyFeatured ? "border-primary/50 bg-primary/10 text-primary" : "border-white/10"
-                      }`}
+                      onClick={filter.onClear}
+                      className="text-xs rounded-full border border-white/10 bg-white/5 px-3 py-1 text-muted-foreground hover:text-foreground"
                     >
-                      Featured gyms
+                      {filter.label} ×
                     </button>
-                    <button
-                      type="button"
-                      onClick={() => setOnlyVerified((prev) => !prev)}
-                      className={`w-full rounded-lg border px-3 py-2 text-left text-sm ${
-                        onlyVerified ? "border-emerald-400/50 bg-emerald-400/10 text-emerald-300" : "border-white/10"
-                      }`}
-                    >
-                      Verified gyms
-                    </button>
-                  </div>
-                  <div className="flex items-center justify-between gap-2">
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => {
-                        setMaxPrice("");
-                        setMaxDistance("");
-                        // name-only search
-                        setOnlyFeatured(false);
-                        setOnlyVerified(false);
-                      }}
-                    >
-                      Clear filters
-                    </Button>
-                    <span className="text-xs text-muted-foreground">Updates instantly</span>
-                  </div>
+                  ))}
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setQuery("");
+                      setMaxPrice("");
+                      setMaxDistance("");
+                      setSortBy("distance");
+                      setOnlyFeatured(false);
+                      setOnlyVerified(false);
+                    }}
+                    className="text-xs rounded-full border border-primary/40 bg-primary/10 px-3 py-1 text-primary hover:bg-primary/20"
+                  >
+                    Clear all
+                  </button>
                 </div>
-              </DropdownMenuContent>
-            </DropdownMenu>
-          </div>
-        </div>
-      </div>
+              )}
+            </div>
+            <div className="flex flex-wrap items-center justify-end gap-2">
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="outline" className="gap-2">
+                    <ArrowDownUp className="h-4 w-4" />
+                    Sort: {SORT_LABELS[sortBy]}
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="w-56">
+                  <DropdownMenuLabel>Sort results</DropdownMenuLabel>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuRadioGroup value={sortBy} onValueChange={(v) => setSortBy(v as SortOption)}>
+                    <DropdownMenuRadioItem value="distance">Nearby to farthest</DropdownMenuRadioItem>
+                    <DropdownMenuRadioItem value="price_asc">Price: low to high</DropdownMenuRadioItem>
+                    <DropdownMenuRadioItem value="price_desc">Price: high to low</DropdownMenuRadioItem>
+                    <DropdownMenuRadioItem value="newest">Newly added</DropdownMenuRadioItem>
+                  </DropdownMenuRadioGroup>
+                </DropdownMenuContent>
+              </DropdownMenu>
 
-      {view === "map" && (
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant={filterCount > 0 ? "secondary" : "outline"} className="gap-2">
+                    <SlidersHorizontal className="h-4 w-4" />
+                    Filters
+                    {filterCount > 0 && (
+                      <span className="ml-1 rounded-full bg-primary/20 px-2 py-0.5 text-[10px] text-primary">
+                        {filterCount}
+                      </span>
+                    )}
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="w-72 p-3">
+                  <div className="space-y-4">
+                    <div className="space-y-2">
+                      <p className="text-sm font-semibold">Price & distance</p>
+                      <Input
+                        type="number"
+                        placeholder="Max price / month"
+                        value={maxPrice}
+                        onChange={(e) => setMaxPrice(e.target.value)}
+                      />
+                      <Input
+                        type="number"
+                        placeholder="Max distance (km)"
+                        value={maxDistance}
+                        onChange={(e) => setMaxDistance(e.target.value)}
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <p className="text-sm font-semibold">Badges</p>
+                      <button
+                        type="button"
+                        onClick={() => setOnlyFeatured((prev) => !prev)}
+                        className={`w-full rounded-lg border px-3 py-2 text-left text-sm ${
+                          onlyFeatured ? "border-primary/50 bg-primary/10 text-primary" : "border-white/10"
+                        }`}
+                      >
+                        Featured gyms
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setOnlyVerified((prev) => !prev)}
+                        className={`w-full rounded-lg border px-3 py-2 text-left text-sm ${
+                          onlyVerified ? "border-emerald-400/50 bg-emerald-400/10 text-emerald-300" : "border-white/10"
+                        }`}
+                      >
+                        Verified gyms
+                      </button>
+                    </div>
+                    <div className="flex items-center justify-between gap-2">
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => {
+                          setMaxPrice("");
+                          setMaxDistance("");
+                          // name-only search
+                          setOnlyFeatured(false);
+                          setOnlyVerified(false);
+                        }}
+                      >
+                        Clear filters
+                      </Button>
+                      <span className="text-xs text-muted-foreground">Updates instantly</span>
+                    </div>
+                  </div>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            </div>
+          </div>
+        </section>
+
+        {view === "map" && (
         <div className="mb-6 h-[360px]">
           <MapView
             latitude={mapCenter.latitude}
@@ -743,15 +639,15 @@ export default function ExplorePage() {
             showUserMarker={mapCenter.showUserMarker}
           />
         </div>
-      )}
+        )}
 
-      {loading ? (
+        {loading ? (
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
           {[1, 2, 3].map((i) => (
             <Skeleton key={i} className="h-40 rounded-2xl" />
           ))}
         </div>
-      ) : filteredGyms.length === 0 ? (
+        ) : filteredGyms.length === 0 ? (
         <Card className="glass-card p-12 text-center space-y-3">
           <p className="text-muted-foreground">
             {loadFailed
@@ -779,7 +675,7 @@ export default function ExplorePage() {
             </Button>
           </div>
         </Card>
-      ) : (
+        ) : (
         <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
           {filteredGyms.map((gym) => {
             const isFeatured = isGymFeatured(gym);
@@ -930,7 +826,7 @@ export default function ExplorePage() {
             );
           })}
         </div>
-      )}
+        )}
       </div>
     </div>
   );

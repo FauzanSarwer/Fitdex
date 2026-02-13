@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useSession, signOut } from "next-auth/react";
 import { isOwner } from "@/lib/permissions";
 import { motion } from "framer-motion";
@@ -12,22 +12,127 @@ import { ThemeToggle } from "@/components/layout/theme-toggle";
 import {
   DropdownMenu,
   DropdownMenuContent,
+  DropdownMenuLabel,
   DropdownMenuItem,
+  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+
+const CITY_OPTIONS = [
+  "Delhi",
+  "Gurugram",
+  "Noida",
+  "Mumbai",
+  "Pune",
+  "Bangalore",
+  "Hyderabad",
+  "Jaipur",
+  "Kolkata",
+  "Lucknow",
+];
+
+type LocationPayload = {
+  latitude?: number;
+  longitude?: number;
+  city?: string;
+};
 
 export function Header() {
   const { data: session, status } = useSession();
   const role = (session?.user as { role?: string })?.role;
   const owner = status === "authenticated" && isOwner(session);
-  const showOwnerCta = status !== "loading" && !session;
-  const showOwnerExplore = status === "authenticated" && owner;
-  const showPricing = status === "authenticated" && owner;
   const emailVerified = !!(session?.user as { emailVerified?: boolean })?.emailVerified;
   const [sendingVerification, setSendingVerification] = useState(false);
   const [verificationSent, setVerificationSent] = useState(false);
+  const [selectedCity, setSelectedCity] = useState("Select city");
+  const [locatingCity, setLocatingCity] = useState(false);
 
   const displayName = session?.user?.name ?? "Account";
+
+  const persistCity = (city: string, latitude?: number, longitude?: number) => {
+    setSelectedCity(city);
+    try {
+      localStorage.setItem("fitdex_selected_city", city);
+      const cached = localStorage.getItem("fitdex_location");
+      const parsed = cached ? JSON.parse(cached) : {};
+      localStorage.setItem(
+        "fitdex_location",
+        JSON.stringify({
+          ...parsed,
+          city,
+          latitude: latitude ?? parsed.latitude,
+          longitude: longitude ?? parsed.longitude,
+          serviceable: true,
+        })
+      );
+    } catch {}
+  };
+
+  const saveCity = async ({ city, latitude, longitude }: LocationPayload) => {
+    try {
+      await fetch("/api/location", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ city, latitude, longitude }),
+      });
+    } catch {}
+  };
+
+  const detectCurrentCity = () => {
+    if (typeof window === "undefined" || !navigator.geolocation) return;
+    setLocatingCity(true);
+    navigator.geolocation.getCurrentPosition(
+      async ({ coords }) => {
+        const latitude = coords.latitude;
+        const longitude = coords.longitude;
+        try {
+          const response = await fetch("/api/location", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ latitude, longitude }),
+          });
+          const data = (await response.json().catch(() => null)) as { city?: string } | null;
+          const resolvedCity = typeof data?.city === "string" && data.city.trim() ? data.city.trim() : null;
+          if (resolvedCity) {
+            persistCity(resolvedCity, latitude, longitude);
+          }
+        } catch {
+          // no-op: selector keeps manual fallback available
+        } finally {
+          setLocatingCity(false);
+        }
+      },
+      () => {
+        setLocatingCity(false);
+      },
+      { enableHighAccuracy: true, timeout: 9000, maximumAge: 300000 }
+    );
+  };
+
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useEffect(() => {
+    try {
+      const chosenCity = localStorage.getItem("fitdex_selected_city");
+      if (chosenCity) {
+        setSelectedCity(chosenCity);
+        return;
+      }
+      const cached = localStorage.getItem("fitdex_location");
+      if (cached) {
+        const parsed = JSON.parse(cached) as { city?: string };
+        if (typeof parsed.city === "string" && parsed.city.trim()) {
+          setSelectedCity(parsed.city.trim());
+          return;
+        }
+      }
+    } catch {}
+    detectCurrentCity();
+  }, []);
+
+  const handleCitySelect = async (city: string) => {
+    persistCity(city);
+    await saveCity({ city });
+  };
 
   return (
     <motion.header
@@ -72,7 +177,6 @@ export function Header() {
               priority
             />
           </div>
-          <span className="text-xl font-bold tracking-tight">Fitdex</span>
         </Link>
         <nav className="hidden md:flex items-center gap-4">
           <Link
@@ -82,20 +186,6 @@ export function Header() {
             <MapPin className="h-4 w-4" />
             Explore
           </Link>
-          {showPricing && (
-            <Link
-              href="/pricing"
-              className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors"
-            >
-              Pricing
-            </Link>
-          )}
-          <Link
-            href="/owners"
-            className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors"
-          >
-            Owners
-          </Link>
           {status === "authenticated" && (
             <Link
               href="/dashboard"
@@ -104,22 +194,40 @@ export function Header() {
               Dashboard
             </Link>
           )}
-          {showOwnerExplore && (
-            <Link
-              href="/dashboard/owner/explore"
-              className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors"
-            >
-              Owner Explore
-            </Link>
-          )}
-          {showOwnerCta && (
-            <Button asChild size="sm" className="bg-gradient-to-r from-primary to-accent shadow-glow">
-              <Link href="/owners">List your gym (owners)</Link>
-            </Button>
-          )}
         </nav>
         <div className="flex items-center gap-3">
           <ThemeToggle />
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="ghost" size="sm" className="max-w-[140px] md:max-w-[170px] gap-1.5 px-2">
+                <MapPin className="h-4 w-4 text-primary" />
+                <span className="truncate text-sm">{locatingCity ? "Locating..." : selectedCity}</span>
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-52 glass border-border/60">
+              <DropdownMenuLabel>Select your city</DropdownMenuLabel>
+              <DropdownMenuSeparator />
+              {CITY_OPTIONS.map((city) => (
+                <DropdownMenuItem
+                  key={city}
+                  onClick={() => {
+                    void handleCitySelect(city);
+                  }}
+                  className={city === selectedCity ? "text-primary" : ""}
+                >
+                  {city}
+                </DropdownMenuItem>
+              ))}
+              <DropdownMenuSeparator />
+              <DropdownMenuItem
+                onClick={detectCurrentCity}
+                disabled={locatingCity}
+                className="text-muted-foreground"
+              >
+                {locatingCity ? "Detecting..." : "Use current location"}
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
           {status === "loading" ? (
             <div className="h-9 w-12 rounded-lg bg-muted animate-pulse" />
           ) : session ? (
@@ -142,7 +250,11 @@ export function Header() {
                       {role === "ADMIN" ? "Admin dashboard" : "Dashboard"}
                     </Link>
                   </DropdownMenuItem>
-                  <DropdownMenuItem onClick={() => signOut()}>
+                  <DropdownMenuItem
+                    onClick={() => {
+                      void signOut();
+                    }}
+                  >
                     <LogOut className="mr-2 h-4 w-4" />
                     Sign out
                   </DropdownMenuItem>
@@ -150,14 +262,9 @@ export function Header() {
               </DropdownMenu>
             </>
           ) : (
-            <>
-              <Button variant="ghost" asChild>
-                <Link href="/auth/login">Log in</Link>
-              </Button>
-              <Button asChild>
-                <Link href="/auth/register">Get started</Link>
-              </Button>
-            </>
+            <Button variant="ghost" asChild>
+              <Link href="/auth/login">Login</Link>
+            </Button>
           )}
         </div>
       </div>

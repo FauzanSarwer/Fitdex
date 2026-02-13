@@ -1,10 +1,18 @@
+import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { LocationGate } from "@/components/layout/location-gate";
 import { DashboardNav } from "@/components/layout/dashboard-nav";
-import { Footer } from "@/components/layout/footer";
 import { prisma } from "@/lib/prisma";
+import { buildPageMetadata } from "@/lib/seo/config";
+
+export const metadata: Metadata = buildPageMetadata({
+  title: "Dashboard",
+  description: "Member and owner dashboard",
+  path: "/dashboard",
+  noIndex: true,
+});
 
 export default async function DashboardLayout({
   children,
@@ -39,12 +47,7 @@ export default async function DashboardLayout({
           <div className="absolute inset-0 bg-[radial-gradient(circle_at_top,rgba(59,130,246,0.12),transparent_55%)] dark:bg-[radial-gradient(circle_at_top,rgba(255,255,255,0.08),transparent_55%)]" />
         </div>
         <DashboardNav role={role ?? "USER"} isOwner={isOwner} showVerification={showVerification} />
-        <main className="pl-0 md:pl-56 pt-16 flex-1">
-          {children}
-        </main>
-        <div className="pl-0 md:pl-56">
-          <Footer />
-        </div>
+        <main className="pl-0 md:pl-56 pt-16 flex-1">{children}</main>
       </div>
     </LocationGate>
   );
