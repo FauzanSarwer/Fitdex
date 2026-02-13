@@ -54,13 +54,6 @@ export function HomePageView(): JSX.Element {
   const heroBgRef = useRef<HTMLDivElement | null>(null);
   const heroHeadingRef = useRef<HTMLHeadingElement | null>(null);
   const heroWordmarkShellRef = useRef<HTMLSpanElement | null>(null);
-  const heroWordmarkRef = useRef<HTMLSpanElement | null>(null);
-  const heroBlurNearRef = useRef<HTMLSpanElement | null>(null);
-  const heroBlurFarRef = useRef<HTMLSpanElement | null>(null);
-  const heroTrailRef = useRef<HTMLSpanElement | null>(null);
-  const heroWordmarkLetterRefs = useRef<Array<HTMLSpanElement | null>>([]);
-  const heroTrailLetterRefs = useRef<Array<HTMLSpanElement | null>>([]);
-  const heroDepthLetterRefs = useRef<Array<HTMLSpanElement | null>>([]);
   const heroSubRef = useRef<HTMLParagraphElement | null>(null);
   const heroCtaRef = useRef<HTMLAnchorElement | null>(null);
   const heroArrowRef = useRef<HTMLSpanElement | null>(null);
@@ -81,7 +74,6 @@ export function HomePageView(): JSX.Element {
   const partnerMagnetTarget = useRef({ x: 0, y: 0 });
   const partnerMagnetCurrent = useRef({ x: 0, y: 0 });
   const partnerHovering = useRef(false);
-  const wordmarkIntroHasRun = useRef(false);
   const wordmarkPressAnimationRef = useRef<Animation | null>(null);
 
   const { scrollProgress, scrollVelocity } = useScrollEngine();
@@ -95,11 +87,11 @@ export function HomePageView(): JSX.Element {
     const pressAnimation = wordmarkNode.animate(
       [
         { transform: "translate3d(0, 0, 0) scale(1)" },
-        { transform: "translate3d(0, 0, 0) scale(0.97)", offset: 0.45 },
+        { transform: "translate3d(0, 0, 0) scale(0.98)", offset: 0.45 },
         { transform: "translate3d(0, 0, 0) scale(1)" },
       ],
       {
-        duration: 200,
+        duration: 180,
         easing: "cubic-bezier(0.22,1,0.36,1)",
       }
     );
@@ -124,59 +116,9 @@ export function HomePageView(): JSX.Element {
     let reduceMotion = reduceMotionMedia.matches;
     let mobileFallback = coarsePointerMedia.matches || window.innerWidth < 900;
 
-    const heroWordmarkShell = heroWordmarkShellRef.current;
     const heroSub = heroSubRef.current;
     const heroCta = heroCtaRef.current;
     const flowSection = flowSectionRef.current;
-    const heroWordmark = heroWordmarkRef.current;
-    const heroWordmarkLetters = heroWordmarkLetterRefs.current.filter((node): node is HTMLSpanElement => !!node);
-    const heroBlurNear = heroBlurNearRef.current;
-    const heroBlurFar = heroBlurFarRef.current;
-    const heroTrail = heroTrailRef.current;
-    let wordmarkIntroTimer = 0;
-
-    if (heroWordmarkShell && !wordmarkIntroHasRun.current) {
-      wordmarkIntroHasRun.current = true;
-      if (reduceMotion) {
-        heroWordmarkShell.style.opacity = "1";
-        heroWordmarkShell.style.transform = "translate3d(0, 0, 0) scale(1)";
-        heroWordmarkShell.style.filter = "blur(0px)";
-        heroWordmarkLetters.forEach((letter) => {
-          letter.style.opacity = "1";
-          letter.style.transform = "translate3d(0, 0, 0) scale(1)";
-        });
-      } else {
-        heroWordmarkShell.style.opacity = "0";
-        heroWordmarkShell.style.transform = "translate3d(0, 0, 0) scale(0.94)";
-        heroWordmarkShell.style.filter = "blur(14px)";
-        heroWordmarkShell.style.willChange = "opacity, transform, filter";
-        heroWordmarkLetters.forEach((letter) => {
-          letter.style.opacity = "0";
-          letter.style.transform = "translate3d(0, 10px, 0) scale(0.98)";
-          letter.style.willChange = "opacity, transform";
-        });
-        window.requestAnimationFrame(() => {
-          heroWordmarkShell.style.transition =
-            "opacity 1200ms cubic-bezier(0.22,1,0.36,1), transform 1200ms cubic-bezier(0.22,1,0.36,1), filter 1200ms cubic-bezier(0.22,1,0.36,1)";
-          heroWordmarkShell.style.opacity = "1";
-          heroWordmarkShell.style.transform = "translate3d(0, 0, 0) scale(1)";
-          heroWordmarkShell.style.filter = "blur(0px)";
-
-          heroWordmarkLetters.forEach((letter, index) => {
-            const letterDelay = 70 + index * 40;
-            letter.style.transition = `opacity 720ms cubic-bezier(0.22,1,0.36,1) ${letterDelay}ms, transform 720ms cubic-bezier(0.22,1,0.36,1) ${letterDelay}ms`;
-            letter.style.opacity = "1";
-            letter.style.transform = "translate3d(0, 0, 0) scale(1)";
-          });
-        });
-        wordmarkIntroTimer = window.setTimeout(() => {
-          heroWordmarkShell.style.willChange = "auto";
-          heroWordmarkLetters.forEach((letter) => {
-            letter.style.willChange = "auto";
-          });
-        }, 1320);
-      }
-    }
 
     const introTargets = [heroSub, heroCta];
     introTargets.forEach((node, index) => {
@@ -211,123 +153,27 @@ export function HomePageView(): JSX.Element {
       flowSection.style.transform = "translate3d(0, 0, 0) scale(1)";
     }
 
-    if (heroBlurNear) {
-      heroBlurNear.style.opacity = "0";
-      heroBlurNear.style.transform = "translate3d(0, 0, 0)";
-    }
-    if (heroBlurFar) {
-      heroBlurFar.style.opacity = "0";
-      heroBlurFar.style.transform = "translate3d(0, 0, 0)";
-    }
-    if (heroTrail) {
-      heroTrail.style.opacity = "0";
-      heroTrail.style.transform = "translate3d(0, 0, 0)";
-    }
-
-    const clearWordmarkEffects = () => {
-      if (heroWordmarkShell) {
-        heroWordmarkShell.style.transform = "translate3d(0, 0, 0) scale(1)";
-      }
-      if (heroWordmark) {
-        heroWordmark.style.transform = "translate3d(0, 0, 0)";
-      }
-      if (heroBlurNear) {
-        heroBlurNear.style.opacity = "0";
-        heroBlurNear.style.transform = "translate3d(0, 0, 0)";
-        heroBlurNear.style.filter = "blur(0px)";
-      }
-      if (heroBlurFar) {
-        heroBlurFar.style.opacity = "0";
-        heroBlurFar.style.transform = "translate3d(0, 0, 0)";
-        heroBlurFar.style.filter = "blur(0px)";
-      }
-      if (heroTrail) {
-        heroTrail.style.opacity = "0";
-        heroTrail.style.transform = "translate3d(0, 0, 0)";
-        heroTrail.style.filter = "blur(0px)";
-      }
-      heroTrailLetterRefs.current.forEach((letter) => {
-        if (!letter) return;
-        letter.style.opacity = "0";
-        letter.style.transform = "translate3d(0, 0, 0)";
-      });
-      heroDepthLetterRefs.current.forEach((letter, index) => {
-        if (!letter) return;
-        const centered = index - (wordmarkLetters.length - 1) * 0.5;
-        letter.style.transform = `translate3d(0, ${(centered * 0.24).toFixed(2)}px, 0)`;
-      });
-    };
-
     const syncMotionPreferences = () => {
       reduceMotion = reduceMotionMedia.matches;
       mobileFallback = coarsePointerMedia.matches || window.innerWidth < 900;
-      if (reduceMotion || mobileFallback) {
-        clearWordmarkEffects();
-      }
     };
 
     reduceMotionMedia.addEventListener("change", syncMotionPreferences);
     coarsePointerMedia.addEventListener("change", syncMotionPreferences);
     window.addEventListener("resize", syncMotionPreferences, { passive: true });
 
-    const cursorVelocity = { x: 0, y: 0, speed: 0 };
-    const cursorDirection = { x: 1, y: 0 };
-    const cursorLast = { x: window.innerWidth * 0.5, y: window.innerHeight * 0.5, time: performance.now() };
-    const onPointerMove = (event: PointerEvent) => {
-      if (reduceMotion || mobileFallback || event.pointerType !== "mouse") return;
-      const now = performance.now();
-      const dt = Math.max(now - cursorLast.time, 12);
-      const dx = event.clientX - cursorLast.x;
-      const dy = event.clientY - cursorLast.y;
-      const nextVX = (dx / dt) * 1000;
-      const nextVY = (dy / dt) * 1000;
-      cursorVelocity.x = lerp(cursorVelocity.x, nextVX, 0.42);
-      cursorVelocity.y = lerp(cursorVelocity.y, nextVY, 0.42);
-      cursorVelocity.speed = Math.hypot(cursorVelocity.x, cursorVelocity.y);
-      if (cursorVelocity.speed > 16) {
-        const inverseSpeed = 1 / cursorVelocity.speed;
-        cursorDirection.x = cursorVelocity.x * inverseSpeed;
-        cursorDirection.y = cursorVelocity.y * inverseSpeed;
-      }
-      cursorLast.x = event.clientX;
-      cursorLast.y = event.clientY;
-      cursorLast.time = now;
-    };
-    const onPointerLeave = () => {
-      cursorVelocity.x = 0;
-      cursorVelocity.y = 0;
-      cursorVelocity.speed = 0;
-    };
-    window.addEventListener("pointermove", onPointerMove, { passive: true });
-    window.addEventListener("pointerleave", onPointerLeave, { passive: true });
-
     let rafId = 0;
-    let clearWillChangeTimer = 0;
-    let interactionWillChange = false;
-    let blurEnergy = 0;
-    let trailEnergy = 0;
     let wasScrolling = false;
     let settling = false;
     let settleStart = 0;
     let timeScale = 1;
     let sceneTime = performance.now();
     let lastFrameTime = sceneTime;
-    let wordmarkClearedForSimple = false;
     const initialIntroProgress = Math.min(window.scrollY / (window.innerHeight * 0.88), 1);
     let heroParallaxY = Math.min(window.scrollY * 0.16, 84);
     let flowYCurrent = 140 * (1 - initialIntroProgress);
     let flowScaleCurrent = 0.94 + initialIntroProgress * 0.06;
     let flowOpacityCurrent = 0.36 + initialIntroProgress * 0.64;
-
-    const updateWordmarkWillChange = (active: boolean) => {
-      if (interactionWillChange === active) return;
-      interactionWillChange = active;
-      const nextWillChange = active ? "transform, opacity, filter" : "auto";
-      if (heroWordmark) heroWordmark.style.willChange = nextWillChange;
-      if (heroBlurNear) heroBlurNear.style.willChange = nextWillChange;
-      if (heroBlurFar) heroBlurFar.style.willChange = nextWillChange;
-      if (heroTrail) heroTrail.style.willChange = nextWillChange;
-    };
 
     const update = (time: number) => {
       const dt = clamp(time - lastFrameTime, 8, 34);
@@ -410,96 +256,6 @@ export function HomePageView(): JSX.Element {
         calculatorImageRef.current.style.transform = `translate3d(0, 0, 0) rotate(${rotate.toFixed(2)}deg)`;
       }
 
-      if (!simpleMotion) {
-        wordmarkClearedForSimple = false;
-        const blurDecay = Math.exp(-dt / 220);
-        const trailDecay = Math.exp(-dt / 125);
-        const speedNorm = clamp(cursorVelocity.speed / 1800, 0, 1);
-        blurEnergy = Math.max(blurEnergy * blurDecay, speedNorm);
-
-        const trailKick = speedNorm > 0.54 ? (speedNorm - 0.54) / 0.46 : 0;
-        trailEnergy = Math.max(trailEnergy * trailDecay, trailKick);
-
-        if (settling) {
-          blurEnergy *= Math.exp(-dt / 90);
-          trailEnergy *= Math.exp(-dt / 72);
-        }
-
-        cursorVelocity.x *= blurDecay;
-        cursorVelocity.y *= blurDecay;
-        cursorVelocity.speed = Math.hypot(cursorVelocity.x, cursorVelocity.y);
-
-        const directionMag = Math.hypot(cursorDirection.x, cursorDirection.y) || 1;
-        const dirX = cursorDirection.x / directionMag;
-        const dirY = cursorDirection.y / directionMag;
-        const angle = (Math.atan2(dirY, dirX) * 180) / Math.PI;
-        const stretch = 1 + blurEnergy * 0.08;
-        const nearOffset = blurEnergy * 7.5;
-        const farOffset = blurEnergy * 12.5;
-        const trailOffsetScale = (0.92 + timeScale * 0.2) * trailEnergy;
-        const depthNudge = settleFactor * 0.55;
-
-        if (heroWordmark) {
-          heroWordmark.style.transform = `translate3d(${(dirX * depthNudge).toFixed(2)}px, ${(dirY * depthNudge).toFixed(2)}px, 0)`;
-        }
-        if (heroBlurNear) {
-          heroBlurNear.style.opacity = (blurEnergy * 0.26).toFixed(3);
-          heroBlurNear.style.filter = `blur(${(0.5 + blurEnergy * 2.4).toFixed(2)}px)`;
-          heroBlurNear.style.transform = `translate3d(${(dirX * nearOffset).toFixed(2)}px, ${(dirY * nearOffset).toFixed(2)}px, 0) rotate(${angle.toFixed(2)}deg) scale3d(${stretch.toFixed(3)}, 1, 1) rotate(${(-angle).toFixed(2)}deg)`;
-        }
-        if (heroBlurFar) {
-          heroBlurFar.style.opacity = (blurEnergy * 0.18).toFixed(3);
-          heroBlurFar.style.filter = `blur(${(1.1 + blurEnergy * 4.2).toFixed(2)}px)`;
-          heroBlurFar.style.transform = `translate3d(${(dirX * farOffset).toFixed(2)}px, ${(dirY * farOffset).toFixed(2)}px, 0) rotate(${angle.toFixed(2)}deg) scale3d(${(stretch + blurEnergy * 0.05).toFixed(3)}, 1, 1) rotate(${(-angle).toFixed(2)}deg)`;
-        }
-        if (heroTrail) {
-          heroTrail.style.opacity = (trailEnergy * 0.22).toFixed(3);
-          heroTrail.style.filter = `blur(${(0.4 + trailEnergy * 1.6).toFixed(2)}px)`;
-          heroTrail.style.transform = "translate3d(0, 0, 0)";
-        }
-
-        heroDepthLetterRefs.current.forEach((letter, index) => {
-          if (!letter) return;
-          const centered = index - (wordmarkLetters.length - 1) * 0.5;
-          const depth = centered * 0.24 * (1 + blurEnergy * 0.45) - settleFactor * 0.08;
-          letter.style.transform = `translate3d(0, ${depth.toFixed(2)}px, 0)`;
-        });
-
-        heroTrailLetterRefs.current.forEach((letter, index) => {
-          if (!letter) return;
-          const drift = (4.6 + index * 0.75) * trailOffsetScale;
-          const opacity = clamp((0.34 - index * 0.032) * trailEnergy, 0, 0.22);
-          letter.style.transform = `translate3d(${(dirX * drift).toFixed(2)}px, ${(dirY * drift).toFixed(2)}px, 0)`;
-          letter.style.opacity = opacity.toFixed(3);
-        });
-
-        const highVelocity = speedNorm > 0.38 || blurEnergy > 0.08 || trailEnergy > 0.04;
-        if (highVelocity) {
-          if (clearWillChangeTimer) {
-            window.clearTimeout(clearWillChangeTimer);
-            clearWillChangeTimer = 0;
-          }
-          updateWordmarkWillChange(true);
-        } else if (!clearWillChangeTimer && interactionWillChange) {
-          clearWillChangeTimer = window.setTimeout(() => {
-            updateWordmarkWillChange(false);
-            clearWillChangeTimer = 0;
-          }, 240);
-        }
-      } else {
-        blurEnergy = 0;
-        trailEnergy = 0;
-        if (clearWillChangeTimer) {
-          window.clearTimeout(clearWillChangeTimer);
-          clearWillChangeTimer = 0;
-        }
-        updateWordmarkWillChange(false);
-        if (!wordmarkClearedForSimple) {
-          clearWordmarkEffects();
-          wordmarkClearedForSimple = true;
-        }
-      }
-
       calculatorTiltCurrent.current.x = lerp(calculatorTiltCurrent.current.x, calculatorTiltTarget.current.x, 0.14);
       calculatorTiltCurrent.current.y = lerp(calculatorTiltCurrent.current.y, calculatorTiltTarget.current.y, 0.14);
       if (calculatorCardRef.current) {
@@ -533,18 +289,10 @@ export function HomePageView(): JSX.Element {
 
     rafId = window.requestAnimationFrame(update);
     return () => {
-      if (wordmarkIntroTimer) {
-        window.clearTimeout(wordmarkIntroTimer);
-      }
-      if (clearWillChangeTimer) {
-        window.clearTimeout(clearWillChangeTimer);
-      }
       if (wordmarkPressAnimationRef.current) {
         wordmarkPressAnimationRef.current.cancel();
         wordmarkPressAnimationRef.current = null;
       }
-      window.removeEventListener("pointermove", onPointerMove);
-      window.removeEventListener("pointerleave", onPointerLeave);
       window.removeEventListener("resize", syncMotionPreferences);
       reduceMotionMedia.removeEventListener("change", syncMotionPreferences);
       coarsePointerMedia.removeEventListener("change", syncMotionPreferences);
@@ -676,96 +424,38 @@ export function HomePageView(): JSX.Element {
         </div>
         <div className="relative mx-auto flex min-h-[calc(100vh-4rem)] w-full max-w-6xl flex-col items-center justify-center px-4 text-center sm:px-6 lg:px-8">
           <div className="space-y-6">
-            <h1 ref={heroHeadingRef} className="relative mx-auto flex w-full justify-center text-6xl font-semibold text-white sm:text-7xl">
+            <h1 ref={heroHeadingRef} className="relative mx-auto flex w-full justify-center text-6xl font-semibold leading-[0.94] text-white sm:text-7xl">
               <span
                 ref={heroWordmarkShellRef}
                 onPointerDown={handleWordmarkPress}
-                className="group/wordmark relative mx-auto inline-flex cursor-pointer select-none items-center justify-center overflow-hidden rounded-[0.1em] px-[0.02em] text-center align-middle tracking-[-0.03em] transform-gpu transition-[transform,opacity] duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] hover:scale-[1.03]"
+                className="group/wordmark relative mx-auto inline-flex cursor-pointer select-none items-center justify-center overflow-hidden rounded-[0.08em] px-[0.025em] text-center align-middle tracking-[-0.048em] opacity-100 transform-gpu transition-transform duration-500 ease-[cubic-bezier(0.22,1,0.36,1)] hover:scale-[1.022]"
                 style={{ transform: "translate3d(0, 0, 0) scale(1)" }}
               >
                 <span
-                  ref={heroWordmarkRef}
-                  className="relative z-[2] inline-flex items-center justify-center bg-[linear-gradient(112deg,#ffffff_0%,#f7fbff_28%,#b5fff4_54%,#ffffff_80%,rgba(255,255,255,0.85)_100%)] bg-[length:180%_100%] bg-[position:20%_50%] bg-clip-text text-transparent transition-opacity duration-300 ease-[cubic-bezier(0.22,1,0.36,1)]"
+                  className="relative z-[3] inline-flex items-center justify-center font-semibold text-white opacity-100 transition-opacity duration-500 ease-[cubic-bezier(0.22,1,0.36,1)] group-hover/wordmark:opacity-[0.98]"
+                  style={{
+                    textShadow: "0 1px 2px rgba(0,0,0,0.16), 0 0 34px rgba(235,241,255,0.14)",
+                  }}
                 >
                   {wordmarkLetters.map((letter, index) => (
-                    <span
-                      key={`main-${index}`}
-                      ref={(node) => {
-                        heroWordmarkLetterRefs.current[index] = node;
-                      }}
-                      className={wordmarkLetterClassName}
-                      style={{ transform: "translate3d(0, 0, 0) scale(1)" }}
-                    >
+                    <span key={`main-${index}`} className={wordmarkLetterClassName}>
                       {letter}
                     </span>
                   ))}
                 </span>
                 <span
                   aria-hidden="true"
-                  className="pointer-events-none absolute inset-0 z-[1] rounded-[0.18em] bg-cyan-100/50 opacity-0 blur-xl transition-opacity duration-300 ease-out group-hover/wordmark:opacity-35"
+                  className="pointer-events-none absolute inset-0 z-[1] rounded-[0.16em] bg-white/10 opacity-0 transition-opacity duration-500 ease-[cubic-bezier(0.22,1,0.36,1)] group-hover/wordmark:opacity-100"
                 />
                 <span
-                  ref={heroBlurNearRef}
                   aria-hidden="true"
-                  className="pointer-events-none absolute inset-0 z-[2] inline-flex items-center justify-center text-white/80 opacity-0 mix-blend-screen"
-                  style={{ filter: "blur(0px)", transform: "translate3d(0, 0, 0)" }}
+                  className="pointer-events-none absolute inset-0 z-[2] inline-flex items-center justify-center opacity-0 transition-opacity duration-500 ease-[cubic-bezier(0.22,1,0.36,1)] group-hover/wordmark:opacity-100"
                 >
-                  {wordmarkLetters.map((letter, index) => {
-                    const centered = index - (wordmarkLetters.length - 1) * 0.5;
-                    return (
-                      <span
-                        key={`near-${index}`}
-                        ref={(node) => {
-                          heroDepthLetterRefs.current[index] = node;
-                        }}
-                        className={wordmarkLetterClassName}
-                        style={{ transform: `translate3d(0, ${(centered * 0.24).toFixed(2)}px, 0)` }}
-                      >
-                        {letter}
-                      </span>
-                    );
-                  })}
-                </span>
-                <span
-                  ref={heroBlurFarRef}
-                  aria-hidden="true"
-                  className="pointer-events-none absolute inset-0 z-[2] inline-flex items-center justify-center text-white/60 opacity-0 mix-blend-screen"
-                  style={{ filter: "blur(0px)", transform: "translate3d(0, 0, 0)" }}
-                >
-                  {wordmarkLetters.map((letter, index) => (
-                    <span key={`far-${index}`} className={wordmarkLetterClassName}>
-                      {letter}
-                    </span>
-                  ))}
-                </span>
-                <span
-                  ref={heroTrailRef}
-                  aria-hidden="true"
-                  className="pointer-events-none absolute inset-0 z-[2] inline-flex items-center justify-center text-white/55 opacity-0 mix-blend-screen"
-                  style={{ filter: "blur(0px)", transform: "translate3d(0, 0, 0)" }}
-                >
-                  {wordmarkLetters.map((letter, index) => (
-                    <span
-                      key={`trail-${index}`}
-                      ref={(node) => {
-                        heroTrailLetterRefs.current[index] = node;
-                      }}
-                      className={`${wordmarkLetterClassName} opacity-0`}
-                      style={{ transform: "translate3d(0, 0, 0)" }}
-                    >
-                      {letter}
-                    </span>
-                  ))}
-                </span>
-                <span
-                  aria-hidden="true"
-                  className="pointer-events-none absolute inset-0 z-[4] inline-flex items-center justify-center opacity-0 transition-opacity duration-200 ease-out group-hover/wordmark:opacity-100"
-                >
-                  <span className="inline-flex items-center justify-center transform-gpu -translate-x-[132%] transition-transform duration-500 ease-[cubic-bezier(0.22,1,0.36,1)] group-hover/wordmark:translate-x-[132%]">
+                  <span className="inline-flex items-center justify-center transform-gpu -translate-x-[118%] transition-transform duration-[540ms] ease-[cubic-bezier(0.22,1,0.36,1)] group-hover/wordmark:translate-x-[118%]">
                     {wordmarkLetters.map((letter, index) => (
                       <span
                         key={`sweep-${index}`}
-                        className={`${wordmarkLetterClassName} bg-[linear-gradient(112deg,rgba(255,255,255,0)_24%,rgba(255,255,255,0.98)_50%,rgba(255,255,255,0)_76%)] bg-[length:200%_100%] bg-[position:50%_50%] bg-clip-text text-transparent`}
+                        className={`${wordmarkLetterClassName} bg-[linear-gradient(110deg,rgba(255,255,255,0)_20%,rgba(255,255,255,0.9)_50%,rgba(255,255,255,0)_80%)] bg-[length:180%_100%] bg-[position:50%_50%] bg-clip-text text-transparent`}
                       >
                         {letter}
                       </span>
