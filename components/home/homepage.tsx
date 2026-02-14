@@ -68,34 +68,10 @@ export function HomePageView(): JSX.Element {
   const partnerHeadingRef = useRef<HTMLHeadingElement | null>(null);
 
   const headingRefs = useRef<Array<HTMLHeadingElement | null>>([]);
-  const featureCardRefs = useRef<Array<HTMLDivElement | null>>([]);
 
   const { scrollProgress, scrollVelocity } = useScrollEngine();
   const [reduceMotion, setReduceMotion] = useState(false);
   const [introDone, setIntroDone] = useState(false);
-
-  const getElementTranslateY = (element: HTMLElement) => {
-    const transform = window.getComputedStyle(element).transform;
-    if (!transform || transform === "none") return 0;
-
-    if (transform.startsWith("matrix3d(")) {
-      const values = transform
-        .slice("matrix3d(".length, -1)
-        .split(",")
-        .map((value) => Number.parseFloat(value.trim()));
-      return Number.isFinite(values[13]) ? values[13] : 0;
-    }
-
-    if (transform.startsWith("matrix(")) {
-      const values = transform
-        .slice("matrix(".length, -1)
-        .split(",")
-        .map((value) => Number.parseFloat(value.trim()));
-      return Number.isFinite(values[5]) ? values[5] : 0;
-    }
-
-    return 0;
-  };
 
   const scrollToTopGyms = () => {
     const section = nextSectionRef.current;
@@ -103,13 +79,11 @@ export function HomePageView(): JSX.Element {
 
     const header = document.querySelector("header");
     const headerHeight = header instanceof HTMLElement ? header.getBoundingClientRect().height : 0;
-    const heading = headingRefs.current[0];
-    const sectionScrollMarginTop = Number.parseFloat(window.getComputedStyle(section).scrollMarginTop || "0");
-    const baseOffset = Math.max(headerHeight + 14, sectionScrollMarginTop * 0.5, 72);
-    const sectionVisualTop = section.getBoundingClientRect().top + window.scrollY;
-    const headingVisualTop = heading ? heading.getBoundingClientRect().top + window.scrollY : sectionVisualTop;
-    const sectionTranslateY = getElementTranslateY(section);
-    const targetTop = headingVisualTop - sectionTranslateY - baseOffset;
+    const heading = headingRefs.current[0] ?? document.getElementById("fitdex-top-gyms-heading");
+    if (!(heading instanceof HTMLElement)) return;
+    const headingOffset = Number.parseFloat(window.getComputedStyle(heading).scrollMarginTop || "0");
+    const baseOffset = headerHeight + headingOffset + 100;
+    const targetTop = heading.getBoundingClientRect().top + window.scrollY - baseOffset;
     window.scrollTo({ top: Math.max(targetTop, 0), behavior: "smooth" });
   };
 
@@ -263,65 +237,6 @@ export function HomePageView(): JSX.Element {
     };
   }, [scrollProgress, scrollVelocity]);
 
-  // Viewport/Feature Cards Observer
-  useEffect(() => {
-    if (typeof window === "undefined") return;
-
-    const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-    const cards = featureCardRefs.current.filter((card): card is HTMLDivElement => !!card);
-
-    if (cards.length === 0) return;
-
-    if (reduceMotion) {
-      cards.forEach((card) => {
-        card.style.opacity = "1";
-        card.style.transform = "translate3d(0, 0, 0) scale(1)";
-      });
-      return;
-    }
-
-    cards.forEach((card) => {
-      card.style.opacity = "0";
-      card.style.transform = "translate3d(0, 38px, 0) scale(0.985)";
-      card.style.willChange = "transform, opacity";
-    });
-
-    const timeoutIds: number[] = [];
-    const observer = new IntersectionObserver(
-      (entries) => {
-        entries.forEach((entry) => {
-          if (!entry.isIntersecting) return;
-          const node = entry.target as HTMLDivElement;
-          const index = Number(node.dataset.index ?? "0");
-          const delay = 120 + index * 130;
-          const timeoutId = window.setTimeout(() => {
-            node.style.transition = "opacity 760ms cubic-bezier(0.22,1,0.36,1), transform 900ms cubic-bezier(0.22,1,0.36,1)";
-            window.requestAnimationFrame(() => {
-              node.style.opacity = "1";
-              node.style.transform = "translate3d(0, 0, 0) scale(1)";
-            });
-            const settleTimeoutId = window.setTimeout(() => {
-              node.style.willChange = "auto";
-            }, 1120);
-            timeoutIds.push(settleTimeoutId);
-          }, delay);
-          timeoutIds.push(timeoutId);
-          observer.unobserve(node);
-        });
-      },
-      {
-        threshold: 0.16,
-        rootMargin: "0px 0px -6% 0px",
-      }
-    );
-
-    cards.forEach((card) => observer.observe(card));
-    return () => {
-      observer.disconnect();
-      timeoutIds.forEach((id) => window.clearTimeout(id));
-    };
-  }, []);
-
   // Partner Heading Observer
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -376,10 +291,23 @@ export function HomePageView(): JSX.Element {
             fill
             priority
             sizes="100vw"
-            className="object-cover object-center blur-[2.2px] brightness-[0.68] opacity-24"
+            className="object-cover object-center blur-[1.6px] brightness-[0.68] opacity-55"
           />
         </div>
-        <div className="absolute inset-0 bg-gradient-to-b from-black/52 via-black/78 to-background/96 -z-10" />
+        <div className="absolute inset-0 bg-black/20 -z-10" />
+        <div
+          className="absolute inset-0 -z-10 opacity-40"
+          style={{
+            background:
+              "radial-gradient(circle at 18% 18%, rgba(56,189,248,0.32), rgba(56,189,248,0) 58%), radial-gradient(circle at 82% 22%, rgba(139,92,246,0.28), rgba(139,92,246,0) 54%)",
+          }}
+        />
+        <div
+          className="absolute inset-0 -z-10"
+          style={{
+            background: "linear-gradient(180deg, rgba(0,0,0,0.16) 0%, rgba(0,0,0,0.28) 52%, hsl(var(--background)) 100%)",
+          }}
+        />
 
         {/* DOM Content Overlay */}
         <div
@@ -453,7 +381,7 @@ export function HomePageView(): JSX.Element {
           nextSectionRef.current = node;
           flowSectionRef.current = node;
         }}
-        className="relative mx-auto w-full max-w-6xl scroll-mt-28 px-4 py-20 text-center sm:px-6 lg:px-8"
+        className="relative mx-auto -mt-px w-full max-w-6xl scroll-mt-28 px-4 py-20 text-center sm:px-6 lg:px-8"
       >
         <div
           className="pointer-events-none absolute inset-x-[22%] top-[-10%] h-44 opacity-[0.11]"
@@ -461,6 +389,7 @@ export function HomePageView(): JSX.Element {
         />
         <Reveal>
           <h2
+            id="fitdex-top-gyms-heading"
             ref={(node) => {
               headingRefs.current[0] = node;
             }}
@@ -484,15 +413,15 @@ export function HomePageView(): JSX.Element {
             return (
               <div
                 key={feature.title}
-                ref={(node) => {
-                  featureCardRefs.current[index] = node;
-                }}
                 data-index={index}
               >
                 <Card
-                  className="group relative h-full overflow-hidden border-white/10 bg-white/[0.04] shadow-[0_16px_28px_rgba(2,8,20,0.18)] transition-[transform,box-shadow,border-color] duration-700 hover:delay-100 hover:-translate-y-2 hover:scale-[1.01] hover:shadow-[0_24px_40px_rgba(2,8,20,0.26)]"
+                  className="fitdex-feature-card group relative h-full overflow-hidden border-white/10 bg-white/[0.04] shadow-[0_16px_28px_rgba(2,8,20,0.18)] transition-[transform,box-shadow,border-color] duration-700 hover:delay-100 hover:-translate-y-2 hover:scale-[1.01] hover:shadow-[0_24px_40px_rgba(2,8,20,0.26)]"
                   data-accent-color={accentRgb[feature.accent]}
-                  style={{ transitionTimingFunction: "cubic-bezier(0.22, 1, 0.36, 1)" }}
+                  style={{
+                    transitionTimingFunction: "cubic-bezier(0.22, 1, 0.36, 1)",
+                    ["--reveal-delay" as string]: `${index * 120}ms`,
+                  }}
                 >
                   <div
                     className="motion-border-sweep pointer-events-none absolute inset-x-0 top-0 h-px opacity-0 transition-opacity duration-500 group-hover:delay-100 group-hover:opacity-100"
@@ -500,10 +429,6 @@ export function HomePageView(): JSX.Element {
                       backgroundImage: accent.borderGlow,
                       backgroundSize: "220% 100%",
                     }}
-                  />
-                  <div
-                    className="pointer-events-none absolute -top-14 left-1/2 h-36 w-36 -translate-x-1/2 opacity-0 transition-opacity duration-500 group-hover:delay-150 group-hover:opacity-100"
-                    style={{ backgroundImage: accent.softGlow, filter: "blur(34px)" }}
                   />
                   <CardHeader className="space-y-3">
                     <div

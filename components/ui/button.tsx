@@ -21,9 +21,9 @@ const buttonVariants = cva(
         destructive:
           "bg-destructive text-primary-foreground hover:-translate-y-0.5 hover:opacity-95",
         outline:
-          "border border-border bg-background/60 hover:-translate-y-0.5 hover:bg-muted/70",
+          "fitdex-glass-button-vivid text-white hover:text-white",
         secondary:
-          "bg-secondary text-secondary-foreground hover:-translate-y-0.5 hover:bg-secondary/80",
+          "fitdex-glass-button-vivid text-white hover:text-white",
         ghost: "text-foreground hover:bg-muted/80",
         link: "text-primary underline-offset-4 hover:underline",
       },

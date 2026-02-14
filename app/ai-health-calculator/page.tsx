@@ -21,7 +21,7 @@ const BASE_URL = getBaseUrl();
 export const metadata: Metadata = {
   title: "Health Calculator | Fitdex",
   description:
-    "Use the Fitdex Health Calculator to estimate your score, calorie needs, and personalized fitness recommendations.",
+    "Use the Fitdex Health Calculator for robust personalized scoring with a clean visual summary.",
   alternates: {
     canonical: `${BASE_URL}/ai-health-calculator`,
   },
@@ -34,38 +34,37 @@ export default function AIHealthCalculatorPage(): JSX.Element {
         <section className="rounded-2xl border border-white/10 bg-gradient-to-b from-white/10 to-white/[0.02] p-8">
           <h1 className="text-3xl font-bold sm:text-4xl">Fitdex AI Health Calculator</h1>
           <p className="mt-3 max-w-3xl text-sm text-muted-foreground sm:text-base">
-            A deterministic scoring model built on BMI, BMR, activity load, and age-adjusted health factors.
+            Robust personalized logic under the hood, delivered as a brief visual report you can act on quickly.
           </p>
         </section>
 
         <section aria-labelledby="health-score-engine" className="space-y-4">
           <h2 id="health-score-engine" className="text-2xl font-semibold">
-            Health Score Engine
+            Personalized Health Engine
           </h2>
           <AIHealthCalculatorClient />
         </section>
 
         <section aria-labelledby="how-it-works" className="space-y-3 rounded-2xl border border-white/10 bg-white/[0.02] p-6">
           <h2 id="how-it-works" className="text-2xl font-semibold">
-            How the score works
+            How this upgraded model works
           </h2>
           <p className="text-sm text-muted-foreground sm:text-base">
-            The model uses fixed weightings for body composition, activity level, and age. Results are reproducible and
-            easy to compare over time.
+            The backend combines body composition, activity, recovery, and metabolic markers into one robust score.
           </p>
           <p className="text-sm text-muted-foreground sm:text-base">
-            Every recommendation is tied directly to measurable profile inputs.
+            You get a concise output with visuals, brief guidance, and actionable targets.
           </p>
         </section>
 
         <section className="rounded-2xl border border-white/10 bg-gradient-to-r from-white/10 to-white/[0.03] p-8">
           <h2 className="text-2xl font-semibold">Put your score into action</h2>
           <p className="mt-2 max-w-2xl text-sm text-muted-foreground sm:text-base">
-            Pair your results with local gym discovery to execute your plan with the right environment and support.
+            Use your output with local gym discovery to execute the exact training environment and structure your plan needs.
           </p>
           <Link
             href="/explore"
-            className="mt-5 inline-flex items-center rounded-lg bg-white px-4 py-2 text-sm font-semibold text-black transition hover:opacity-90"
+            className="fitdex-health-cta mt-5 inline-flex items-center rounded-lg px-4 py-2 text-sm font-semibold text-white"
           >
             Explore Gyms
           </Link>
@@ -77,21 +76,21 @@ export default function AIHealthCalculatorPage(): JSX.Element {
           </h2>
           <div className="grid gap-4 md:grid-cols-3">
             <article className="rounded-xl border border-white/10 bg-white/[0.02] p-5">
-              <h3 className="font-semibold">Weight Loss</h3>
+              <h3 className="font-semibold">Precision Fat Loss</h3>
               <p className="mt-2 text-sm text-muted-foreground">
-                Use calorie targets and risk scoring to track fat-loss progression with objective baselines.
+                Align calorie deficits, steps, and recovery constraints so fat loss is steady without destroying performance.
               </p>
             </article>
             <article className="rounded-xl border border-white/10 bg-white/[0.02] p-5">
-              <h3 className="font-semibold">Muscle Gain</h3>
+              <h3 className="font-semibold">Lean Muscle Gain</h3>
               <p className="mt-2 text-sm text-muted-foreground">
-                Estimate maintenance needs and apply intake adjustments to improve lean-mass outcomes.
+                Use macro splits, hydration, and workload guidance tuned to your profile and training experience level.
               </p>
             </article>
             <article className="rounded-xl border border-white/10 bg-white/[0.02] p-5">
-              <h3 className="font-semibold">General Fitness Tracking</h3>
+              <h3 className="font-semibold">Long-Term Tracking</h3>
               <p className="mt-2 text-sm text-muted-foreground">
-                Monitor score trends over time to guide sustainable habit improvements.
+                Re-run the score with fresh measurements and monitor whether risk markers and behavior scores improve month over month.
               </p>
             </article>
           </div>
