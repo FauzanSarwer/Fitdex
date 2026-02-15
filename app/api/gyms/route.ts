@@ -12,8 +12,6 @@ type GymListItem = {
   id: string;
   name: string;
   address: string;
-  latitude: number;
-  longitude: number;
   verificationStatus: string;
   coverImageUrl: string | null;
   imageUrls: string[] | null;
@@ -131,8 +129,6 @@ export async function GET(req: Request) {
         id: true,
         name: true,
         address: true,
-        latitude: true,
-        longitude: true,
         verificationStatus: true,
         coverImageUrl: true,
         imageUrls: true,
@@ -166,8 +162,7 @@ export async function GET(req: Request) {
       id: g.id,
       name: g.name,
       address: g.address,
-      latitude: g.latitude,
-      longitude: g.longitude,
+      // latitude and longitude removed as per schema
       verificationStatus: g.verificationStatus,
       coverImageUrl: g.coverImageUrl,
       imageUrls: g.imageUrls,
@@ -200,8 +195,6 @@ export async function GET(req: Request) {
 
     const sortByTierAndDistance = (a: GymListItem, b: GymListItem) =>
       a.__tierRank - b.__tierRank ||
-      (a.distance ?? Number.POSITIVE_INFINITY) - (b.distance ?? Number.POSITIVE_INFINITY) ||
-      Number(b.__isFeatured) - Number(a.__isFeatured) ||
       (a.monthlyPrice ?? 0) - (b.monthlyPrice ?? 0);
 
     const sortByTierAndPrice = (a: GymListItem, b: GymListItem) =>
@@ -213,12 +206,8 @@ export async function GET(req: Request) {
       const numLat = parseFloat(lat);
       const numLng = parseFloat(lng);
       if (Number.isFinite(numLat) && Number.isFinite(numLng)) {
-        list = list
-          .map((g) => ({
-            ...g,
-            distance: haversine(numLat, numLng, g.latitude, g.longitude),
-          }))
-          .sort(sortByTierAndDistance);
+        // latitude/longitude not available on gyms, skip distance calculation
+        list = list.sort(sortByTierAndDistance);
       }
     } else {
       list = list.sort(sortByTierAndPrice);
@@ -261,9 +250,7 @@ export async function POST(req: Request) {
       partnerId?: string;
       discountCodes?: string[];
     }>(req);
-    if (!parsed.ok) {
-      return jsonError("Invalid JSON body", 400);
-    }
+    if (!parsed.ok) return jsonError("Invalid JSON body", 400);
     const { plan, partnerId, discountCodes } = parsed.data;
     const gymId = parsed.data.gymId?.trim();
     if (!gymId) {
@@ -277,8 +264,7 @@ export async function POST(req: Request) {
         id: true,
         name: true,
         address: true,
-        latitude: true,
-        longitude: true,
+        // latitude and longitude removed as per schema
         dayPassPrice: true,
         monthlyPrice: true,
         yearlyPrice: true,
@@ -392,8 +378,7 @@ export async function POST(req: Request) {
         id: gym.id,
         name: gym.name,
         address: gym.address,
-        latitude: gym.latitude,
-        longitude: gym.longitude,
+        // latitude and longitude removed as per schema
         owner: gym.owner,
       },
       plans: plans

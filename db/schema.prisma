@@ -155,7 +155,7 @@ model Gym {
   id                     String                    @id @default(cuid())
   name                   String
   address                String
-  longitude              Float
+  // longitude removed
   ownerId                String
   monthlyPrice           Int
   quarterlyPrice         Int?
@@ -220,6 +220,36 @@ model Gym {
   qrStatics              qrStatic[]
   qrTokens               qrToken[]
   gymSessions            gymSession[]        @relation("GymGymSessions")
+  // latitude removed
+}
+
+model QrBatchJob {
+  id             String   @id @default(cuid())
+  actorId        String
+  scope          String
+  gymId          String?
+  status         String
+  totalCount     Int
+  processedCount Int
+  downloadUrl    String?
+  completedAt    DateTime?
+  createdAt      DateTime @default(now())
+}
+
+model QrAuditLog {
+  id        String   @id @default(cuid())
+  gymId     String
+  action    String
+  actorId   String
+  createdAt DateTime @default(now())
+}
+
+model QrKey {
+  id        String   @id @default(cuid())
+  gymId     String
+  key       String
+  version   Int
+  createdAt DateTime @default(now())
 }
 
 model Notification {

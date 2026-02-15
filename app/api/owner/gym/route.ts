@@ -163,8 +163,6 @@ export async function POST(req: Request) {
         ownerId: uid,
         name: name.trim(),
         address: address.trim(),
-        latitude: Number(lat),
-        longitude: Number(lng),
         city,
         state,
         hasAC: !!hasAC,

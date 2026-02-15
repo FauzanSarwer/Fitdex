@@ -1,3 +1,9 @@
+// Add debug property to window for sync debugging
+declare global {
+  interface Window {
+    __FITDEX_SYNC_DEBUG__?: any;
+  }
+}
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -34,6 +40,7 @@ export type LiveSession = {
   gymName: string;
   entryAt: number;
   lastActivityAt: number;
+  updatedAt: number;
   deviceId?: string;
 };
 
@@ -165,9 +172,22 @@ export function useFitnessSync(identity: string | null) {
     // Hydrate queue from IndexedDB, fallback to localStorage if needed
     (async () => {
       const idbQueue = await getAllQueueItems();
+      function normalizeQueueItem(item: any): LocalQueueItem {
+        return {
+          ...item,
+          retryCount: typeof item.retryCount === "number" ? item.retryCount : 0,
+          lastAttemptAt: typeof item.lastAttemptAt === "string" || item.lastAttemptAt === null ? item.lastAttemptAt : null,
+        };
+      }
+      let queue: LocalQueueItem[];
+      if (idbQueue && idbQueue.length > 0) {
+        queue = idbQueue.map(normalizeQueueItem);
+      } else {
+        queue = Array.isArray(restored.queue) ? restored.queue.map(normalizeQueueItem) : [];
+      }
       setState({
         ...restored,
-        queue: (idbQueue && idbQueue.length > 0) ? idbQueue : restored.queue,
+        queue,
       });
     })();
   }, [storageKey]);
@@ -270,7 +290,15 @@ export function useFitnessSync(identity: string | null) {
       let liveSession = prev.liveSession;
       if (serverActive) {
         if (!liveSession || serverActive.updatedAt > liveSession.updatedAt) {
-          liveSession = serverActive;
+          liveSession = {
+            id: serverActive.id,
+            gymId: serverActive.gymId,
+            gymName: serverActive.gymName,
+            entryAt: serverActive.entryAt,
+            lastActivityAt: serverActive.exitAt ?? serverActive.updatedAt,
+            updatedAt: serverActive.updatedAt,
+            deviceId: undefined,
+          };
         }
       } else if (liveSession && !sessionMap.has(liveSession.id)) {
         liveSession = null;
@@ -318,14 +346,14 @@ export function useFitnessSync(identity: string | null) {
         setSyncHealth((prev) => {
           const fails = prev.consecutiveFailures + 1;
           const isStale = !!(prev.lastSuccessfulSyncAt && Date.now() - new Date(prev.lastSuccessfulSyncAt).getTime() > 60000);
-          const dataAtRisk = (state.queue && state.queue.length > 0 && prev.lastSuccessfulSyncAt && Date.now() - new Date(prev.lastSuccessfulSyncAt).getTime() > 120000);
+          const dataAtRisk = Boolean(state.queue && state.queue.length > 0 && prev.lastSuccessfulSyncAt && Date.now() - new Date(prev.lastSuccessfulSyncAt).getTime() > 120000);
           return {
             ...prev,
             consecutiveFailures: fails,
             isStale,
             dataAtRisk,
             showSyncWarning: isStale,
-            showDataAtRiskWarning: dataAtRisk,
+            showDataAtRiskWarning: Boolean(dataAtRisk),
           };
         });
         setState((prev) => {

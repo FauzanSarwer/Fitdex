@@ -39,9 +39,7 @@ export const QrAuditLogSchema = z.object({
   id: z.string().uuid(),
   actorId: z.string(),
   gymId: z.string(),
-  type: QrTypeSchema.optional(),
   action: QrAuditActionSchema,
-  metadata: z.record(z.any()).optional(),
   createdAt: z.string(),
 });
 export type QrAuditLog = z.infer<typeof QrAuditLogSchema>;

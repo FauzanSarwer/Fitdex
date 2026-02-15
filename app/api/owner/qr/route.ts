@@ -16,7 +16,7 @@ export async function GET() {
   const uid = (session!.user as { id: string }).id;
   const gyms = await prisma.gym.findMany({
     where: { ownerId: uid },
-    select: { id: true, name: true, logoUrl: true },
+    select: { id: true, name: true },
   });
 
   const previews = await Promise.all(

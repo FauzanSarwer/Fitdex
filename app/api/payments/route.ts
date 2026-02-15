@@ -8,15 +8,15 @@ import { jsonError } from "@/lib/api";
 import { logServerError } from "@/lib/logger";
 
 export async function GET() {
-    const { success } = await ratelimit.limit(uid);
-    if (!success) {
-      return jsonError("Too many requests", 429);
-    }
   const session = await getServerSession(authOptions);
   if (!requireUser(session)) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
   const uid = (session!.user as { id: string }).id;
+  const { success } = await ratelimit.limit(uid);
+  if (!success) {
+    return jsonError("Too many requests", 429);
+  }
   try {
     const transactions = await prisma.transaction.findMany({
       where: { userId: uid },

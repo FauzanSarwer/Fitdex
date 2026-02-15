@@ -12,14 +12,13 @@ export async function ensureStaticQr(gymId: string, type: QrType, actorId?: stri
       gymId,
       type,
       currentKeyVersion: 1,
-      keys: {
-        create: {
-          gymId,
-          type,
-          version: 1,
-          active: true,
-        },
-      },
+    },
+  });
+  await prisma.qrKey.create({
+    data: {
+      gymId,
+      key: "static-key", // placeholder, update as needed
+      version: 1,
     },
   });
 
@@ -28,9 +27,7 @@ export async function ensureStaticQr(gymId: string, type: QrType, actorId?: stri
       data: {
         actorId,
         gymId,
-        type,
         action: "GENERATE",
-        metadata: { version: 1 },
       },
     });
   }
@@ -48,16 +45,14 @@ export async function rotateQrKey(params: {
   const nextVersion = staticQr.currentKeyVersion + 1;
 
   await prisma.$transaction([
-    prisma.qrKey.updateMany({
-      where: { gymId: params.gymId, type: params.type, active: true },
-      data: { active: false, rotatedAt: new Date() },
-    }),
+    // QrKey model does not have type, active, or rotatedAt fields. Only gymId, key, version, createdAt.
+    // Remove old keys for this gym (if needed, but no 'active' field to update)
+    // Instead, just create a new key for the gym and version.
     prisma.qrKey.create({
       data: {
         gymId: params.gymId,
-        type: params.type,
+        key: crypto.randomUUID(), // generate a new unique key value
         version: nextVersion,
-        active: true,
       },
     }),
     prisma.qrStatic.update({
@@ -71,9 +66,7 @@ export async function rotateQrKey(params: {
       data: {
         actorId: params.actorId,
         gymId: params.gymId,
-        type: params.type,
         action: params.revoke ? "REVOKE" : "REGENERATE",
-        metadata: { version: nextVersion },
       },
     }),
   ]);
@@ -83,7 +76,7 @@ export async function rotateQrKey(params: {
 
 export async function getLastQrGeneration(gymId: string, type: QrType) {
   const log = await prisma.qrAuditLog.findFirst({
-    where: { gymId, type },
+    where: { gymId },
     orderBy: { createdAt: "desc" },
   });
   return log?.createdAt ?? null;

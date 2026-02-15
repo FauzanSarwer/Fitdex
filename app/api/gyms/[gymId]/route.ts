@@ -48,8 +48,6 @@ export async function GET(
         id: gym.id,
         name: gym.name,
         address: gym.address,
-        latitude: gym.latitude,
-        longitude: gym.longitude,
         verificationStatus: gym.verificationStatus,
         coverImageUrl: gym.coverImageUrl,
         imageUrls: gym.imageUrls,

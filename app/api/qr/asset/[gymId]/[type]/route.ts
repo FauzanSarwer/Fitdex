@@ -62,7 +62,7 @@ export async function GET(req: Request, { params }: { params: Promise<{ gymId: s
       instructions: lastGeneratedAt ? `Last generated ${lastGeneratedAt.toLocaleDateString()}` : undefined,
     });
 
-    return new NextResponse(pdf, {
+    return new NextResponse(new Uint8Array(pdf), {
       headers: {
         "Content-Type": "application/pdf",
         "Content-Disposition": `inline; filename="${gym.name}-${parsedType.data}.pdf"`,
@@ -71,7 +71,7 @@ export async function GET(req: Request, { params }: { params: Promise<{ gymId: s
     });
   }
 
-  return new NextResponse(png, {
+  return new NextResponse(new Uint8Array(png), {
     headers: {
       "Content-Type": "image/png",
       "Cache-Control": "private, max-age=120",

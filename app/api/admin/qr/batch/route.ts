@@ -28,16 +28,16 @@ export async function POST(req: Request) {
   if (scope === "GYM" && !gymId) return jsonError("gymId required", 400);
 
   const uid = (session!.user as { id: string }).id;
-  const job = await prisma.qrBatchJob.create({
-    data: {
-      actorId: uid,
-      scope,
-      gymId: scope === "GYM" ? gymId ?? null : null,
-      status: "PENDING",
-      totalCount: 0,
-      processedCount: 0,
-    },
-  });
+        const job = await prisma.qrBatchJob.create({
+          data: {
+            actorId: uid,
+            scope,
+            gymId: scope === "GYM" ? gymId ?? null : null,
+            status: "PENDING",
+            totalCount: 0,
+            processedCount: 0,
+          },
+        });
 
   return NextResponse.json({ ok: true, jobId: job.id });
 }

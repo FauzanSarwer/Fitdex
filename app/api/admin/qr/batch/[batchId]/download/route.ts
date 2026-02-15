@@ -72,10 +72,11 @@ export async function GET(_req: Request, { params }: { params: Promise<{ batchId
     },
   });
 
-  return new NextResponse(buffer, {
-    headers: {
-      "Content-Type": "application/zip",
-      "Content-Disposition": `attachment; filename="fitdex-qr-batch-${batchId}.zip"`,
-    },
-  });
+return new NextResponse(new Uint8Array(buffer), {
+  headers: {
+    "Content-Type": "application/zip",
+    "Content-Disposition": `attachment; filename="fitdex-qr-batch-${batchId}.zip"`,
+  },
+});
+
 }

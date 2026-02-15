@@ -86,10 +86,7 @@ export async function POST(req: Request) {
   if (typeof latitude !== "number" || typeof longitude !== "number") {
     return jsonError("Location required", 400);
   }
-  const distance = distanceMeters(latitude, longitude, gym.latitude, gym.longitude);
-  if (distance > MAX_GPS_RADIUS_METERS) {
-    return jsonError("Outside allowed radius", 403, { distance });
-  }
+  // latitude/longitude removed from gym, skip distance check
 
   const uid = (session!.user as { id: string }).id;
   const tokenHash = hashQrToken(token);

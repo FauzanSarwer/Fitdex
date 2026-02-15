@@ -10,12 +10,11 @@ export async function GET() {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
   // Users with >1 active session
-  const usersWithMultiple = await prisma.gymSession.groupBy({
+  const usersWithMultiple = (await prisma.gymSession.groupBy({
     by: ["userId"],
     where: { exitAt: null },
     _count: { _all: true },
-    having: { _count: { _all: { gt: 1 } } },
-  });
+  })).filter(g => g._count._all > 1);
   // Queue backlog: count of open sessions and weights
   const openSessions = await prisma.gymSession.count({ where: { exitAt: null } });
   const openWeights = await prisma.weightLog.count();

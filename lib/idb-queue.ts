@@ -1,9 +1,15 @@
+
 // Minimal IndexedDB wrapper for fitness mutation queue
 const DB_NAME = "fitdex-fitness-queue";
 const STORE_NAME = "queue";
 const DB_VERSION = 1;
 
-function openDB() {
+export interface QueueItem {
+  id: string;
+  [key: string]: unknown;
+}
+
+function openDB(): Promise<IDBDatabase> {
   return new Promise((resolve, reject) => {
     const req = indexedDB.open(DB_NAME, DB_VERSION);
     req.onupgradeneeded = () => {
@@ -17,18 +23,18 @@ function openDB() {
   });
 }
 
-export async function getAllQueueItems() {
+export async function getAllQueueItems(): Promise<QueueItem[]> {
   const db = await openDB();
   return new Promise((resolve, reject) => {
     const tx = db.transaction(STORE_NAME, "readonly");
     const store = tx.objectStore(STORE_NAME);
     const req = store.getAll();
-    req.onsuccess = () => resolve(req.result);
+    req.onsuccess = () => resolve(req.result as QueueItem[]);
     req.onerror = () => reject(req.error);
   });
 }
 
-export async function putQueueItem(item) {
+export async function putQueueItem(item: QueueItem): Promise<void> {
   const db = await openDB();
   return new Promise((resolve, reject) => {
     const tx = db.transaction(STORE_NAME, "readwrite");
@@ -39,7 +45,8 @@ export async function putQueueItem(item) {
   });
 }
 
-export async function deleteQueueItem(id) {
+
+export async function deleteQueueItem(id: string): Promise<void> {
   const db = await openDB();
   return new Promise((resolve, reject) => {
     const tx = db.transaction(STORE_NAME, "readwrite");
@@ -50,7 +57,8 @@ export async function deleteQueueItem(id) {
   });
 }
 
-export async function clearQueue() {
+
+export async function clearQueue(): Promise<void> {
   const db = await openDB();
   return new Promise((resolve, reject) => {
     const tx = db.transaction(STORE_NAME, "readwrite");
