@@ -1,12 +1,3 @@
-generator client {
-  provider = "prisma-client-js"
-}
-
-datasource db {
-  provider = "postgresql"
-  url      = env("DATABASE_URL")
-}
-
 enum GymTier {
   CORE
   SUPPORTING
@@ -18,87 +9,85 @@ enum InvoiceType {
   NON_GST
 }
 
-enum InvoiceTaxMode {
-  CGST_SGST
-  IGST
-  NONE
+
+generator client {
+  provider = "prisma-client-js"
 }
 
-enum InvoiceTaxType {
-  CGST
-  SGST
-  IGST
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
 }
+
+
 
 model User {
-  id            String    @id @default(cuid())
-  name          String?
-  email         String    @unique
-  emailVerified DateTime?
-  image         String?
-  password      String?   // hashed for credentials
-  role          String    @default("USER") // USER | OWNER | ADMIN
-  latitude      Float?
-  longitude     Float?
-  city          String?
-  state         String?
-  phoneNumber   String?
-  billingEmail  String?
-  billingAddress String?
-  businessName   String?
-  businessType   String?
-  supportEmail   String?
-  supportPhone   String?
-  supportWhatsapp String?
-  logoUrl        String?
-  twoFactorEnabled Boolean @default(false)
-  timezone      String?
-  notifyMemberships Boolean @default(true)
-  notifyPromos  Boolean  @default(true)
-  notifyDuo     Boolean  @default(true)
-  createdAt     DateTime  @default(now())
-  updatedAt     DateTime  @updatedAt
-
-  accounts Account[]
-  sessions Session[]
-  gymSessions GymSession[]
+  gymSessions             gymSession[]        @relation("UserGymSessions")
   weightLogs WeightLog[]
-  memberships Membership[]
-  duosAsOne    Duo[]       @relation("UserOne")
-  duosAsTwo    Duo[]       @relation("UserTwo")
-  invitesSent  Invite[]    @relation("Inviter")
-  payments     Payment[]
-  transactions Transaction[]
-  ownedGyms    Gym[]
-  savedGyms    SavedGym[]
-  featuredPurchases FeaturedListingPurchase[]
-  verifiedPurchases VerifiedBadgePurchase[]
-  notifications Notification[]
-  passwordResetTokens PasswordResetToken[]
-  gymPageViews GymPageView[]
+  id                      String                    @id @default(cuid())
+  name                    String?
+  email                   String                    @unique
+  emailVerified           DateTime?
+  image                   String?
+  password                String?
+  role                    String                    @default("USER")
+  latitude                Float?
+  longitude               Float?
+  city                    String?
+  state                   String?
+  createdAt               DateTime                  @default(now())
+  updatedAt               DateTime                  @updatedAt
+  billingEmail            String?
+  notifyDuo               Boolean                   @default(true)
+  notifyMemberships       Boolean                   @default(true)
+  notifyPromos            Boolean                   @default(true)
+  phoneNumber             String?
+  timezone                String?
+  billingAddress          String?
+  businessName            String?
+  businessType            String?
+  logoUrl                 String?
+  supportEmail            String?
+  supportPhone            String?
+  supportWhatsapp         String?
+  twoFactorEnabled        Boolean                   @default(false)
+  accounts                Account[]
+  duosAsOne               Duo[]                     @relation("UserOne")
+  duosAsTwo               Duo[]                     @relation("UserTwo")
   emailVerificationTokens EmailVerificationToken[]
-  ownerSubscriptions OwnerSubscription[]
-  leads        Lead[]
-  whatsappLogs WhatsAppLog[]
-  ownerInvoices Invoice[] @relation("OwnerInvoices")
-  memberInvoices Invoice[] @relation("MemberInvoices")
-  subscriptionReminders SubscriptionReminderLog[]
+  featuredPurchases       FeaturedListingPurchase[]
+  ownedGyms               Gym[]
+  gymPageViews            GymPageView[]
+  invitesSent             Invite[]                  @relation("Inviter")
+  ownerInvoices           Invoice[]                 @relation("OwnerInvoices")
+  memberInvoices          Invoice[]                 @relation("MemberInvoices")
+  leads                   Lead[]
+  memberships             Membership[]
+  notifications           Notification[]
+  ownerSubscriptions      OwnerSubscription[]
+  passwordResetTokens     PasswordResetToken[]
+  payments                Payment[]
+  savedGyms               SavedGym[]
+  sessions                Session[]
+  subscriptionReminders   SubscriptionReminderLog[]
+  transactions            Transaction[]
+  verifiedPurchases       VerifiedBadgePurchase[]
+  whatsappLogs            WhatsAppLog[]
 }
 
 model OwnerSubscription {
-  id                 String   @id @default(cuid())
-  ownerId            String
-  plan               String   // STARTER | PRO
-  status             String   // PENDING | ACTIVE | CANCELED | EXPIRED
-  startsAt           DateTime
-  expiresAt          DateTime
-  razorpayOrderId    String?  @unique
-  razorpayPaymentId  String?
-  createdAt          DateTime @default(now())
-  updatedAt          DateTime @updatedAt
-
-  owner User @relation(fields: [ownerId], references: [id], onDelete: Cascade)
-  reminders SubscriptionReminderLog[]
+  id                String                    @id @default(cuid())
+  ownerId           String
+  plan              String
+  status            String
+  startsAt          DateTime
+  expiresAt         DateTime
+  razorpayOrderId   String?                   @unique
+  razorpayPaymentId String?
+  createdAt         DateTime                  @default(now())
+  updatedAt         DateTime                  @updatedAt
+  owner             User                      @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  reminders         SubscriptionReminderLog[]
 
   @@index([ownerId])
   @@index([status])
@@ -108,11 +97,10 @@ model EmailVerificationToken {
   id        String   @id @default(cuid())
   userId    String
   tokenHash String   @unique
-  purpose   String   // VERIFY | DELETE
+  purpose   String
   expiresAt DateTime
   createdAt DateTime @default(now())
-
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId])
   @@index([expiresAt])
@@ -124,8 +112,7 @@ model PasswordResetToken {
   tokenHash String   @unique
   expiresAt DateTime
   createdAt DateTime @default(now())
-
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId])
 }
@@ -143,8 +130,7 @@ model Account {
   scope             String?
   id_token          String?
   session_state     String?
-
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user              User    @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([provider, providerAccountId])
 }
@@ -154,8 +140,7 @@ model Session {
   sessionToken String   @unique
   userId       String
   expires      DateTime
-
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
 
 model VerificationToken {
@@ -167,205 +152,86 @@ model VerificationToken {
 }
 
 model Gym {
-  id                     String   @id @default(cuid())
+  id                     String                    @id @default(cuid())
   name                   String
   address                String
-  latitude               Float
   longitude              Float
   ownerId                String
-  verificationStatus     String   @default("UNVERIFIED") // UNVERIFIED | PENDING | VERIFIED | REJECTED
+  monthlyPrice           Int
+  quarterlyPrice         Int?
+  yearlyPrice            Int
+  partnerDiscountPercent Int                       @default(10)
+  coverImageUrl          String?
+  createdAt              DateTime                  @default(now())
+  updatedAt              DateTime                  @updatedAt
+  bankAccountLast4       String?
+  bankAccountVerified    Boolean                   @default(false)
+  closeTime              String?
+  dayPassPrice           Int?
+  featuredUntil          DateTime?
+  gstCertificateUrl      String?
+  gstNumber              String?
+  gstVerifiedAt          DateTime?
+  openDays               String?
+  openTime               String?
+  razorpaySubAccountId   String?
   verificationNotes      String?
-  gymTier                GymTier  @default(SUPPORTING)
-  hasAC                  Boolean  @default(false)
-  amenities              String[] @default([])
-  ownerConsentAt         DateTime?
+  verificationStatus     String                    @default("UNVERIFIED")
+  verifiedUntil          DateTime?
+  quarterlyDiscountType  String                    @default("PERCENT")
+  quarterlyDiscountValue Int                       @default(10)
+  welcomeDiscountType    String                    @default("PERCENT")
+  welcomeDiscountValue   Int                       @default(10)
+  yearlyDiscountType     String                    @default("PERCENT")
+  yearlyDiscountValue    Int                       @default(15)
+  facebookUrl            String?
+  instagramUrl           String?
+  youtubeUrl             String?
+  amenities              String[]                  @default([])
   city                   String?
+  featuredEndAt          DateTime?
+  featuredStartAt        DateTime?
+  gymTier                GymTier                   @default(SUPPORTING)
+  hasAC                  Boolean                   @default(false)
+  isFeatured             Boolean                   @default(false)
+  lastContactedAt        DateTime?
+  ownerConsentAt         DateTime?
+  responsivenessOverride Int?
+  responsivenessScore    Int                       @default(0)
   state                  String?
   suspendedAt            DateTime?
-  lastContactedAt        DateTime?
-  responsivenessScore    Int      @default(0)
-  responsivenessOverride Int?
-  gstNumber              String?
-  gstCertificateUrl      String?
-  gstVerifiedAt          DateTime?
-  razorpaySubAccountId   String?
-  bankAccountLast4       String?
-  bankAccountVerified    Boolean  @default(false)
-  openTime               String?  // "HH:mm"
-  closeTime              String?  // "HH:mm"
-  openDays               String?  // "MON,TUE,WED,THU,FRI,SAT,SUN"
-  dayPassPrice           Int?     // in paise, optional
-  monthlyPrice           Int      // in paise
-  quarterlyPrice         Int?     // in paise, null = computed as monthlyPrice * 3
-  yearlyPrice            Int      // in paise
-  partnerDiscountPercent Int      @default(10)
-  quarterlyDiscountType  String   @default("PERCENT") // PERCENT | FLAT
-  quarterlyDiscountValue Int      @default(10)        // percent or paise (if FLAT)
-  yearlyDiscountType     String   @default("PERCENT") // PERCENT | FLAT
-  yearlyDiscountValue    Int      @default(15)        // percent or paise (if FLAT)
-  welcomeDiscountType    String   @default("PERCENT") // PERCENT | FLAT
-  welcomeDiscountValue   Int      @default(10)        // percent or paise (if FLAT)
-  coverImageUrl          String?  // optional gym photo
-  imageUrls              String[] @default([])
-  instagramUrl           String?
-  facebookUrl            String?
-  youtubeUrl             String?
-  isFeatured             Boolean  @default(false)
-  featuredStartAt        DateTime?
-  featuredEndAt          DateTime?
-  featuredUntil          DateTime?
-  verifiedUntil          DateTime?
-  createdAt              DateTime @default(now())
-  updatedAt              DateTime @updatedAt
-
-  owner        User          @relation(fields: [ownerId], references: [id], onDelete: Cascade)
-  memberships  Membership[]
-  duos         Duo[]
-  invites      Invite[]
-  payments     Payment[]
-  discountCodes DiscountCode[]
-  savedBy      SavedGym[]
-  featuredPurchases FeaturedListingPurchase[]
-  verifiedPurchases VerifiedBadgePurchase[]
-  transactions Transaction[]
-  pageViews   GymPageView[]
-  leads       Lead[]
-  whatsappLogs WhatsAppLog[]
-  invoices    Invoice[]
-  invoiceTypeDefault   InvoiceType?
-  invoiceSequence InvoiceSequence?
-  gymSessions GymSession[]
-  qrStatics   QrStatic[]
-  qrKeys      QrKey[]
-  qrTokens    QrToken[]
-  qrAuditLogs QrAuditLog[]
-}
-
-model GymSession {
-  id                String   @id @default(uuid())
-  userId            String
-  gymId             String?
-  entryAt           DateTime
-  exitAt            DateTime?
-  durationMinutes   Int?
-  calories          Int?
-  validForStreak    Boolean  @default(false)
-  endedBy           String?
-  verificationStatus String  @default("VERIFIED") // PENDING | VERIFIED | REJECTED
-  deviceId          String?
-  createdAt         DateTime @default(now())
-  updatedAt         DateTime @updatedAt
-
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
-  gym  Gym? @relation(fields: [gymId], references: [id], onDelete: SetNull)
-
-  @@index([userId, entryAt])
-  @@index([gymId, entryAt])
-}
-
-model WeightLog {
-  id        String   @id @default(uuid())
-  userId    String
-  valueKg   Float
-  loggedAt  DateTime
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  @@index([userId, loggedAt])
-}
-
-model QrStatic {
-  id               String   @id @default(uuid())
-  gymId            String
-  type             String   // ENTRY | EXIT | PAYMENT
-  currentKeyVersion Int     @default(1)
-  revokedAt        DateTime?
-  createdAt        DateTime @default(now())
-  updatedAt        DateTime @updatedAt
-
-  gym Gym @relation(fields: [gymId], references: [id], onDelete: Cascade)
-  keys QrKey[]
-
-  @@unique([gymId, type])
-  @@index([gymId])
-}
-
-model QrKey {
-  id        String   @id @default(uuid())
-  gymId     String
-  type      String   // ENTRY | EXIT | PAYMENT
-  version   Int
-  active    Boolean  @default(true)
-  rotatedAt DateTime?
-  createdAt DateTime @default(now())
-
-  gym Gym @relation(fields: [gymId], references: [id], onDelete: Cascade)
-
-  @@unique([gymId, type, version])
-  @@index([gymId, type, active])
-}
-
-model QrToken {
-  id        String   @id @default(uuid())
-  gymId     String
-  type      String   // ENTRY | EXIT | PAYMENT
-  tokenHash String   @unique
-  expiresAt DateTime
-  createdAt DateTime @default(now())
-  usedAt    DateTime?
-
-  gym Gym @relation(fields: [gymId], references: [id], onDelete: Cascade)
-
-  @@index([gymId, type, expiresAt])
-}
-
-model QrAuditLog {
-  id        String   @id @default(uuid())
-  actorId   String
-  gymId     String
-  type      String?
-  action    String   // GENERATE | REGENERATE | REVOKE | BULK_GENERATE | BULK_EXPORT
-  metadata  Json?
-  createdAt DateTime @default(now())
-
-  actor User @relation(fields: [actorId], references: [id], onDelete: Cascade)
-  gym   Gym  @relation(fields: [gymId], references: [id], onDelete: Cascade)
-
-  @@index([gymId, createdAt])
-}
-
-model QrBatchJob {
-  id             String   @id @default(uuid())
-  actorId        String
-  scope          String   // ALL_GYMS | GYM
-  gymId          String?
-  status         String   // PENDING | RUNNING | COMPLETE | FAILED
-  totalCount     Int      @default(0)
-  processedCount Int      @default(0)
-  downloadUrl    String?
-  error          String?
-  createdAt      DateTime @default(now())
-  updatedAt      DateTime @updatedAt
-  completedAt    DateTime?
-
-  actor User @relation(fields: [actorId], references: [id], onDelete: Cascade)
-
-  @@index([status, createdAt])
+  imageUrls              String[]                  @default([])
+  invoiceTypeDefault     InvoiceType?
+  discountCodes          DiscountCode[]
+  duos                   Duo[]
+  featuredPurchases      FeaturedListingPurchase[]
+  owner                  User                      @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  pageViews              GymPageView[]
+  invites                Invite[]
+  invoices               Invoice[]
+  invoiceSequence        InvoiceSequence?
+  leads                  Lead[]
+  memberships            Membership[]
+  payments               Payment[]
+  savedBy                SavedGym[]
+  transactions           Transaction[]
+  verifiedPurchases      VerifiedBadgePurchase[]
+  whatsappLogs           WhatsAppLog[]
+  qrStatics              qrStatic[]
+  qrTokens               qrToken[]
+  gymSessions            gymSession[]        @relation("GymGymSessions")
 }
 
 model Notification {
   id        String   @id @default(cuid())
   userId    String
-  type      String   // membership_expiring | duo_accepted
+  type      String
   title     String
   body      String
   entityId  String?
   read      Boolean  @default(false)
   createdAt DateTime @default(now())
-
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([userId, type, entityId])
 }
@@ -375,15 +241,12 @@ model FeaturedListingPurchase {
   gymId             String
   ownerId           String
   amount            Int
-  status            String   // PENDING | CAPTURED | FAILED
-  razorpayOrderId   String
+  status            String
+  razorpayOrderId   String   @unique
   razorpayPaymentId String?
   createdAt         DateTime @default(now())
-
-  gym   Gym  @relation(fields: [gymId], references: [id], onDelete: Cascade)
-  owner User @relation(fields: [ownerId], references: [id], onDelete: Cascade)
-
-  @@unique([razorpayOrderId])
+  gym               Gym      @relation(fields: [gymId], references: [id], onDelete: Cascade)
+  owner             User     @relation(fields: [ownerId], references: [id], onDelete: Cascade)
 }
 
 model VerifiedBadgePurchase {
@@ -391,15 +254,12 @@ model VerifiedBadgePurchase {
   gymId             String
   ownerId           String
   amount            Int
-  status            String   // PENDING | CAPTURED | FAILED
-  razorpayOrderId   String
+  status            String
+  razorpayOrderId   String   @unique
   razorpayPaymentId String?
   createdAt         DateTime @default(now())
-
-  gym   Gym  @relation(fields: [gymId], references: [id], onDelete: Cascade)
-  owner User @relation(fields: [ownerId], references: [id], onDelete: Cascade)
-
-  @@unique([razorpayOrderId])
+  gym               Gym      @relation(fields: [gymId], references: [id], onDelete: Cascade)
+  owner             User     @relation(fields: [ownerId], references: [id], onDelete: Cascade)
 }
 
 model SavedGym {
@@ -407,46 +267,44 @@ model SavedGym {
   userId    String
   gymId     String
   createdAt DateTime @default(now())
-
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
-  gym  Gym  @relation(fields: [gymId], references: [id], onDelete: Cascade)
+  gym       Gym      @relation(fields: [gymId], references: [id], onDelete: Cascade)
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([userId, gymId])
 }
 
 model DiscountCode {
-  id             String   @id @default(cuid())
-  gymId          String
-  code           String
-  discountType   String   @default("PERCENT") // PERCENT | FLAT
-  discountValue  Int
-  maxUses        Int      @default(100)
-  usedCount      Int      @default(0)
-  validFrom      DateTime @default(now())
-  validUntil     DateTime
-  createdAt      DateTime @default(now())
-
-  gym Gym @relation(fields: [gymId], references: [id], onDelete: Cascade)
+  id            String   @id @default(cuid())
+  gymId         String
+  code          String
+  maxUses       Int      @default(100)
+  usedCount     Int      @default(0)
+  validFrom     DateTime @default(now())
+  validUntil    DateTime
+  createdAt     DateTime @default(now())
+  discountType  String   @default("PERCENT")
+  discountValue Int
+  gym           Gym      @relation(fields: [gymId], references: [id], onDelete: Cascade)
 
   @@unique([gymId, code])
 }
 
 model Membership {
-  id           String   @id @default(cuid())
-  userId       String
-  gymId        String
-  planType     String   // DAY_PASS | MONTHLY | QUARTERLY | YEARLY
-  basePrice    Int      // in paise
-  finalPrice   Int      // in paise
-  discountBreakdown String? // JSON
-  active       Boolean  @default(true)
-  startedAt    DateTime @default(now())
-  expiresAt    DateTime
-
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
-  gym  Gym  @relation(fields: [gymId], references: [id], onDelete: Cascade)
-  transactions Transaction[]
-  invoice Invoice? @relation("MembershipInvoice")
+  id                String        @id @default(cuid())
+  userId            String
+  gymId             String
+  planType          String
+  basePrice         Int
+  finalPrice        Int
+  discountBreakdown String?
+  active            Boolean       @default(true)
+  startedAt         DateTime      @default(now())
+  expiresAt         DateTime
+  invoice           Invoice[]     @relation("MembershipInvoice")
+  gym               Gym           @relation(fields: [gymId], references: [id], onDelete: Cascade)
+  user              User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  transactions      Transaction[]
+  gymSessions       gymSession[]  @relation("MembershipGymSessions")
 }
 
 model GymPageView {
@@ -454,9 +312,8 @@ model GymPageView {
   gymId     String
   userId    String?
   createdAt DateTime @default(now())
-
-  gym  Gym  @relation(fields: [gymId], references: [id], onDelete: Cascade)
-  user User? @relation(fields: [userId], references: [id], onDelete: SetNull)
+  gym       Gym      @relation(fields: [gymId], references: [id], onDelete: Cascade)
+  user      User?    @relation(fields: [userId], references: [id])
 
   @@index([gymId, createdAt])
 }
@@ -468,13 +325,27 @@ model Duo {
   gymId     String
   active    Boolean  @default(true)
   createdAt DateTime @default(now())
-
-  userOne User @relation("UserOne", fields: [userOneId], references: [id], onDelete: Cascade)
-  userTwo User @relation("UserTwo", fields: [userTwoId], references: [id], onDelete: Cascade)
-  gym     Gym  @relation(fields: [gymId], references: [id], onDelete: Cascade)
+  gym       Gym      @relation(fields: [gymId], references: [id], onDelete: Cascade)
+  userOne   User     @relation("UserOne", fields: [userOneId], references: [id], onDelete: Cascade)
+  userTwo   User     @relation("UserTwo", fields: [userTwoId], references: [id], onDelete: Cascade)
 
   @@unique([userOneId, userTwoId, gymId])
 }
+
+model WeightLog {
+  id        String   @id @default(cuid())
+  userId    String
+  valueKg   Float
+  loggedAt  DateTime
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+
 
 model Invite {
   id            String   @id @default(cuid())
@@ -482,28 +353,25 @@ model Invite {
   code          String   @unique
   gymId         String
   inviterId     String
-  invitedUserId String?  // set when invitee joins (for join-together flow)
+  invitedUserId String?
   accepted      Boolean  @default(false)
   createdAt     DateTime @default(now())
-
-  gym    Gym  @relation(fields: [gymId], references: [id], onDelete: Cascade)
-  inviter User @relation("Inviter", fields: [inviterId], references: [id], onDelete: Cascade)
+  gym           Gym      @relation(fields: [gymId], references: [id], onDelete: Cascade)
+  inviter       User     @relation("Inviter", fields: [inviterId], references: [id], onDelete: Cascade)
 }
-
 
 model Lead {
   id           String   @id @default(cuid())
   gymId        String
   userId       String?
-  type         String   // BOOK_CTA | ENQUIRY
+  type         String
   message      String?
   contactName  String?
   contactEmail String?
   contactPhone String?
   createdAt    DateTime @default(now())
-
-  gym  Gym  @relation(fields: [gymId], references: [id], onDelete: Cascade)
-  user User? @relation(fields: [userId], references: [id], onDelete: SetNull)
+  gym          Gym      @relation(fields: [gymId], references: [id], onDelete: Cascade)
+  user         User?    @relation(fields: [userId], references: [id])
 
   @@index([gymId, createdAt])
   @@index([userId])
@@ -527,15 +395,14 @@ model WhatsAppLog {
   id        String   @id @default(cuid())
   eventType String
   toNumber  String
-  status    String   // SENT | FAILED | SKIPPED
+  status    String
   error     String?
   payload   Json?
   gymId     String?
   userId    String?
   createdAt DateTime @default(now())
-
-  gym  Gym?  @relation(fields: [gymId], references: [id], onDelete: SetNull)
-  user User? @relation(fields: [userId], references: [id], onDelete: SetNull)
+  gym       Gym?     @relation(fields: [gymId], references: [id])
+  user      User?    @relation(fields: [userId], references: [id])
 
   @@index([eventType, createdAt])
   @@index([gymId])
@@ -543,59 +410,58 @@ model WhatsAppLog {
 }
 
 model SubscriptionReminderLog {
-  id               String   @id @default(cuid())
+  id               String            @id @default(cuid())
   ownerId          String
   subscriptionId   String
   daysBeforeExpiry Int
-  channel          String   // EMAIL | WHATSAPP
-  status           String   // SENT | FAILED | SKIPPED
+  channel          String
+  status           String
   error            String?
-  createdAt        DateTime @default(now())
-
-  owner        User              @relation(fields: [ownerId], references: [id], onDelete: Cascade)
-  subscription OwnerSubscription @relation(fields: [subscriptionId], references: [id], onDelete: Cascade)
+  createdAt        DateTime          @default(now())
+  owner            User              @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  subscription     OwnerSubscription @relation(fields: [subscriptionId], references: [id], onDelete: Cascade)
 
   @@unique([subscriptionId, daysBeforeExpiry, channel])
   @@index([ownerId])
 }
 
 model Invoice {
-  id            String   @id @default(cuid())
-  invoiceNumber String   @unique
-  ownerId       String
-  gymId         String?
-  userId        String?
-  membershipId  String?  @unique
-  transactionId String?
-  invoiceType   InvoiceType @default(NON_GST)
-  taxMode       InvoiceTaxMode @default(NONE)
-  gstRate       Int?
-  subtotal      Int
-  taxTotal      Int
-  total         Int
-  amount        Int
-  currency      String   @default("INR")
-  gymName       String
-  gymAddress    String?
-  gymCity       String?
-  gymState      String?
-  gymGstNumber  String?
-  memberName    String?
-  memberEmail   String?
-  memberState   String?
-  pdfUrl        String?
-  gstNumber     String?
-  status        String   @default("ISSUED")
-  issuedAt      DateTime @default(now())
-  createdAt     DateTime @default(now())
-
-  owner User @relation("OwnerInvoices", fields: [ownerId], references: [id], onDelete: Cascade)
-  gym   Gym?  @relation(fields: [gymId], references: [id], onDelete: SetNull)
-  user  User? @relation("MemberInvoices", fields: [userId], references: [id], onDelete: SetNull)
-  membership Membership? @relation("MembershipInvoice", fields: [membershipId], references: [id], onDelete: SetNull)
-  transaction Transaction? @relation("TransactionInvoice")
-  items InvoiceItem[]
-  taxes InvoiceTax[]
+  id                                             String         @id @default(cuid())
+  invoiceNumber                                  String         @unique
+  ownerId                                        String
+  gymId                                          String?
+  amount                                         Int
+  gstNumber                                      String?
+  status                                         String         @default("ISSUED")
+  issuedAt                                       DateTime       @default(now())
+  createdAt                                      DateTime       @default(now())
+  userId                                         String?
+  membershipId                                   String?
+  transactionId                                  String?
+  invoiceType                                    InvoiceType    @default(NON_GST)
+  taxMode                                        InvoiceTaxMode @default(NONE)
+  gstRate                                        Int?
+  subtotal                                       Int            @default(0)
+  taxTotal                                       Int            @default(0)
+  total                                          Int            @default(0)
+  currency                                       String         @default("INR")
+  gymName                                        String         @default("Fitdex")
+  gymAddress                                     String?
+  gymCity                                        String?
+  gymState                                       String?
+  gymGstNumber                                   String?
+  memberName                                     String?
+  memberEmail                                    String?
+  memberState                                    String?
+  pdfUrl                                         String?
+  gym                                            Gym?           @relation(fields: [gymId], references: [id])
+  membership                                     Membership?    @relation("MembershipInvoice", fields: [membershipId], references: [id])
+  owner                                          User           @relation("OwnerInvoices", fields: [ownerId], references: [id], onDelete: Cascade)
+  Transaction_Invoice_transactionIdToTransaction Transaction?   @relation("Invoice_transactionIdToTransaction", fields: [transactionId], references: [id])
+  user                                           User?          @relation("MemberInvoices", fields: [userId], references: [id])
+  items                                          InvoiceItem[]
+  taxes                                          InvoiceTax[]
+  transaction                                    Transaction[]  @relation("TransactionInvoice")
 
   @@index([ownerId, issuedAt])
   @@index([gymId])
@@ -610,21 +476,19 @@ model InvoiceItem {
   unitPrice   Int
   total       Int
   createdAt   DateTime @default(now())
-
-  invoice Invoice @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+  invoice     Invoice  @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
 
   @@index([invoiceId])
 }
 
 model InvoiceTax {
-  id        String   @id @default(cuid())
+  id        String         @id @default(cuid())
   invoiceId String
   taxType   InvoiceTaxType
   rate      Int
   amount    Int
-  createdAt DateTime @default(now())
-
-  invoice Invoice @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+  createdAt DateTime       @default(now())
+  invoice   Invoice        @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
 
   @@index([invoiceId])
 }
@@ -633,45 +497,43 @@ model InvoiceSequence {
   id         String   @id @default(cuid())
   gymId      String   @unique
   lastNumber Int      @default(0)
-  updatedAt  DateTime @updatedAt
-
-  gym Gym @relation(fields: [gymId], references: [id], onDelete: Cascade)
+  updatedAt  DateTime @default(now()) @updatedAt
+  gym        Gym      @relation(fields: [gymId], references: [id], onDelete: Cascade)
 }
 
 model Payment {
-  id                 String   @id @default(cuid())
-  userId             String
-  gymId              String
-  amount             Int      // in paise
-  razorpayOrderId    String?
-  razorpayPaymentId  String?
-  status             String   // PENDING | CAPTURED | FAILED
-  createdAt          DateTime @default(now())
-
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
-  gym  Gym  @relation(fields: [gymId], references: [id], onDelete: Cascade)
+  id                String   @id @default(cuid())
+  userId            String
+  gymId             String
+  amount            Int
+  razorpayOrderId   String?
+  razorpayPaymentId String?
+  status            String
+  createdAt         DateTime @default(now())
+  gym               Gym      @relation(fields: [gymId], references: [id], onDelete: Cascade)
+  user              User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
 
 model Transaction {
-  id                        String   @id @default(cuid())
-  userId                    String
-  gymId                     String
-  membershipId              String
-  invoiceId                 String?  @unique
-  totalAmount               Int      // in paise
-  platformCommissionAmount  Int      // in paise
-  gymPayoutAmount           Int      // in paise
-  razorpayOrderId           String   @unique
-  razorpayPaymentId         String?
-  paymentStatus             String   // CREATED | PAID | FAILED
-  settlementStatus          String   // NOT_STARTED | PARTIAL | COMPLETED
-  createdAt                 DateTime @default(now())
-  updatedAt                 DateTime @updatedAt
-
-  user       User       @relation(fields: [userId], references: [id], onDelete: Cascade)
-  gym        Gym        @relation(fields: [gymId], references: [id], onDelete: Cascade)
-  membership Membership @relation(fields: [membershipId], references: [id], onDelete: Cascade)
-  invoice    Invoice?   @relation("TransactionInvoice", fields: [invoiceId], references: [id], onDelete: SetNull)
+  id                                         String     @id @default(cuid())
+  userId                                     String
+  gymId                                      String
+  membershipId                               String
+  totalAmount                                Int
+  platformCommissionAmount                   Int
+  gymPayoutAmount                            Int
+  razorpayOrderId                            String     @unique
+  razorpayPaymentId                          String?
+  paymentStatus                              String
+  settlementStatus                           String
+  createdAt                                  DateTime   @default(now())
+  updatedAt                                  DateTime   @updatedAt
+  invoiceId                                  String?
+  Invoice_Invoice_transactionIdToTransaction Invoice[]  @relation("Invoice_transactionIdToTransaction")
+  gym                                        Gym        @relation(fields: [gymId], references: [id], onDelete: Cascade)
+  invoice                                    Invoice?   @relation("TransactionInvoice", fields: [invoiceId], references: [id])
+  membership                                 Membership @relation(fields: [membershipId], references: [id], onDelete: Cascade)
+  user                                       User       @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId])
   @@index([gymId])
@@ -679,10 +541,74 @@ model Transaction {
 }
 
 model RazorpayWebhookEvent {
-  id          String   @id @default(cuid())
-  eventId     String   @unique
+  id          String    @id @default(cuid())
+  eventId     String    @unique
   eventType   String
   payload     Json
   processedAt DateTime?
-  createdAt   DateTime @default(now())
+  createdAt   DateTime  @default(now())
+}
+
+model qrStatic {
+  gymId      String
+  type       String
+  currentKeyVersion Int
+  revokedAt  DateTime?
+  gym        Gym      @relation(fields: [gymId], references: [id], onDelete: Cascade)
+
+  @@id([gymId, type])
+}
+
+model qrToken {
+  tokenHash  String   @id
+  gymId      String
+  type       String
+  expiresAt  DateTime
+  usedAt     DateTime?
+  createdAt  DateTime @default(now())
+  gym        Gym      @relation(fields: [gymId], references: [id], onDelete: Cascade)
+}
+
+model gymSession {
+  id                  String   @id @default(cuid())
+  userId              String
+  gymId               String
+  membershipId        String?
+  entryAt             DateTime
+  exitAt              DateTime?
+  durationMinutes     Int?
+  calories            Int?
+  validForStreak      Boolean  @default(false)
+  endedBy             String?
+  verificationStatus  String   @default("PENDING")
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+    user                User     @relation("UserGymSessions", fields: [userId], references: [id], onDelete: Cascade)
+  gym                 Gym      @relation("GymGymSessions", fields: [gymId], references: [id], onDelete: Cascade)
+    membership          Membership? @relation("MembershipGymSessions", fields: [membershipId], references: [id])
+
+  @@index([userId])
+  @@index([gymId])
+  @@index([membershipId])
+}
+
+enum InvoiceTaxMode {
+  CGST_SGST
+  IGST
+  NONE
+}
+
+enum InvoiceTaxType {
+  CGST
+  SGST
+  IGST
+}
+
+model LedgerEntry {
+  id        String   @id @default(cuid())
+  userId    String?
+  gymId     String?
+  amount    Int
+  type      String
+  createdAt DateTime @default(now())
 }

@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { getAllQueueItems, putQueueItem, clearQueue } from "@/lib/idb-queue";
 import { fetchJson } from "@/lib/client-fetch";
 import type { SyncQueueItem, SyncResponse } from "@/types/fitness";
 
@@ -135,6 +136,15 @@ function shouldAttempt(item: LocalQueueItem, now: number): boolean {
 }
 
 export function useFitnessSync(identity: string | null) {
+    // Sync health state
+    const [syncHealth, setSyncHealth] = useState({
+      lastSuccessfulSyncAt: null as string | null,
+      consecutiveFailures: 0,
+      isStale: false,
+      dataAtRisk: false,
+      showSyncWarning: false,
+      showDataAtRiskWarning: false,
+    });
   const storageKey = useMemo(() => getStorageKey(identity), [identity]);
   const deviceIdRef = useRef<string>(safeRandomUUID());
   const [state, setState] = useState<PersistedFitnessState>(() =>
@@ -152,13 +162,27 @@ export function useFitnessSync(identity: string | null) {
     if (!storageKey) return;
     const raw = window.localStorage.getItem(storageKey);
     const restored = parsePersistedFitnessState(raw, deviceIdRef.current);
-    setState(restored);
+    // Hydrate queue from IndexedDB, fallback to localStorage if needed
+    (async () => {
+      const idbQueue = await getAllQueueItems();
+      setState({
+        ...restored,
+        queue: (idbQueue && idbQueue.length > 0) ? idbQueue : restored.queue,
+      });
+    })();
   }, [storageKey]);
 
   useEffect(() => {
     if (!storageKey) return;
     window.localStorage.setItem(storageKey, JSON.stringify(state));
-  }, [state, storageKey]);
+    // Persist queue to IndexedDB
+    (async () => {
+      await clearQueue();
+      for (const item of state.queue) {
+        await putQueueItem(item);
+      }
+    })();
+  }, [state.queue, storageKey]);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -201,11 +225,13 @@ export function useFitnessSync(identity: string | null) {
   const applyServerChanges = useCallback((changes: SyncResponse["changes"]) => {
     setState((prev) => {
       const sessionMap = new Map(prev.sessions.map((session) => [session.id, session]));
+      let serverActive: LocalSession | null = null;
       for (const session of changes.sessions) {
+        // Normalize ISO string to number at hydration
         const updatedAt = Date.parse(session.updatedAt);
         const existing = sessionMap.get(session.id);
         if (existing && existing.updatedAt >= updatedAt) continue;
-        sessionMap.set(session.id, {
+        const localSession: LocalSession = {
           id: session.id,
           gymId: session.gymId ?? null,
           gymName: (session as any).gymName ?? existing?.gymName ?? "Fitdex Gym",
@@ -218,11 +244,16 @@ export function useFitnessSync(identity: string | null) {
           verificationStatus: (session.verificationStatus ?? "VERIFIED") as LocalSession["verificationStatus"],
           createdAt: Date.parse(session.createdAt),
           updatedAt,
-        });
+        };
+        sessionMap.set(session.id, localSession);
+        if (!session.exitAt) {
+          serverActive = localSession;
+        }
       }
 
       const weightMap = new Map(prev.weights.map((weight) => [weight.id, weight]));
       for (const weight of changes.weights) {
+        // Normalize ISO string to number at hydration
         const updatedAt = Date.parse(weight.updatedAt);
         const existing = weightMap.get(weight.id);
         if (existing && existing.updatedAt >= updatedAt) continue;
@@ -235,10 +266,21 @@ export function useFitnessSync(identity: string | null) {
         });
       }
 
+      // Hydrate liveSession from server if newer or missing
+      let liveSession = prev.liveSession;
+      if (serverActive) {
+        if (!liveSession || serverActive.updatedAt > liveSession.updatedAt) {
+          liveSession = serverActive;
+        }
+      } else if (liveSession && !sessionMap.has(liveSession.id)) {
+        liveSession = null;
+      }
+
       return {
         ...prev,
         sessions: Array.from(sessionMap.values()).sort((a, b) => b.exitAt - a.exitAt).slice(0, 200),
         weights: Array.from(weightMap.values()).sort((a, b) => b.timestamp - a.timestamp).slice(0, 200),
+        liveSession,
       };
     });
   }, []);
@@ -273,6 +315,19 @@ export function useFitnessSync(identity: string | null) {
       if (!result.ok || !result.data?.ok) {
         const errorMessage = result.error ?? "Sync failed";
         setSyncStatus((prev) => ({ ...prev, lastError: errorMessage }));
+        setSyncHealth((prev) => {
+          const fails = prev.consecutiveFailures + 1;
+          const isStale = !!(prev.lastSuccessfulSyncAt && Date.now() - new Date(prev.lastSuccessfulSyncAt).getTime() > 60000);
+          const dataAtRisk = (state.queue && state.queue.length > 0 && prev.lastSuccessfulSyncAt && Date.now() - new Date(prev.lastSuccessfulSyncAt).getTime() > 120000);
+          return {
+            ...prev,
+            consecutiveFailures: fails,
+            isStale,
+            dataAtRisk,
+            showSyncWarning: isStale,
+            showDataAtRiskWarning: dataAtRisk,
+          };
+        });
         setState((prev) => {
           const attemptedIds = new Set(pendingQueue.map((item) => item.id));
           const updatedQueue = prev.queue.map((item) =>
@@ -305,6 +360,7 @@ export function useFitnessSync(identity: string | null) {
                 ? { ...item, retryCount: item.retryCount + 1, lastAttemptAt: new Date().toISOString() }
                 : item
             );
+          // Use serverTime as the new sync cursor, not client clock
           return {
             ...prev,
             queue: nextQueue,
@@ -313,6 +369,17 @@ export function useFitnessSync(identity: string | null) {
         });
 
         setSyncStatus((prev) => ({ ...prev, lastSyncAt: response.serverTime }));
+        setSyncHealth((prev) => {
+          return {
+            ...prev,
+            lastSuccessfulSyncAt: response.serverTime,
+            consecutiveFailures: 0,
+            isStale: false,
+            dataAtRisk: false,
+            showSyncWarning: false,
+            showDataAtRiskWarning: false,
+          };
+        });
       }
     } catch (error) {
       setSyncStatus((prev) => ({
@@ -324,6 +391,25 @@ export function useFitnessSync(identity: string | null) {
       setSyncStatus((prev) => ({ ...prev, syncing: false }));
     }
   }, [identity, state.queue, state.lastSyncedAt, applyServerChanges]);
+  // ENTRY QR failure handler: show error and force sync
+  const handleEntryFailure = useCallback((error: string) => {
+    if (typeof window !== "undefined" && window.dispatchEvent) {
+      window.dispatchEvent(new CustomEvent("fitdex:entry-failure", { detail: error }));
+    }
+    void syncNow();
+  }, [syncNow]);
+  // Warn on logout or beforeunload if queue is non-empty
+  useEffect(() => {
+    const warnIfQueue = (e: BeforeUnloadEvent) => {
+      if (state.queue && state.queue.length > 0) {
+        e.preventDefault();
+        e.returnValue = "You have unsynced workouts. Leaving may cause data loss.";
+        return e.returnValue;
+      }
+    };
+    window.addEventListener("beforeunload", warnIfQueue);
+    return () => window.removeEventListener("beforeunload", warnIfQueue);
+  }, [state.queue]);
 
   useEffect(() => {
     if (!identity) return;
@@ -357,6 +443,17 @@ export function useFitnessSync(identity: string | null) {
     setState((prev) => ({ ...prev, pendingVerification: value }));
   }, []);
 
+  // Expose sync debug info in window for debugging
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      window.__FITDEX_SYNC_DEBUG__ = {
+        syncHealth,
+        queueSize: state.queue?.length ?? 0,
+        lastSyncAt: syncStatus.lastSyncAt,
+      };
+    }
+  }, [syncHealth, state.queue, syncStatus.lastSyncAt]);
+
   return {
     state,
     syncStatus,
@@ -369,5 +466,7 @@ export function useFitnessSync(identity: string | null) {
     setLastWorkoutLoggedAt,
     setPendingVerification,
     deviceId: state.deviceId,
+    handleEntryFailure,
+    syncHealth,
   };
 }

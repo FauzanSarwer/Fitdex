@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { ratelimit } from "@/lib/rate-limit";
 import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { getRequiredEnv } from "@/lib/env";
@@ -9,6 +10,18 @@ import { logServerError } from "@/lib/logger";
 const passwordPepper = getRequiredEnv("PASSWORD_PEPPER", { allowEmptyInDev: true });
 
 export async function POST(req: Request) {
+    const ip =
+      req.headers.get("x-forwarded-for") ??
+      req.headers.get("x-real-ip") ??
+      "anonymous";
+
+    const { success } = await ratelimit.limit(ip);
+    if (!success) {
+      return NextResponse.json(
+        { error: "Too many requests" },
+        { status: 429 }
+      );
+    }
   try {
     const parsed = await safeJson<{
       email?: string;

@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { ratelimit } from "@/lib/rate-limit";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
@@ -7,6 +8,10 @@ import { jsonError } from "@/lib/api";
 import { logServerError } from "@/lib/logger";
 
 export async function GET() {
+    const { success } = await ratelimit.limit(uid);
+    if (!success) {
+      return jsonError("Too many requests", 429);
+    }
   const session = await getServerSession(authOptions);
   if (!requireUser(session)) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
