@@ -141,6 +141,45 @@
   }
 }
 
+@keyframes fitdexWeightPulse {
+  0% {
+    box-shadow: 0 0 0 0 rgba(59, 130, 246, 0.2);
+    transform: scale(1);
+  }
+  50% {
+    box-shadow: 0 0 0 10px rgba(59, 130, 246, 0);
+    transform: scale(1.01);
+  }
+  100% {
+    box-shadow: 0 0 0 0 rgba(59, 130, 246, 0);
+    transform: scale(1);
+  }
+}
+
+.fitdex-weight-pill {
+  animation: fitdexWeightPulse 2.6s ease-in-out infinite;
+}
+
+@keyframes fitdexFlame {
+  0% {
+    transform: translateY(0) scale(1);
+    filter: saturate(1);
+  }
+  50% {
+    transform: translateY(-1px) scale(1.08);
+    filter: saturate(1.2);
+  }
+  100% {
+    transform: translateY(0) scale(1);
+    filter: saturate(1);
+  }
+}
+
+.fitdex-flame {
+  animation: fitdexFlame 1.2s ease-in-out infinite;
+  transform-origin: center bottom;
+}
+
 @keyframes twinkle {
   0% { opacity: var(--fitdex-star-min); }
   50% { opacity: var(--fitdex-star-max); }
