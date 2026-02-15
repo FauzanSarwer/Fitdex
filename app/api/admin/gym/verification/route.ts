@@ -1,10 +1,30 @@
 import { NextResponse } from "next/server";
+import { revalidatePath } from "next/cache";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { requireAdmin } from "@/lib/permissions";
 import { jsonError, safeJson } from "@/lib/api";
 import { logServerError } from "@/lib/logger";
+import { buildGymSlug } from "@/lib/utils";
+import { normalizeCityName } from "@/lib/seo/cities";
+
+const revalidateGymPaths = (gym: { id: string; name: string | null; city: string | null }) => {
+  revalidatePath("/dashboard/admin/verification");
+  revalidatePath(`/dashboard/admin/verification/${gym.id}`);
+  revalidatePath("/dashboard/admin/gyms");
+  revalidatePath("/dashboard/admin");
+
+  const slug = buildGymSlug(gym.name ?? "Gym", gym.id);
+  revalidatePath(`/gym/${slug}`);
+
+  const citySlug = gym.city ? normalizeCityName(gym.city) : "";
+  if (citySlug) {
+    revalidatePath(`/gyms-in-${citySlug}`);
+  }
+
+  revalidatePath("/sitemap.xml");
+};
 
 export async function POST(req: Request) {
   const session = await getServerSession(authOptions);
@@ -43,6 +63,7 @@ export async function POST(req: Request) {
           verificationNotes: parsed.data.notes ?? null,
         },
       });
+      revalidateGymPaths(gym);
       return NextResponse.json({ ok: true, gym: { id: updated.id, razorpaySubAccountId: updated.razorpaySubAccountId } });
     }
 
@@ -56,6 +77,7 @@ export async function POST(req: Request) {
           verificationNotes: parsed.data.notes ?? null,
         },
       });
+      revalidateGymPaths(gym);
       return NextResponse.json({ ok: true, verificationStatus: updated.verificationStatus });
     }
 
@@ -68,6 +90,7 @@ export async function POST(req: Request) {
           gstVerifiedAt: null,
         },
       });
+      revalidateGymPaths(gym);
       return NextResponse.json({ ok: true, verificationStatus: updated.verificationStatus });
     }
 
@@ -80,6 +103,7 @@ export async function POST(req: Request) {
           gstVerifiedAt: null,
         },
       });
+      revalidateGymPaths(gym);
       return NextResponse.json({ ok: true, verificationStatus: updated.verificationStatus });
     }
 
@@ -93,6 +117,7 @@ export async function POST(req: Request) {
             parsed.data.notes?.trim() || "Manually verified by admin via bypass flow.",
         },
       });
+      revalidateGymPaths(gym);
       return NextResponse.json({ ok: true, verificationStatus: updated.verificationStatus });
     }
 

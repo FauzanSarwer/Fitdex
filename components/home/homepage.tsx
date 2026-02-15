@@ -416,7 +416,7 @@ export function HomePageView(): JSX.Element {
                 data-index={index}
               >
                 <Card
-                  className="fitdex-feature-card group relative h-full overflow-hidden border-white/10 bg-white/[0.04] shadow-[0_16px_28px_rgba(2,8,20,0.18)] transition-[transform,box-shadow,border-color] duration-700 hover:delay-100 hover:-translate-y-2 hover:scale-[1.01] hover:shadow-[0_24px_40px_rgba(2,8,20,0.26)]"
+                  className="fitdex-feature-card group relative h-full overflow-hidden border-white/10 bg-white/[0.04] shadow-[0_16px_28px_rgba(2,8,20,0.18)] transition-[transform,box-shadow,border-color] duration-700 hover:delay-100 hover:-translate-y-2 hover:shadow-[0_24px_40px_rgba(2,8,20,0.26)]"
                   data-accent-color={accentRgb[feature.accent]}
                   style={{
                     transitionTimingFunction: "cubic-bezier(0.22, 1, 0.36, 1)",

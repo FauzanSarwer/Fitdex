@@ -1,11 +1,12 @@
 "use client";
 
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
 import { fetchJson } from "@/lib/client-fetch";
 
-type VerificationAction = "APPROVE" | "REJECT" | "REQUEST_REUPLOAD";
+type VerificationAction = "APPROVE" | "REJECT" | "REQUEST_REUPLOAD" | "FORCE_VERIFY";
 
 type Props = {
   gymId: string;
@@ -15,6 +16,7 @@ type Props = {
 
 export function VerificationActions({ gymId, initialStatus, initialNotes }: Props) {
   const { toast } = useToast();
+  const router = useRouter();
   const [notes, setNotes] = useState(initialNotes ?? "");
   const [status, setStatus] = useState(initialStatus);
   const [submitting, setSubmitting] = useState<VerificationAction | null>(null);
@@ -37,6 +39,7 @@ export function VerificationActions({ gymId, initialStatus, initialNotes }: Prop
 
     if (result.ok) {
       setStatus(result.data?.verificationStatus ?? status);
+      router.refresh();
       toast({
         title: "Updated",
         description: `Verification marked as ${result.data?.verificationStatus ?? status}.`,
@@ -77,6 +80,14 @@ export function VerificationActions({ gymId, initialStatus, initialNotes }: Prop
           onClick={() => handleAction("APPROVE")}
         >
           {submitting === "APPROVE" ? "Approving..." : "Approve"}
+        </Button>
+        <Button
+          size="sm"
+          variant="secondary"
+          disabled={submitting !== null}
+          onClick={() => handleAction("FORCE_VERIFY")}
+        >
+          {submitting === "FORCE_VERIFY" ? "Verifying..." : "Force verify"}
         </Button>
         <Button
           size="sm"

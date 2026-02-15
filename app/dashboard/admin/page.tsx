@@ -44,7 +44,7 @@ export default async function AdminOverviewPage() {
   ] = await Promise.all([
     prisma.user.count(),
     prisma.gym.count(),
-    prisma.gym.count({ where: { verificationStatus: "PENDING" } }),
+    prisma.gym.count({ where: { verificationStatus: { in: ["PENDING", "UNVERIFIED"] } } }),
     prisma.gym.count({ where: { verificationStatus: "VERIFIED" } }),
     prisma.membership.count(),
     prisma.duo.count({ where: { active: true } }),

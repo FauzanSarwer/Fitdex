@@ -20,7 +20,7 @@ export async function GET() {
   };
 
   const [pendingGyms, newGyms24h, failedPayments24h, activeSubscriptions, activeSubs, gymsByCity, gymsByTier] = await Promise.all([
-    prisma.gym.count({ where: { verificationStatus: "PENDING" } }),
+    prisma.gym.count({ where: { verificationStatus: { in: ["PENDING", "UNVERIFIED"] } } }),
     prisma.gym.count({ where: { createdAt: { gte: since } } }),
     prisma.payment.count({ where: { status: "FAILED", createdAt: { gte: since } } }),
     prisma.ownerSubscription.count({ where: { status: "ACTIVE", expiresAt: { gt: now } } }),

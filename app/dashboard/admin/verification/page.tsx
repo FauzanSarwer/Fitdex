@@ -15,13 +15,14 @@ export default async function AdminVerificationQueuePage() {
   }
 
   const gyms = await prisma.gym.findMany({
-    where: { verificationStatus: "PENDING" },
+    where: { verificationStatus: { in: ["PENDING", "UNVERIFIED"] } },
     select: {
       id: true,
       name: true,
       address: true,
       updatedAt: true,
       verificationNotes: true,
+      verificationStatus: true,
       owner: {
         select: {
           name: true,
@@ -37,17 +38,17 @@ export default async function AdminVerificationQueuePage() {
       <div className="space-y-2">
         <h1 className="text-2xl font-semibold">Verification Queue</h1>
         <p className="text-sm text-muted-foreground">
-          Pending gym verification reviews.
+          Gyms awaiting verification review, including those without submitted documents.
         </p>
       </div>
 
       <Card>
         <CardHeader>
-          <CardTitle>Pending gyms ({gyms.length})</CardTitle>
+          <CardTitle>Verification pending ({gyms.length})</CardTitle>
         </CardHeader>
         <CardContent>
           {gyms.length === 0 ? (
-            <p className="text-sm text-muted-foreground">No pending gyms.</p>
+            <p className="text-sm text-muted-foreground">No gyms awaiting verification.</p>
           ) : (
             <div className="space-y-3">
               {gyms.map((gym) => (
@@ -64,6 +65,11 @@ export default async function AdminVerificationQueuePage() {
                       </div>
                       <div className="text-xs text-muted-foreground">
                         Owner: {gym.owner?.name ?? "Unknown"} · {gym.owner?.email ?? "No email"}
+                      </div>
+                      <div className="mt-2">
+                        <span className="rounded-full border border-white/10 px-2 py-0.5 text-[11px] text-muted-foreground">
+                          {gym.verificationStatus === "UNVERIFIED" ? "Awaiting documents" : "Under review"}
+                        </span>
                       </div>
                     </div>
                     <div className="text-xs text-muted-foreground">

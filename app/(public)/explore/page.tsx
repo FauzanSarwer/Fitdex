@@ -341,20 +341,20 @@ export default function ExplorePage() {
     if (reduceMotion) {
       cards.forEach((card) => {
         card.style.opacity = "1";
-        card.style.transform = "translate3d(0, 0, 0) scale(1)";
+        card.style.transform = "translate3d(0, 0, 0)";
       });
       return;
     }
 
     cards.forEach((card, index) => {
       card.style.opacity = "0";
-      card.style.transform = "translate3d(0, 60px, 0) scale(0.92)";
+      card.style.transform = "translate3d(0, 60px, 0)";
       card.style.filter = "blur(8px)";
       card.style.willChange = "opacity, transform, filter";
       const timeoutId = window.setTimeout(() => {
         card.style.transition = "opacity 760ms cubic-bezier(0.22,1,0.36,1), transform 760ms cubic-bezier(0.22,1,0.36,1), filter 760ms cubic-bezier(0.22,1,0.36,1)";
         card.style.opacity = "1";
-        card.style.transform = "translate3d(0, 0, 0) scale(1)";
+        card.style.transform = "translate3d(0, 0, 0)";
         card.style.filter = "blur(0px)";
         window.setTimeout(() => {
           card.style.willChange = "auto";
@@ -655,7 +655,7 @@ export default function ExplorePage() {
             >
               <Card
                 className={cn(
-                    "motion-gym-card group glass-card relative flex h-full min-h-[380px] flex-col overflow-hidden transition-[transform,filter,opacity] duration-400 hover:-translate-y-[4px] hover:scale-[1.008] [filter:drop-shadow(0_10px_18px_rgba(0,0,0,0.16))] hover:[filter:drop-shadow(0_16px_26px_rgba(0,0,0,0.22))]",
+                    "motion-gym-card group glass-card relative flex h-full min-h-[380px] flex-col overflow-hidden transition-[transform,filter,opacity] duration-400 hover:-translate-y-[4px] [filter:drop-shadow(0_10px_18px_rgba(0,0,0,0.16))] hover:[filter:drop-shadow(0_16px_26px_rgba(0,0,0,0.22))]",
                   isFeatured && "border-primary/40",
                   isPremium && "motion-gym-card-premium"
                 )}

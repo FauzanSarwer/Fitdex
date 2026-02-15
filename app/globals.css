@@ -790,7 +790,7 @@
 
 .fitdex-feature-card {
   opacity: 0;
-  transform: translate3d(0, 24px, 0) scale(0.985);
+  transform: translate3d(0, 24px, 0);
   animation: fitdex-card-reveal 820ms cubic-bezier(0.22, 1, 0.36, 1) forwards;
   animation-delay: var(--reveal-delay, 0ms);
   will-change: transform, opacity;
@@ -799,7 +799,7 @@
 @keyframes fitdex-card-reveal {
   to {
     opacity: 1;
-    transform: translate3d(0, 0, 0) scale(1);
+    transform: translate3d(0, 0, 0);
   }
 }
 
