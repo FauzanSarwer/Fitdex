@@ -1,32 +1,45 @@
 const { execSync } = require("child_process");
 const { PrismaClient } = require("@prisma/client");
 
-const MIGRATION_NAME = "20260208153438_add_gym_image_urls";
+const LEGACY_ENUM_MIGRATION = "20260208153438_add_gym_image_urls";
 const MIGRATE_CMD = "npx prisma migrate deploy --schema=db/schema.prisma";
 
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+
+function resolveMigration(name, status) {
+  execSync(
+    `npx prisma migrate resolve --schema=db/schema.prisma --${status} ${name}`,
+    { stdio: "inherit" }
+  );
+}
 
 async function resolveFailedMigration(prisma) {
   const failed = await prisma.$queryRaw`
     SELECT migration_name
     FROM _prisma_migrations
-    WHERE migration_name = ${MIGRATION_NAME}
-      AND finished_at IS NULL
+    WHERE finished_at IS NULL
       AND rolled_back_at IS NULL
-    LIMIT 1
+    ORDER BY started_at ASC
   `;
 
   if (!Array.isArray(failed) || failed.length === 0) return;
 
-  const enumExists = await prisma.$queryRaw`
-    SELECT 1 FROM pg_type WHERE typname = 'GymTier' LIMIT 1
-  `;
+  for (const row of failed) {
+    const name = row?.migration_name;
+    if (typeof name !== "string" || !name) continue;
 
-  if (Array.isArray(enumExists) && enumExists.length > 0) {
-    execSync(
-      `npx prisma migrate resolve --schema=db/schema.prisma --applied ${MIGRATION_NAME}`,
-      { stdio: "inherit" }
-    );
+    if (name === LEGACY_ENUM_MIGRATION) {
+      const enumExists = await prisma.$queryRaw`
+        SELECT 1 FROM pg_type WHERE typname = 'GymTier' LIMIT 1
+      `;
+      if (Array.isArray(enumExists) && enumExists.length > 0) {
+        resolveMigration(name, "applied");
+        continue;
+      }
+    }
+
+    // Reset failed records so migrate deploy can replay them cleanly.
+    resolveMigration(name, "rolled-back");
   }
 }
 

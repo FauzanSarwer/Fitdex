@@ -2,7 +2,6 @@
 const nextConfig = {
   reactStrictMode: true,
   experimental: {
-    instrumentationHook: true,
     optimizePackageImports: ["lucide-react"],
   },
   images: {

@@ -6,6 +6,7 @@ import React, { Suspense } from "react";
 import { organizationSchema } from "@/lib/seo/schema";
 import { rootMetadata } from "@/lib/seo/config";
 import { Inter, Poppins } from "next/font/google";
+import { ensureQrKeyRotationSchedulerStarted } from "@/lib/qr/key-rotation-scheduler";
 
 const inter = Inter({
   subsets: ["latin"],
@@ -41,6 +42,8 @@ export default function RootLayout({
 }: {
   children: React.ReactNode;
 }) {
+  ensureQrKeyRotationSchedulerStarted();
+
   return (
     <html lang="en" className={`dark ${inter.variable} ${poppins.variable}`} suppressHydrationWarning>
       <head>
