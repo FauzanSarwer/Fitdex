@@ -39,9 +39,18 @@ function isUnknownCoordinateArgError(error: unknown): boolean {
 }
 
 function isCoordinateConstraintError(error: unknown): boolean {
+  if (error instanceof Prisma.PrismaClientKnownRequestError) {
+    if (error.code === "P2011") {
+      const metaText = JSON.stringify(error.meta ?? {}).toLowerCase();
+      if (metaText.includes("latitude") || metaText.includes("longitude")) {
+        return true;
+      }
+    }
+  }
   const message = getErrorMessage(error).toLowerCase();
   const mentionsCoordinates = message.includes("latitude") || message.includes("longitude");
   const isRequiredConstraint =
+    message.includes("null constraint violation") ||
     message.includes("not-null") ||
     message.includes("null value") ||
     message.includes("cannot be null") ||
@@ -322,14 +331,8 @@ export async function POST(req: Request) {
       try {
         gym = await prisma.gym.create({ data: baseCreateData });
       } catch (error) {
-        if (isCoordinateConstraintError(error)) {
-          if (lat == null || lng == null) {
-            return jsonError(
-              "Could not resolve gym coordinates from address. Please use 'Resolve coordinates' and retry.",
-              422
-            );
-          }
-          if (coordinateArgsUnsupported) {
+        if (coordinateArgsUnsupported && lat != null && lng != null) {
+          try {
             const legacyGym = await createGymWithLegacyCoordinates({
               ownerId: uid,
               name: name.trim(),
@@ -345,6 +348,27 @@ export async function POST(req: Request) {
             if (legacyGym) {
               gym = legacyGym;
             }
+          } catch {}
+        }
+
+        if (gym) {
+          return NextResponse.json({
+            gym,
+            geocoding: {
+              resolved: lat != null && lng != null,
+              latitude: lat != null ? Number(lat) : null,
+              longitude: lng != null ? Number(lng) : null,
+              provider: geocodeProvider,
+            },
+          });
+        }
+
+        if (isCoordinateConstraintError(error)) {
+          if (lat == null || lng == null) {
+            return jsonError(
+              "Could not resolve gym coordinates from address. Please use 'Resolve coordinates' and retry.",
+              422
+            );
           }
         }
 
@@ -371,7 +395,8 @@ export async function POST(req: Request) {
       return jsonError("Database schema mismatch detected. Please apply latest migrations.", 500);
     }
     logServerError(error as Error, { route: "/api/owner/gym", userId: uid });
-    return jsonError("Failed to create gym", 500);
+    const detailed = getErrorMessage(error).replace(/\s+/g, " ").trim().slice(0, 260);
+    return jsonError(detailed ? `Failed to create gym: ${detailed}` : "Failed to create gym", 500);
   }
 }
 
