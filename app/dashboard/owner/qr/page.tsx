@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useSession } from "next-auth/react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -16,38 +16,42 @@ type QrPreviewGym = {
 };
 
 export default function OwnerQrManagementPage() {
-  const { data: session } = useSession();
+  useSession();
   const [gyms, setGyms] = useState<QrPreviewGym[]>([]);
   const [selectedGymId, setSelectedGymId] = useState<string | null>(null);
   const [selectedType, setSelectedType] = useState<(typeof TYPES)[number]>("ENTRY");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [regenerating, setRegenerating] = useState(false);
+  const [previewNonce, setPreviewNonce] = useState<number>(Date.now());
+
+  const loadPreviews = useCallback(async () => {
+    setLoading(true);
+    const res = await fetchJson<{ gyms?: QrPreviewGym[]; error?: string }>("/api/owner/qr", {
+      retries: 1,
+    }).catch(() => null);
+
+    if (!res) {
+      setError("Failed to load QR data");
+      setLoading(false);
+      return;
+    }
+    if (!res.ok) {
+      setError(res.error ?? "Failed to load QR data");
+      setLoading(false);
+      return;
+    }
+
+    const items = res.data?.gyms ?? [];
+    setGyms(items);
+    setSelectedGymId((prev) => prev ?? items[0]?.gym.id ?? null);
+    setError(null);
+    setLoading(false);
+  }, []);
 
   useEffect(() => {
-    let active = true;
-    fetchJson<{ gyms?: QrPreviewGym[]; error?: string }>("/api/owner/qr", { retries: 1 })
-      .then((res) => {
-        if (!active) return;
-        if (!res.ok) {
-          setError(res.error ?? "Failed to load QR data");
-          return;
-        }
-        const items = res.data?.gyms ?? [];
-        setGyms(items);
-        setSelectedGymId((prev) => prev ?? items[0]?.gym.id ?? null);
-      })
-      .catch(() => {
-        if (active) setError("Failed to load QR data");
-      })
-      .finally(() => {
-        if (active) setLoading(false);
-      });
-
-    return () => {
-      active = false;
-    };
-  }, []);
+    void loadPreviews();
+  }, [loadPreviews]);
 
   const selectedGym = gyms.find((gym) => gym.gym.id === selectedGymId) ?? null;
   const selectedEntry = selectedGym?.entries.find((entry) => entry.type === selectedType) ?? null;
@@ -68,6 +72,8 @@ export default function OwnerQrManagementPage() {
       setError(res.error ?? "Failed to regenerate QR");
     } else {
       setError(null);
+      await loadPreviews();
+      setPreviewNonce(Date.now());
     }
     setRegenerating(false);
   };
@@ -146,7 +152,7 @@ export default function OwnerQrManagementPage() {
               <div className="rounded-2xl border border-white/10 bg-white/[0.02] p-6 flex items-center justify-center">
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img
-                  src={`${assetBase}?format=png&size=420`}
+                  src={`${assetBase}?format=png&size=420&t=${previewNonce}`}
                   alt="QR preview"
                   className="h-64 w-64 rounded-xl bg-white p-2"
                 />

@@ -4,6 +4,8 @@ import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { jsonError, safeJson } from "@/lib/api";
 import { requireSuperAdmin } from "@/lib/permissions";
+import { enqueueQrBatchJob, isQrBatchRunning } from "@/lib/qr/batch-worker";
+import { writeAuditLog } from "@/lib/audit-log";
 
 export async function POST(req: Request) {
   const session = await getServerSession(authOptions);
@@ -16,19 +18,18 @@ export async function POST(req: Request) {
 
   const job = await prisma.qrBatchJob.findUnique({ where: { id: jobId } });
   if (!job) return jsonError("Batch not found", 404);
+  if (isQrBatchRunning(jobId)) {
+    return NextResponse.json({ ok: true, started: false, status: "RUNNING" });
+  }
 
-  const gyms = job.scope === "GYM" && job.gymId
-    ? await prisma.gym.findMany({ where: { id: job.gymId } })
-    : await prisma.gym.findMany({ select: { id: true } });
-
-  await prisma.qrBatchJob.update({
-    where: { id: jobId },
-    data: {
-      status: "RUNNING",
-      totalCount: gyms.length,
-      processedCount: 0,
-    },
+  enqueueQrBatchJob(jobId);
+  await writeAuditLog({
+    actorId: (session!.user as { id: string }).id,
+    gymId: job.gymId,
+    type: "QR_BATCH",
+    action: "BULK_GENERATE_STARTED",
+    metadata: { jobId, scope: job.scope },
   });
 
-  return NextResponse.json({ ok: true, totalCount: gyms.length });
+  return NextResponse.json({ ok: true, started: true, status: "RUNNING" }, { status: 202 });
 }

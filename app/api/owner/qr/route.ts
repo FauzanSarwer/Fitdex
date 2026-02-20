@@ -3,19 +3,28 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { jsonError, safeJson } from "@/lib/api";
-import { requireGymAdmin } from "@/lib/permissions";
+import { ensureGymScope, getAppRole, getUserId, requireGymAdmin } from "@/lib/permissions";
 import { QrTypeSchema } from "@/lib/qr/qr-types";
 import { ensureStaticQr, getLastQrGeneration, rotateQrKey } from "@/lib/qr/qr-service";
 
 const APP_URL = process.env.NEXT_PUBLIC_APP_URL ?? "https://fitdex.app";
 
-export async function GET() {
+export async function GET(req: Request) {
   const session = await getServerSession(authOptions);
   if (!requireGymAdmin(session)) return jsonError("Unauthorized", 401);
 
-  const uid = (session!.user as { id: string }).id;
+  const uid = getUserId(session);
+  const role = getAppRole(session);
+  if (!uid || !role) return jsonError("Unauthorized", 401);
+
+  const gymIdFilter = new URL(req.url).searchParams.get("gymId");
   const gyms = await prisma.gym.findMany({
-    where: { ownerId: uid },
+    where:
+      role === "SUPER_ADMIN"
+        ? gymIdFilter
+          ? { id: gymIdFilter }
+          : undefined
+        : { ownerId: uid, ...(gymIdFilter ? { id: gymIdFilter } : {}) },
     select: { id: true, name: true },
   });
 
@@ -56,11 +65,19 @@ export async function POST(req: Request) {
   const typeParsed = QrTypeSchema.safeParse(type.toUpperCase());
   if (!typeParsed.success) return jsonError("Invalid QR type", 400);
 
-  const uid = (session!.user as { id: string }).id;
-  const gym = await prisma.gym.findFirst({ where: { id: gymId, ownerId: uid } });
-  if (!gym) return jsonError("Gym not found", 404);
+  const scope = await ensureGymScope(session, gymId);
+  if (!scope.ok) {
+    if (scope.status === 404) return jsonError("Gym not found", 404);
+    if (scope.status === 403) return jsonError("Forbidden", 403);
+    return jsonError("Unauthorized", 401);
+  }
 
-  await rotateQrKey({ gymId, type: typeParsed.data, actorId: uid, revoke: Boolean(revoke) });
+  await rotateQrKey({
+    gymId,
+    type: typeParsed.data,
+    actorId: scope.userId!,
+    revoke: Boolean(revoke),
+  });
 
   return NextResponse.json({ ok: true });
 }

@@ -24,7 +24,13 @@ export default async function DashboardLayout({
   if (!session?.user) {
     redirect("/auth/login?callbackUrl=/dashboard");
   }
-  const role = (session.user as { role?: string }).role;
+  const rawRole = (session.user as { role?: string }).role;
+  const role =
+    rawRole === "SUPER_ADMIN"
+      ? "ADMIN"
+      : rawRole === "GYM_ADMIN"
+        ? "OWNER"
+        : rawRole;
   if (role !== "USER" && role !== "OWNER" && role !== "ADMIN") {
     redirect("/auth/login");
   }

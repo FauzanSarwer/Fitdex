@@ -7,6 +7,7 @@ import { jsonError } from "@/lib/api";
 import { requireSuperAdmin } from "@/lib/permissions";
 import { ensureStaticQr } from "@/lib/qr/qr-service";
 import { generateQrPng, generateQrPrintPdf } from "@/lib/qr/qr-generator";
+import { writeAuditLog } from "@/lib/audit-log";
 
 const APP_URL = process.env.NEXT_PUBLIC_APP_URL ?? "https://fitdex.app";
 const TYPES = ["ENTRY", "EXIT", "PAYMENT"] as const;
@@ -20,18 +21,15 @@ export async function GET(_req: Request, { params }: { params: Promise<{ batchId
   const { batchId } = await params;
   const job = await prisma.qrBatchJob.findUnique({ where: { id: batchId } });
   if (!job) return jsonError("Batch not found", 404);
+  if (job.status !== "COMPLETE") {
+    return jsonError("Batch is not ready for export", 409);
+  }
 
   const gyms = job.scope === "GYM" && job.gymId
     ? await prisma.gym.findMany({ where: { id: job.gymId } })
     : await prisma.gym.findMany({ select: { id: true, name: true } });
 
-  await prisma.qrBatchJob.update({
-    where: { id: batchId },
-    data: { status: "RUNNING", processedCount: 0, totalCount: gyms.length },
-  });
-
   const zip = new JSZip();
-  let processed = 0;
 
   for (const gym of gyms) {
     const folder = zip.folder(sanitize(gym.name ?? gym.id)) ?? zip;
@@ -50,26 +48,16 @@ export async function GET(_req: Request, { params }: { params: Promise<{ batchId
       folder.file(`${type.toLowerCase()}.png`, png);
       folder.file(`print-${type.toLowerCase()}.pdf`, pdf);
     }
-
-    processed += 1;
-    if (processed % 10 === 0) {
-      await prisma.qrBatchJob.update({
-        where: { id: batchId },
-        data: { processedCount: processed },
-      });
-    }
   }
 
   const buffer = await zip.generateAsync({ type: "nodebuffer" });
 
-  await prisma.qrBatchJob.update({
-    where: { id: batchId },
-    data: {
-      status: "COMPLETE",
-      processedCount: processed,
-      completedAt: new Date(),
-      downloadUrl: `/api/admin/qr/batch/${batchId}/download`,
-    },
+  await writeAuditLog({
+    actorId: (session!.user as { id: string }).id,
+    gymId: job.gymId,
+    type: "QR_BATCH",
+    action: "BULK_EXPORT",
+    metadata: { jobId: batchId, scope: job.scope, gymCount: gyms.length },
   });
 
 return new NextResponse(new Uint8Array(buffer), {

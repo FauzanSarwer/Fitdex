@@ -21,7 +21,14 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Progress } from "@/components/ui/progress";
 import { Skeleton } from "@/components/ui/skeleton";
 import { fetchJson } from "@/lib/client-fetch";
+import { runWhenIdle } from "@/lib/browser-idle";
+import { computeRollingStreak } from "@/lib/fitness/streak";
 import { buildGymSlug, cn, formatPrice } from "@/lib/utils";
+import {
+  useFitnessSync,
+  type LocalSession as CompletedGymSession,
+  type LocalWeightEntry as WeightEntry,
+} from "@/hooks/use-fitness-sync";
 
 interface Membership {
   id: string;
@@ -53,43 +60,9 @@ type SavedGym = {
 
 type SessionEndReason = "EXIT_QR" | "INACTIVITY_TIMEOUT";
 
-type WeightEntry = {
-  id: string;
-  valueKg: number;
-  timestamp: number;
-};
-
-type LiveGymSession = {
-  id: string;
-  gymId: string | null;
-  gymName: string;
-  entryAt: number;
-  lastActivityAt: number;
-};
-
-type CompletedGymSession = {
-  id: string;
-  gymId: string | null;
-  gymName: string;
-  entryAt: number;
-  exitAt: number;
-  durationMinutes: number;
-  calories: number;
-  validForStreak: boolean;
-  endedBy: SessionEndReason;
-};
-
 type SessionCompletionState = CompletedGymSession & {
   streakAfter: number;
   progressFill: number;
-};
-
-type PersistedFitnessState = {
-  weights: WeightEntry[];
-  sessions: CompletedGymSession[];
-  liveSession: LiveGymSession | null;
-  dismissedWeightPromptDate: string | null;
-  lastWorkoutLoggedAt: number | null;
 };
 
 type ConsistencyDay = {
@@ -98,7 +71,6 @@ type ConsistencyDay = {
   trained: boolean;
 };
 
-const FITNESS_STORAGE_VERSION = "v1";
 const MIN_VALID_SESSION_MINUTES = 20;
 const SESSION_INACTIVITY_TIMEOUT_MS = 45 * 60 * 1000;
 const DEFAULT_WEIGHT_WHOLE = 70;
@@ -161,20 +133,19 @@ function clamp(value: number, min: number, max: number): number {
 }
 
 function computeStreakDays(sessions: CompletedGymSession[], now: number): number {
-  const validDaySet = new Set(
-    sessions.filter((session) => session.validForStreak).map((session) => dayKeyFromTimestamp(session.exitAt))
+  return computeRollingStreak(
+    sessions.map((session) => ({ exitAt: session.exitAt, validForStreak: session.validForStreak })),
+    now
   );
+}
 
-  let streak = 0;
-  const cursor = new Date(now);
-  cursor.setHours(0, 0, 0, 0);
-
-  while (validDaySet.has(dayKeyFromTimestamp(cursor.getTime()))) {
-    streak += 1;
-    cursor.setDate(cursor.getDate() - 1);
-  }
-
-  return streak;
+function makeClientId() {
+  if (typeof crypto !== "undefined" && "randomUUID" in crypto) return crypto.randomUUID();
+  return "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(/[xy]/g, (char) => {
+    const rand = Math.floor(Math.random() * 16);
+    const value = char === "x" ? rand : (rand & 0x3) | 0x8;
+    return value.toString(16);
+  });
 }
 
 function computeWeeklyConsistency(sessions: CompletedGymSession[], now: number): ConsistencyDay[] {
@@ -240,88 +211,6 @@ function animateNumber(
   return () => window.cancelAnimationFrame(raf);
 }
 
-function parsePersistedFitnessState(raw: string | null): PersistedFitnessState {
-  if (!raw) {
-    return {
-      weights: [],
-      sessions: [],
-      liveSession: null,
-      dismissedWeightPromptDate: null,
-      lastWorkoutLoggedAt: null,
-    };
-  }
-
-  try {
-    const parsed = JSON.parse(raw) as Partial<PersistedFitnessState>;
-
-    const weights = Array.isArray(parsed.weights)
-      ? parsed.weights
-          .filter((item): item is WeightEntry => {
-            if (!item || typeof item !== "object") return false;
-            const maybeEntry = item as WeightEntry;
-            return (
-              typeof maybeEntry.id === "string" &&
-              typeof maybeEntry.timestamp === "number" &&
-              typeof maybeEntry.valueKg === "number"
-            );
-          })
-          .slice(0, 120)
-      : [];
-
-    const sessions = Array.isArray(parsed.sessions)
-      ? parsed.sessions
-          .filter((item): item is CompletedGymSession => {
-            if (!item || typeof item !== "object") return false;
-            const maybeSession = item as CompletedGymSession;
-            return (
-              typeof maybeSession.id === "string" &&
-              typeof maybeSession.entryAt === "number" &&
-              typeof maybeSession.exitAt === "number" &&
-              typeof maybeSession.durationMinutes === "number" &&
-              typeof maybeSession.calories === "number" &&
-              typeof maybeSession.validForStreak === "boolean" &&
-              (maybeSession.endedBy === "EXIT_QR" || maybeSession.endedBy === "INACTIVITY_TIMEOUT")
-            );
-          })
-          .slice(0, 120)
-      : [];
-
-    const liveSession =
-      parsed.liveSession &&
-      typeof parsed.liveSession === "object" &&
-      typeof parsed.liveSession.id === "string" &&
-      typeof parsed.liveSession.entryAt === "number" &&
-      typeof parsed.liveSession.lastActivityAt === "number" &&
-      typeof parsed.liveSession.gymName === "string"
-        ? {
-            id: parsed.liveSession.id,
-            gymId: parsed.liveSession.gymId ?? null,
-            gymName: parsed.liveSession.gymName,
-            entryAt: parsed.liveSession.entryAt,
-            lastActivityAt: parsed.liveSession.lastActivityAt,
-          }
-        : null;
-
-    return {
-      weights,
-      sessions,
-      liveSession,
-      dismissedWeightPromptDate:
-        typeof parsed.dismissedWeightPromptDate === "string" ? parsed.dismissedWeightPromptDate : null,
-      lastWorkoutLoggedAt:
-        typeof parsed.lastWorkoutLoggedAt === "number" ? parsed.lastWorkoutLoggedAt : null,
-    };
-  } catch {
-    return {
-      weights: [],
-      sessions: [],
-      liveSession: null,
-      dismissedWeightPromptDate: null,
-      lastWorkoutLoggedAt: null,
-    };
-  }
-}
-
 function WheelColumn({
   values,
   selected,
@@ -384,14 +273,6 @@ function UserDashboardContent() {
   const [savedGyms, setSavedGyms] = useState<SavedGym[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-
-  const [weights, setWeights] = useState<WeightEntry[]>([]);
-  const [sessions, setSessions] = useState<CompletedGymSession[]>([]);
-  const [liveSession, setLiveSession] = useState<LiveGymSession | null>(null);
-  const [dismissedWeightPromptDate, setDismissedWeightPromptDate] = useState<string | null>(null);
-  const [lastWorkoutLoggedAt, setLastWorkoutLoggedAt] = useState<number | null>(null);
-
-  const [fitnessHydrated, setFitnessHydrated] = useState(false);
   const [clockNow, setClockNow] = useState<number>(Date.now());
   const [showContextualWeightReminder, setShowContextualWeightReminder] = useState(false);
 
@@ -409,9 +290,44 @@ function UserDashboardContent() {
 
   const sessionUser = session?.user as { id?: string; email?: string } | undefined;
   const userIdentity = sessionUser?.id ?? sessionUser?.email ?? null;
-  const fitnessStorageKey = userIdentity
-    ? `fitdex:fitness-dashboard:${FITNESS_STORAGE_VERSION}:${userIdentity}`
-    : null;
+  const {
+    state: fitnessState,
+    hydrated: fitnessHydrated,
+    syncStatus,
+    enqueueMutation,
+    updateWeights,
+    updateSessions,
+    updateLiveSession,
+    setDismissedWeightPromptDate,
+    setLastWorkoutLoggedAt,
+    setPendingVerification,
+    syncNow,
+  } = useFitnessSync(userIdentity);
+  const optimisticSyncCancelRef = useRef<(() => void) | null>(null);
+
+  const weights = fitnessState.weights;
+  const sessions = useMemo(
+    () => fitnessState.sessions.filter((sessionItem) => sessionItem.exitAt > sessionItem.entryAt),
+    [fitnessState.sessions]
+  );
+  const liveSession = fitnessState.liveSession;
+  const dismissedWeightPromptDate = fitnessState.dismissedWeightPromptDate;
+  const lastWorkoutLoggedAt = fitnessState.lastWorkoutLoggedAt;
+
+  const scheduleOptimisticSync = useCallback(() => {
+    optimisticSyncCancelRef.current?.();
+    optimisticSyncCancelRef.current = runWhenIdle(() => {
+      optimisticSyncCancelRef.current = null;
+      void syncNow({ force: true });
+    });
+  }, [syncNow]);
+
+  useEffect(() => {
+    return () => {
+      optimisticSyncCancelRef.current?.();
+      optimisticSyncCancelRef.current = null;
+    };
+  }, []);
 
   useEffect(() => {
     let active = true;
@@ -479,44 +395,6 @@ function UserDashboardContent() {
     }, 1000);
     return () => window.clearInterval(interval);
   }, []);
-
-  useEffect(() => {
-    if (!fitnessStorageKey) {
-      setFitnessHydrated(true);
-      return;
-    }
-
-    const raw = window.localStorage.getItem(fitnessStorageKey);
-    const persisted = parsePersistedFitnessState(raw);
-    setWeights(persisted.weights.sort((a, b) => b.timestamp - a.timestamp));
-    setSessions(persisted.sessions.sort((a, b) => b.exitAt - a.exitAt));
-    setLiveSession(persisted.liveSession);
-    setDismissedWeightPromptDate(persisted.dismissedWeightPromptDate);
-    setLastWorkoutLoggedAt(persisted.lastWorkoutLoggedAt);
-    setFitnessHydrated(true);
-  }, [fitnessStorageKey]);
-
-  useEffect(() => {
-    if (!fitnessHydrated || !fitnessStorageKey) return;
-
-    const payload: PersistedFitnessState = {
-      weights: weights.slice(0, 120),
-      sessions: sessions.slice(0, 120),
-      liveSession,
-      dismissedWeightPromptDate,
-      lastWorkoutLoggedAt,
-    };
-
-    window.localStorage.setItem(fitnessStorageKey, JSON.stringify(payload));
-  }, [
-    weights,
-    sessions,
-    liveSession,
-    dismissedWeightPromptDate,
-    lastWorkoutLoggedAt,
-    fitnessHydrated,
-    fitnessStorageKey,
-  ]);
 
   const activeMembership = memberships.find((membership) => membership.active) ?? null;
   const activeDuo = duos.find((duo) => duo.active) ?? null;
@@ -592,16 +470,19 @@ function UserDashboardContent() {
     if (!liveSession) return;
     if (clockNow - liveSession.lastActivityAt < SESSION_INACTIVITY_TIMEOUT_MS) return;
 
-    setLiveSession((current) => {
+    updateLiveSession((current) => {
       if (!current) return null;
 
       const endedAt = Date.now();
       const durationMinutes = Math.max(1, Math.round((endedAt - current.entryAt) / 60000));
       const calories = estimateCalories(durationMinutes, latestWeight?.valueKg ?? DEFAULT_WEIGHT_WHOLE);
       const validForStreak = durationMinutes >= MIN_VALID_SESSION_MINUTES;
+      const existing = sessions.find((sessionItem) => sessionItem.id === current.id);
+      const verificationStatus =
+        existing?.verificationStatus ?? (current.serverVersion > 0 ? "VERIFIED" : "PENDING");
 
       const endedSession: CompletedGymSession = {
-        id: `session_${endedAt}`,
+        id: current.id,
         gymId: current.gymId,
         gymName: current.gymName,
         entryAt: current.entryAt,
@@ -610,10 +491,16 @@ function UserDashboardContent() {
         calories,
         validForStreak,
         endedBy: "INACTIVITY_TIMEOUT",
+        verificationStatus,
+        createdAt: existing?.createdAt ?? current.entryAt,
+        updatedAt: endedAt,
+        serverVersion: current.serverVersion,
       };
 
-      setSessions((previous) => {
-        const next = [endedSession, ...previous].sort((a, b) => b.exitAt - a.exitAt).slice(0, 120);
+      updateSessions((previous) => {
+        const next = [endedSession, ...previous.filter((sessionItem) => sessionItem.id !== endedSession.id)]
+          .sort((a, b) => b.exitAt - a.exitAt)
+          .slice(0, 300);
         const streakAfter = computeStreakDays(next, endedAt);
         setSessionCompletion({
           ...endedSession,
@@ -623,9 +510,30 @@ function UserDashboardContent() {
         return next;
       });
 
+      enqueueMutation({
+        id: makeClientId(),
+        entityId: endedSession.id,
+        entityType: "session",
+        operation: "update",
+        payload: {
+          id: endedSession.id,
+          gymId: endedSession.gymId,
+          entryAt: new Date(endedSession.entryAt).toISOString(),
+          exitAt: new Date(endedSession.exitAt).toISOString(),
+          durationMinutes: endedSession.durationMinutes,
+          calories: endedSession.calories,
+          validForStreak: endedSession.validForStreak,
+          endedBy: endedSession.endedBy,
+          verificationStatus: endedSession.verificationStatus,
+          baseServerVersion: current.serverVersion > 0 ? current.serverVersion : undefined,
+          updatedAt: new Date(endedSession.updatedAt).toISOString(),
+        },
+      });
+      void syncNow({ force: true });
+
       return null;
     });
-  }, [clockNow, liveSession, latestWeight?.valueKg]);
+  }, [clockNow, liveSession, latestWeight?.valueKg, updateLiveSession, sessions, updateSessions, enqueueMutation, syncNow]);
 
   useEffect(() => {
     if (!weightSheetOpen) return;
@@ -652,32 +560,92 @@ function UserDashboardContent() {
 
   const startSessionFromEntryScan = useCallback(() => {
     if (liveSession) return;
+    const gymId = activeMembership?.gym.id ?? null;
+    if (!gymId) return;
 
     const now = Date.now();
+    const sessionId = makeClientId();
+    const online = typeof navigator === "undefined" ? true : navigator.onLine;
+    const verificationStatus = online ? "VERIFIED" : "PENDING";
+    const startedSession: CompletedGymSession = {
+      id: sessionId,
+      gymId,
+      gymName: activeMembership?.gym.name ?? "Fitdex Gym",
+      entryAt: now,
+      exitAt: now,
+      durationMinutes: 0,
+      calories: 0,
+      validForStreak: false,
+      endedBy: "EXIT_QR",
+      verificationStatus,
+      createdAt: now,
+      updatedAt: now,
+      serverVersion: 0,
+    };
+
     setSessionCompletion(null);
-    setLiveSession({
-      id: `live_${now}`,
-      gymId: activeMembership?.gym.id ?? null,
+    updateSessions((previous) =>
+      [startedSession, ...previous.filter((sessionItem) => sessionItem.id !== sessionId)]
+        .sort((a, b) => b.exitAt - a.exitAt)
+        .slice(0, 300)
+    );
+    updateLiveSession(() => ({
+      id: sessionId,
+      gymId,
       gymName: activeMembership?.gym.name ?? "Fitdex Gym",
       entryAt: now,
       lastActivityAt: now,
+      updatedAt: now,
+      serverVersion: 0,
+    }));
+
+    enqueueMutation({
+      id: makeClientId(),
+      entityId: sessionId,
+      entityType: "session",
+      operation: "create",
+      payload: {
+        id: sessionId,
+        gymId,
+        entryAt: new Date(now).toISOString(),
+        exitAt: null,
+        durationMinutes: 0,
+        calories: 0,
+        validForStreak: false,
+        endedBy: "EXIT_QR",
+        verificationStatus,
+        updatedAt: new Date(now).toISOString(),
+      },
     });
 
+    if (!online) {
+      setPendingVerification({
+        sessionId,
+        gymId,
+        type: "ENTRY",
+        queuedAt: now,
+      });
+    } else {
+      // Never block optimistic session start on network I/O.
+      scheduleOptimisticSync();
+    }
+
     triggerWeightReminderIfNeeded();
-  }, [liveSession, activeMembership?.gym.id, activeMembership?.gym.name, triggerWeightReminderIfNeeded]);
+  }, [liveSession, activeMembership?.gym.id, activeMembership?.gym.name, triggerWeightReminderIfNeeded, updateSessions, updateLiveSession, enqueueMutation, setPendingVerification, scheduleOptimisticSync]);
 
   const endLiveSession = useCallback(
     (endedBy: SessionEndReason) => {
-      setLiveSession((current) => {
+      updateLiveSession((current) => {
         if (!current) return null;
 
         const endedAt = Date.now();
         const durationMinutes = Math.max(1, Math.round((endedAt - current.entryAt) / 60000));
         const calories = estimateCalories(durationMinutes, latestWeight?.valueKg ?? DEFAULT_WEIGHT_WHOLE);
         const validForStreak = durationMinutes >= MIN_VALID_SESSION_MINUTES;
+        const existing = sessions.find((sessionItem) => sessionItem.id === current.id);
 
         const endedSession: CompletedGymSession = {
-          id: `session_${endedAt}`,
+          id: current.id,
           gymId: current.gymId,
           gymName: current.gymName,
           entryAt: current.entryAt,
@@ -686,10 +654,17 @@ function UserDashboardContent() {
           calories,
           validForStreak,
           endedBy,
+          verificationStatus:
+            existing?.verificationStatus ?? (current.serverVersion > 0 ? "VERIFIED" : "PENDING"),
+          createdAt: existing?.createdAt ?? current.entryAt,
+          updatedAt: endedAt,
+          serverVersion: current.serverVersion,
         };
 
-        setSessions((previous) => {
-          const next = [endedSession, ...previous].sort((a, b) => b.exitAt - a.exitAt).slice(0, 120);
+        updateSessions((previous) => {
+          const next = [endedSession, ...previous.filter((sessionItem) => sessionItem.id !== endedSession.id)]
+            .sort((a, b) => b.exitAt - a.exitAt)
+            .slice(0, 300);
           const streakAfter = computeStreakDays(next, endedAt);
           setSessionCompletion({
             ...endedSession,
@@ -699,21 +674,43 @@ function UserDashboardContent() {
           return next;
         });
 
+        enqueueMutation({
+          id: makeClientId(),
+          entityId: endedSession.id,
+          entityType: "session",
+          operation: "update",
+          payload: {
+            id: endedSession.id,
+            gymId: endedSession.gymId,
+            entryAt: new Date(endedSession.entryAt).toISOString(),
+            exitAt: new Date(endedSession.exitAt).toISOString(),
+            durationMinutes: endedSession.durationMinutes,
+            calories: endedSession.calories,
+            validForStreak: endedSession.validForStreak,
+            endedBy: endedSession.endedBy,
+            verificationStatus: endedSession.verificationStatus,
+            baseServerVersion: current.serverVersion > 0 ? current.serverVersion : undefined,
+            updatedAt: new Date(endedSession.updatedAt).toISOString(),
+          },
+        });
+        void syncNow({ force: true });
+
         return null;
       });
     },
-    [latestWeight?.valueKg]
+    [latestWeight?.valueKg, updateLiveSession, sessions, updateSessions, enqueueMutation, syncNow]
   );
 
   const keepLiveSessionActive = useCallback(() => {
-    setLiveSession((current) => {
+    updateLiveSession((current) => {
       if (!current) return null;
       return {
         ...current,
         lastActivityAt: Date.now(),
+        updatedAt: Date.now(),
       };
     });
-  }, []);
+  }, [updateLiveSession]);
 
   const logWorkout = useCallback(() => {
     const now = Date.now();
@@ -726,16 +723,36 @@ function UserDashboardContent() {
     const valueKg = Number((weightWhole + weightDecimal / 10).toFixed(1));
 
     const nextWeight: WeightEntry = {
-      id: `weight_${now}`,
+      id: makeClientId(),
       valueKg,
       timestamp: now,
+      createdAt: now,
+      updatedAt: now,
+      serverVersion: 0,
     };
 
-    setWeights((previous) => [nextWeight, ...previous].sort((a, b) => b.timestamp - a.timestamp).slice(0, 120));
+    updateWeights((previous) =>
+      [nextWeight, ...previous.filter((weightItem) => weightItem.id !== nextWeight.id)]
+        .sort((a, b) => b.timestamp - a.timestamp)
+        .slice(0, 300)
+    );
+    enqueueMutation({
+      id: makeClientId(),
+      entityId: nextWeight.id,
+      entityType: "weight",
+      operation: "create",
+      payload: {
+        id: nextWeight.id,
+        valueKg: nextWeight.valueKg,
+        loggedAt: new Date(nextWeight.timestamp).toISOString(),
+        updatedAt: new Date(nextWeight.updatedAt).toISOString(),
+      },
+    });
+    void syncNow({ force: true });
     setDismissedWeightPromptDate(null);
     setShowContextualWeightReminder(false);
     setWeightSheetOpen(false);
-  }, [weightWhole, weightDecimal]);
+  }, [weightWhole, weightDecimal, updateWeights, enqueueMutation, syncNow, setDismissedWeightPromptDate]);
 
   const dismissWeightPrompt = useCallback(() => {
     setDismissedWeightPromptDate(todayKey);
@@ -951,7 +968,9 @@ function UserDashboardContent() {
                       <span className="h-2 w-2 rounded-full bg-primary animate-pulse" />
                       LIVE
                     </span>
-                    <p className="text-xs text-primary/80">Optimistic sync active</p>
+                    <p className="text-xs text-primary/80">
+                      {syncStatus.online ? "Optimistic sync active" : "Offline pending verification"}
+                    </p>
                   </div>
 
                   <p className="mt-3 text-xs uppercase tracking-wide text-primary/80">Running timer</p>

@@ -1,19 +1,15 @@
 import type { Session } from "next-auth";
+import { prisma } from "./prisma";
 import { getSessionUser } from "./session-user";
+import { getSessionRole, type AppRole } from "./rbac";
 
-type Role = "USER" | "OWNER" | "ADMIN" | "GYM_ADMIN" | "SUPER_ADMIN";
-
-function normalizeRole(role?: string | null): Role | null {
-  if (!role) return null;
-  if (role === "ADMIN") return "SUPER_ADMIN";
-  if (role === "OWNER") return "GYM_ADMIN";
-  return role as Role;
+function hasRole(session: Session | null, roles: AppRole[]): boolean {
+  const role = getSessionRole(session);
+  return role != null && roles.includes(role);
 }
 
-function hasRole(session: Session | null, roles: Role[]): boolean {
-  const user = getSessionUser(session);
-  const role = normalizeRole(user?.role);
-  return role != null && roles.includes(role);
+export function getAppRole(session: Session | null): AppRole | null {
+  return getSessionRole(session);
 }
 
 export function isOwner(session: Session | null): boolean {
@@ -51,4 +47,35 @@ export function requireSuperAdmin(session: Session | null): boolean {
 export function getUserId(session: Session | null): string | null {
   const user = getSessionUser(session);
   return user?.id ?? null;
+}
+
+export type GymScopeResult = {
+  ok: boolean;
+  status: 200 | 401 | 403 | 404;
+  role: AppRole | null;
+  userId: string | null;
+  gym: { id: string; ownerId: string } | null;
+};
+
+export async function ensureGymScope(session: Session | null, gymId: string): Promise<GymScopeResult> {
+  const userId = getUserId(session);
+  const role = getSessionRole(session);
+  if (!userId || !role) {
+    return { ok: false, status: 401, role: null, userId: null, gym: null };
+  }
+
+  const gym = await prisma.gym.findUnique({
+    where: { id: gymId },
+    select: { id: true, ownerId: true },
+  });
+
+  if (!gym) {
+    return { ok: false, status: 404, role, userId, gym: null };
+  }
+
+  if (role === "SUPER_ADMIN" || gym.ownerId === userId) {
+    return { ok: true, status: 200, role, userId, gym };
+  }
+
+  return { ok: false, status: 403, role, userId, gym };
 }

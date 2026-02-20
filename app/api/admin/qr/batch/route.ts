@@ -4,6 +4,7 @@ import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { jsonError, safeJson } from "@/lib/api";
 import { requireSuperAdmin } from "@/lib/permissions";
+import { writeAuditLog } from "@/lib/audit-log";
 
 export async function GET() {
   const session = await getServerSession(authOptions);
@@ -28,16 +29,26 @@ export async function POST(req: Request) {
   if (scope === "GYM" && !gymId) return jsonError("gymId required", 400);
 
   const uid = (session!.user as { id: string }).id;
-        const job = await prisma.qrBatchJob.create({
-          data: {
-            actorId: uid,
-            scope,
-            gymId: scope === "GYM" ? gymId ?? null : null,
-            status: "PENDING",
-            totalCount: 0,
-            processedCount: 0,
-          },
-        });
+  const job = await prisma.qrBatchJob.create({
+    data: {
+      actorId: uid,
+      scope,
+      gymId: scope === "GYM" ? gymId ?? null : null,
+      status: "PENDING",
+      totalCount: 0,
+      processedCount: 0,
+      startedAt: null,
+      error: null,
+    },
+  });
+
+  await writeAuditLog({
+    actorId: uid,
+    gymId: job.gymId,
+    type: "QR_BATCH",
+    action: "BULK_GENERATE_REQUESTED",
+    metadata: { jobId: job.id, scope: job.scope },
+  });
 
   return NextResponse.json({ ok: true, jobId: job.id });
 }

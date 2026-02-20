@@ -5,186 +5,367 @@ import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { jsonError, safeJson } from "@/lib/api";
 import { requireUser } from "@/lib/permissions";
+import { qrVerifyIpRateLimit, qrVerifyRateLimit } from "@/lib/rate-limit";
 import { QrTypeSchema } from "@/lib/qr/qr-types";
-import { decodeSignedPayload, hashQrToken, verifySignedPayload } from "@/lib/qr/qr-token";
+import {
+  decodeSignedPayload,
+  hashDeviceBinding,
+  hashQrToken,
+  verifySignedPayload,
+} from "@/lib/qr/qr-token";
+import { getQrKeyMaterial } from "@/lib/qr/qr-service";
+import { ensureQrKeyRotationSchedulerStarted } from "@/lib/qr/key-rotation-scheduler";
+import { validateDeviceBindingHook, validateGpsHook } from "@/lib/qr/qr-hooks";
+import { writeAuditLog } from "@/lib/audit-log";
+import { logObservabilityEvent } from "@/lib/logger";
 
 const MIN_VALID_SESSION_MINUTES = 20;
-const MAX_GPS_RADIUS_METERS = 150;
 const GRACE_MS = 5 * 60 * 1000;
 
-function toRadians(value: number) {
-  return (value * Math.PI) / 180;
-}
+type VerifyRequest = {
+  token?: string;
+  gymId?: string;
+  type?: string;
+  latitude?: number;
+  longitude?: number;
+  deviceId?: string;
+  sessionId?: string;
+  entryAt?: number;
+  verifiedAt?: number;
+};
 
-function distanceMeters(aLat: number, aLng: number, bLat: number, bLng: number) {
-  const R = 6371000;
-  const dLat = toRadians(bLat - aLat);
-  const dLng = toRadians(bLng - aLng);
-  const lat1 = toRadians(aLat);
-  const lat2 = toRadians(bLat);
+type VerifyResult =
+  | { ok: true; session: any; action: string }
+  | { ok: false; error: string; status: number };
 
-  const sin1 = Math.sin(dLat / 2);
-  const sin2 = Math.sin(dLng / 2);
-
-  const h = sin1 * sin1 + Math.cos(lat1) * Math.cos(lat2) * sin2 * sin2;
-  return 2 * R * Math.atan2(Math.sqrt(h), Math.sqrt(1 - h));
+function getClientIp(req: Request) {
+  const forwardedFor = req.headers.get("x-forwarded-for");
+  if (forwardedFor) return forwardedFor.split(",")[0]?.trim() ?? "unknown";
+  return req.headers.get("x-real-ip") ?? "unknown";
 }
 
 export async function POST(req: Request) {
-  const session = await getServerSession(authOptions);
-  if (!requireUser(session)) return jsonError("Unauthorized", 401);
+  ensureQrKeyRotationSchedulerStarted();
+  const clientIp = getClientIp(req);
+  const requestId = req.headers.get("x-request-id") ?? crypto.randomUUID();
 
-  const parsed = await safeJson<{
-    token?: string;
-    gymId?: string;
-    type?: string;
-    latitude?: number;
-    longitude?: number;
-    sessionId?: string;
-    entryAt?: number;
-    verifiedAt?: number;
-  }>(req);
-  if (!parsed.ok) return jsonError(parsed.error, 400);
+  const fail = (
+    reason: string,
+    status: number,
+    context?: Record<string, unknown>
+  ) => {
+    logObservabilityEvent({
+      event: "qr.verify.failure",
+      level: status >= 500 ? "error" : "warn",
+      context: {
+        reason,
+        status,
+        clientIp,
+        requestId,
+        ...(context ?? {}),
+      },
+    });
+    return jsonError(reason, status);
+  };
 
-  const { token, gymId, type, latitude, longitude, sessionId, entryAt, verifiedAt } = parsed.data;
-  if (!token) return jsonError("Missing token", 400);
-
-  const payload = decodeSignedPayload(token);
-  if (!payload) return jsonError("Invalid token", 400);
-
-  const typeParsed = QrTypeSchema.safeParse(payload.type);
-  if (!typeParsed.success) return jsonError("Invalid token type", 400);
-
-  if (gymId && payload.gymId !== gymId) {
-    return jsonError("Token gym mismatch", 400);
-  }
-  if (type && payload.type !== type.toUpperCase()) {
-    return jsonError("Token type mismatch", 400);
-  }
-
-  const now = Date.now();
-  if (verifiedAt && verifiedAt > payload.exp + GRACE_MS) {
-    return jsonError("Token expired", 400);
-  }
-
-  if (!verifiedAt) {
-    const verified = verifySignedPayload(payload, now);
-    if (!verified.ok) return jsonError(verified.reason ?? "Invalid token", 400);
-  }
-
-  const staticQr = await prisma.qrStatic.findUnique({
-    where: { gymId_type: { gymId: payload.gymId, type: payload.type } },
-  });
-  if (!staticQr || staticQr.revokedAt) return jsonError("QR revoked", 403);
-  if (payload.v !== staticQr.currentKeyVersion) {
-    return jsonError("QR version expired", 403);
-  }
-
-  const gym = await prisma.gym.findUnique({ where: { id: payload.gymId } });
-  if (!gym) return jsonError("Gym not found", 404);
-
-  if (typeof latitude !== "number" || typeof longitude !== "number") {
-    return jsonError("Location required", 400);
-  }
-  // latitude/longitude removed from gym, skip distance check
-
-  const uid = (session!.user as { id: string }).id;
-  const tokenHash = hashQrToken(token);
-
-  const result = await prisma.$transaction(async (tx) => {
-    const existingToken = await tx.qrToken.findUnique({ where: { tokenHash } });
-    if (existingToken?.usedAt) {
-      return { ok: false as const, error: "Token already used" };
+  try {
+    const ipRateLimit = await qrVerifyIpRateLimit.limit(`qr-verify:ip:${clientIp}`);
+    if (!ipRateLimit.success) {
+      return fail("Too many verification attempts", 429, {
+        reasonCode: "rate_limited_ip",
+        limit: ipRateLimit.limit,
+        remaining: ipRateLimit.remaining,
+        reset: ipRateLimit.reset,
+      });
     }
 
-    if (existingToken) {
-      await tx.qrToken.update({
-        where: { tokenHash },
-        data: { usedAt: new Date() },
+    const session = await getServerSession(authOptions);
+    if (!requireUser(session)) return fail("Unauthorized", 401);
+
+    const parsed = await safeJson<VerifyRequest>(req);
+    if (!parsed.ok) return fail(parsed.error, 400);
+
+    const { token, gymId, type, latitude, longitude, deviceId, sessionId, entryAt, verifiedAt } = parsed.data;
+    if (!token) return fail("Missing token", 400);
+
+    const payload = decodeSignedPayload(token);
+    if (!payload) return fail("Invalid token", 400);
+
+    const parsedType = QrTypeSchema.safeParse(payload.type);
+    if (!parsedType.success) return fail("Invalid token type", 400);
+
+    const uid = (session!.user as { id: string }).id;
+    const scopedRateLimit = await qrVerifyRateLimit.limit(
+      `qr-verify:${uid}:${payload.gymId}:${payload.type}`
+    );
+    if (!scopedRateLimit.success) {
+      return fail("Too many verification attempts", 429, {
+        reasonCode: "rate_limited_scope",
+        userId: uid,
+        gymId: payload.gymId,
+        qrType: payload.type,
+        limit: scopedRateLimit.limit,
+        remaining: scopedRateLimit.remaining,
+        reset: scopedRateLimit.reset,
       });
+    }
+
+    if (gymId && payload.gymId !== gymId) {
+      return fail("Token gym mismatch", 400, { gymId, payloadGymId: payload.gymId, userId: uid });
+    }
+    if (type && payload.type !== type.toUpperCase()) {
+      return fail("Token type mismatch", 400, { type, payloadType: payload.type, userId: uid });
+    }
+
+    const gym = await prisma.gym.findUnique({
+      where: { id: payload.gymId },
+      select: { id: true, suspendedAt: true },
+    });
+    if (!gym) return fail("Gym not found", 404, { gymId: payload.gymId, userId: uid });
+    if (gym.suspendedAt) return fail("Gym unavailable", 403, { gymId: payload.gymId, userId: uid });
+
+    const keyBundle = await getQrKeyMaterial(payload.gymId, payload.type, payload.v, {
+      createIfMissing: false,
+    });
+    if (!keyBundle) {
+      return fail("QR key unavailable", 403, {
+        gymId: payload.gymId,
+        type: payload.type,
+        version: payload.v,
+        userId: uid,
+      });
+    }
+    const { staticQr, key } = keyBundle;
+
+    if (staticQr.revokedAt) return fail("QR revoked", 403, { gymId: payload.gymId, type: payload.type, userId: uid });
+    if (payload.v !== staticQr.currentKeyVersion) {
+      return fail("QR version expired", 403, {
+        gymId: payload.gymId,
+        expectedVersion: staticQr.currentKeyVersion,
+        tokenVersion: payload.v,
+        userId: uid,
+      });
+    }
+
+    if (typeof verifiedAt === "number") {
+      const withinGrace = verifiedAt <= payload.exp + GRACE_MS;
+      if (!withinGrace) return fail("Token expired", 400, { mode: "offline_grace", userId: uid });
+      const verified = verifySignedPayload(payload, key.key, payload.exp);
+      if (!verified.ok) {
+        return fail(verified.reason ?? "Invalid token", 400, { mode: "offline_grace", userId: uid });
+      }
     } else {
-      await tx.qrToken.create({
-        data: {
-          gymId: payload.gymId,
-          type: payload.type,
+      const verified = verifySignedPayload(payload, key.key, Date.now());
+      if (!verified.ok) return fail(verified.reason ?? "Invalid token", 400, { mode: "online", userId: uid });
+    }
+
+    const tokenHash = hashQrToken(token);
+    const deviceBindingHash = deviceId ? hashDeviceBinding(deviceId) : null;
+
+    const tokenRecord = await prisma.qrToken.findUnique({ where: { tokenHash } });
+    if (tokenRecord?.usedAt) {
+      return fail("Token already used", 409, { gymId: payload.gymId, tokenHash, userId: uid });
+    }
+    if (tokenRecord?.deviceBindingHash && tokenRecord.deviceBindingHash !== deviceBindingHash) {
+      return fail("Device mismatch", 403, { gymId: payload.gymId, tokenHash, userId: uid });
+    }
+    if (payload.deviceBinding && payload.deviceBinding !== deviceId) {
+      return fail("Device mismatch", 403, { gymId: payload.gymId, tokenHash, userId: uid });
+    }
+
+    const deviceHook = await validateDeviceBindingHook({
+      gymId: payload.gymId,
+      userId: uid,
+      type: payload.type,
+      deviceId: deviceId ?? null,
+      tokenHash,
+    });
+    if (!deviceHook.ok) {
+      return fail(deviceHook.reason ?? "Device validation failed", 403, {
+        gymId: payload.gymId,
+        tokenHash,
+        userId: uid,
+      });
+    }
+
+    if (typeof latitude === "number" && typeof longitude === "number") {
+      const gpsHook = await validateGpsHook({
+        gymId: payload.gymId,
+        userId: uid,
+        latitude,
+        longitude,
+        type: payload.type,
+      });
+      if (!gpsHook.ok) {
+        return fail(gpsHook.reason ?? "Location validation failed", 403, { gymId: payload.gymId, userId: uid });
+      }
+    }
+
+    const result = await prisma.$transaction(async (tx): Promise<VerifyResult> => {
+      if (!tokenRecord) {
+        await tx.qrToken.create({
+          data: {
+            tokenHash,
+            gymId: payload.gymId,
+            type: payload.type,
+            nonce: payload.nonce,
+            deviceBindingHash,
+            expiresAt: new Date(payload.exp),
+          },
+        });
+      }
+
+      const consume = await tx.qrToken.updateMany({
+        where: {
           tokenHash,
-          expiresAt: new Date(payload.exp),
+          usedAt: null,
+        },
+        data: {
           usedAt: new Date(),
+          ...(deviceBindingHash ? { deviceBindingHash } : {}),
         },
       });
-    }
 
-    if (payload.type === "ENTRY") {
-      const active = await tx.gymSession.findFirst({
-        where: { userId: uid, exitAt: null },
-      });
-      if (active) {
-        return { ok: false as const, error: "Active session exists" };
+      if (consume.count !== 1) {
+        return { ok: false, error: "Token already used", status: 409 };
       }
 
-      const created = await tx.gymSession.create({
-        data: {
-          id: sessionId ?? crypto.randomUUID(),
-          userId: uid,
-          gymId: payload.gymId,
-          entryAt: new Date(entryAt ?? now),
-          validForStreak: false,
-          verificationStatus: "VERIFIED",
-        },
-      });
-
-      return { ok: true as const, session: created };
-    }
-
-    if (payload.type === "EXIT") {
-      const active = await tx.gymSession.findFirst({
-        where: { userId: uid, exitAt: null },
-        orderBy: { entryAt: "desc" },
-      });
-      if (!active) {
-        return { ok: false as const, error: "No active session" };
-      }
-
-      const exitTime = new Date(now);
-      const durationMinutes = Math.max(1, Math.round((exitTime.getTime() - active.entryAt.getTime()) / 60000));
-      const validForStreak = durationMinutes >= MIN_VALID_SESSION_MINUTES;
-
-      const updated = await tx.gymSession.update({
-        where: { id: active.id },
-        data: {
-          exitAt: exitTime,
-          durationMinutes,
-          calories: active.calories ?? null,
-          validForStreak,
-          endedBy: "EXIT_QR",
-          verificationStatus: "VERIFIED",
-        },
-      });
-
-      return { ok: true as const, session: updated };
-    }
-
-    return { ok: true as const, session: null };
-  });
-
-  if (!result.ok) return jsonError(result.error ?? "Verification failed", 400);
-
-  return NextResponse.json({
-    ok: true,
-    session: result.session
-      ? {
-          id: result.session.id,
-          gymId: result.session.gymId,
-          entryAt: result.session.entryAt.toISOString(),
-          exitAt: result.session.exitAt ? result.session.exitAt.toISOString() : null,
-          durationMinutes: result.session.durationMinutes,
-          calories: result.session.calories,
-          validForStreak: result.session.validForStreak,
-          endedBy: result.session.endedBy,
-          verificationStatus: result.session.verificationStatus,
-          createdAt: result.session.createdAt.toISOString(),
-          updatedAt: result.session.updatedAt.toISOString(),
+      if (payload.type === "ENTRY") {
+        const active = await tx.gymSession.findFirst({
+          where: { userId: uid, exitAt: null },
+          orderBy: { entryAt: "desc" },
+        });
+        if (active && (!sessionId || active.id !== sessionId)) {
+          return { ok: false, error: "Active session exists", status: 409 };
         }
-      : null,
-  });
+
+        if (active) {
+          if (active.verificationStatus !== "VERIFIED") {
+            const updated = await tx.gymSession.update({
+              where: { id: active.id },
+              data: {
+                verificationStatus: "VERIFIED",
+                serverVersion: { increment: 1 },
+              },
+            });
+            return { ok: true, session: updated, action: "VERIFY_ENTRY" };
+          }
+          return { ok: true, session: active, action: "VERIFY_ENTRY" };
+        }
+
+        const created = await tx.gymSession.create({
+          data: {
+            id: sessionId ?? crypto.randomUUID(),
+            userId: uid,
+            gymId: payload.gymId,
+            entryAt: new Date(entryAt ?? Date.now()),
+            validForStreak: false,
+            verificationStatus: "VERIFIED",
+          },
+        });
+
+        return { ok: true, session: created, action: "VERIFY_ENTRY" };
+      }
+
+      if (payload.type === "EXIT") {
+        const active = sessionId
+          ? await tx.gymSession.findFirst({
+              where: { id: sessionId, userId: uid, exitAt: null },
+            })
+          : await tx.gymSession.findFirst({
+              where: { userId: uid, exitAt: null },
+              orderBy: { entryAt: "desc" },
+            });
+
+        if (!active) {
+          return { ok: false, error: "No active session", status: 404 };
+        }
+
+        const exitTime = new Date(verifiedAt ?? Date.now());
+        const durationMinutes = Math.max(
+          1,
+          Math.round((exitTime.getTime() - active.entryAt.getTime()) / 60000)
+        );
+        const validForStreak = durationMinutes >= MIN_VALID_SESSION_MINUTES;
+
+        const updated = await tx.gymSession.update({
+          where: { id: active.id },
+          data: {
+            exitAt: exitTime,
+            durationMinutes,
+            calories: active.calories ?? null,
+            validForStreak,
+            endedBy: "EXIT_QR",
+            verificationStatus: "VERIFIED",
+            serverVersion: { increment: 1 },
+          },
+        });
+
+        return { ok: true, session: updated, action: "VERIFY_EXIT" };
+      }
+
+      return { ok: true, session: null, action: "VERIFY_PAYMENT" };
+    });
+
+    if (!result.ok) {
+      return fail(result.error, result.status, { gymId: payload.gymId, qrType: payload.type, userId: uid });
+    }
+
+    await Promise.all([
+      prisma.qrAuditLog.create({
+        data: {
+          actorId: uid,
+          gymId: payload.gymId,
+          type: "QR",
+          action: result.action,
+        },
+      }),
+      writeAuditLog({
+        actorId: uid,
+        gymId: payload.gymId,
+        type: "QR",
+        action: result.action,
+        metadata: {
+          qrType: payload.type,
+          sessionId: result.session?.id ?? null,
+          offlineGrace: typeof verifiedAt === "number",
+          requestId,
+        },
+      }),
+    ]);
+
+    return NextResponse.json({
+      ok: true,
+      session: result.session
+        ? {
+            id: result.session.id,
+            gymId: result.session.gymId,
+            entryAt: result.session.entryAt.toISOString(),
+            exitAt: result.session.exitAt ? result.session.exitAt.toISOString() : null,
+            durationMinutes: result.session.durationMinutes,
+            calories: result.session.calories,
+            validForStreak: result.session.validForStreak,
+            endedBy: result.session.endedBy,
+            verificationStatus: result.session.verificationStatus,
+            serverVersion: result.session.serverVersion,
+            createdAt: result.session.createdAt.toISOString(),
+            updatedAt: result.session.updatedAt.toISOString(),
+          }
+        : null,
+    });
+  } catch (error) {
+    logObservabilityEvent({
+      event: "qr.verify.failure",
+      level: "error",
+      context: {
+        reason: "Verification failed",
+        reasonCode: "unexpected_error",
+        status: 500,
+        requestId,
+        clientIp,
+        error: error instanceof Error ? error.message : "Unknown error",
+      },
+    });
+    return jsonError("Verification failed", 500);
+  }
 }

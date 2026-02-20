@@ -16,7 +16,17 @@ const securityHeaders: Record<string, string> = {
   "Permissions-Policy": "geolocation=(self), camera=(), microphone=()",
 };
 
-const OWNER_ROLES = new Set(["OWNER", "ADMIN"]);
+const OWNER_ROLES = new Set(["OWNER", "ADMIN", "GYM_ADMIN", "SUPER_ADMIN"]);
+
+type AppRole = "SUPER_ADMIN" | "GYM_ADMIN" | "USER" | null;
+
+function normalizeRole(role?: string | null): AppRole {
+  if (!role) return null;
+  if (role === "SUPER_ADMIN" || role === "ADMIN") return "SUPER_ADMIN";
+  if (role === "GYM_ADMIN" || role === "OWNER") return "GYM_ADMIN";
+  if (role === "USER") return "USER";
+  return null;
+}
 
 function getClientIp(req: NextRequest) {
   const forwardedFor = req.headers.get("x-forwarded-for");
@@ -86,6 +96,30 @@ export default async function middleware(req: NextRequest) {
       if (rateLimitResponse) {
         return applySecurityHeaders(rateLimitResponse);
       }
+
+      const pathname = req.nextUrl.pathname;
+      if (pathname.startsWith("/api/admin") || pathname.startsWith("/api/owner")) {
+        const token = await getToken({ req });
+        if (!token) {
+          return applySecurityHeaders(
+            NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+          );
+        }
+
+        const role = normalizeRole((token as { role?: string }).role);
+        if (pathname.startsWith("/api/admin") && role !== "SUPER_ADMIN") {
+          return applySecurityHeaders(
+            NextResponse.json({ error: "Forbidden" }, { status: 403 })
+          );
+        }
+
+        if (pathname.startsWith("/api/owner") && role !== "SUPER_ADMIN" && role !== "GYM_ADMIN") {
+          return applySecurityHeaders(
+            NextResponse.json({ error: "Forbidden" }, { status: 403 })
+          );
+        }
+      }
+
       return applySecurityHeaders(NextResponse.next());
     }
 
@@ -99,15 +133,21 @@ export default async function middleware(req: NextRequest) {
         return applySecurityHeaders(NextResponse.redirect(loginUrl));
       }
 
-      const role = (token as { role?: string }).role;
-      const isOwner = !!role && OWNER_ROLES.has(role);
+      const rawRole = (token as { role?: string }).role;
+      const appRole = normalizeRole(rawRole);
+      const isOwner = !!rawRole && OWNER_ROLES.has(rawRole);
 
       if (pathname === "/dashboard" || pathname === "/dashboard/") {
-        const target = role === "ADMIN" ? "/dashboard/admin" : isOwner ? "/dashboard/owner" : "/dashboard/user";
+        const target =
+          appRole === "SUPER_ADMIN"
+            ? "/dashboard/admin"
+            : isOwner
+              ? "/dashboard/owner"
+              : "/dashboard/user";
         return applySecurityHeaders(NextResponse.redirect(new URL(target, req.url)));
       }
 
-      if (pathname.startsWith("/dashboard/admin") && role !== "ADMIN") {
+      if (pathname.startsWith("/dashboard/admin") && appRole !== "SUPER_ADMIN") {
         const target = isOwner ? "/dashboard/owner" : "/dashboard/user";
         return applySecurityHeaders(NextResponse.redirect(new URL(target, req.url)));
       }
@@ -116,7 +156,7 @@ export default async function middleware(req: NextRequest) {
         return applySecurityHeaders(NextResponse.redirect(new URL("/dashboard/user", req.url)));
       }
 
-      if (pathname.startsWith("/dashboard/user") && isOwner && role !== "ADMIN") {
+      if (pathname.startsWith("/dashboard/user") && isOwner && appRole !== "SUPER_ADMIN") {
         return applySecurityHeaders(NextResponse.redirect(new URL("/dashboard/owner", req.url)));
       }
 

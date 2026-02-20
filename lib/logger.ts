@@ -39,6 +39,31 @@ function logMessage(level: LogLevel, message: string, context?: LogContext) {
   console.log(`${LOG_LEVELS[level]} [${timestamp}]`, message, context);
 }
 
+export function logObservabilityEvent(params: {
+  event: string;
+  level?: "info" | "warn" | "error";
+  context?: Record<string, unknown>;
+}) {
+  const record = {
+    kind: "observability",
+    timestamp: getTimestamp(),
+    event: params.event,
+    level: params.level ?? "info",
+    ...(params.context ?? {}),
+  };
+
+  const serialized = JSON.stringify(record);
+  if (params.level === "error") {
+    console.error(serialized);
+    return;
+  }
+  if (params.level === "warn") {
+    console.warn(serialized);
+    return;
+  }
+  console.log(serialized);
+}
+
 export function logClientError(error: unknown, context?: LogContext) {
   logError("CLIENT_ERROR", error, context);
 }

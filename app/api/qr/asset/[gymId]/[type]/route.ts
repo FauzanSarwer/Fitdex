@@ -3,7 +3,7 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { jsonError } from "@/lib/api";
-import { requireGymAdmin, requireSuperAdmin } from "@/lib/permissions";
+import { ensureGymScope, requireGymAdmin } from "@/lib/permissions";
 import { QrTypeSchema } from "@/lib/qr/qr-types";
 import { ensureStaticQr, getLastQrGeneration } from "@/lib/qr/qr-service";
 import { generateQrPng, generateQrPrintPdf, generateQrSvg } from "@/lib/qr/qr-generator";
@@ -27,13 +27,15 @@ export async function GET(req: Request, { params }: { params: Promise<{ gymId: s
   const gym = await prisma.gym.findUnique({ where: { id: gymId } });
   if (!gym) return jsonError("Gym not found", 404);
 
-  const uid = (session!.user as { id: string }).id;
-  if (!requireSuperAdmin(session) && gym.ownerId !== uid) {
-    return jsonError("Forbidden", 403);
+  const scope = await ensureGymScope(session, gymId);
+  if (!scope.ok) {
+    if (scope.status === 404) return jsonError("Gym not found", 404);
+    if (scope.status === 403) return jsonError("Forbidden", 403);
+    return jsonError("Unauthorized", 401);
   }
 
   const url = `${process.env.NEXT_PUBLIC_APP_URL ?? "https://fitdex.app"}/qr/static/${gymId}/${parsedType.data}`;
-  await ensureStaticQr(gymId, parsedType.data, uid);
+  await ensureStaticQr(gymId, parsedType.data, scope.userId!);
 
   const searchParams = new URL(req.url).searchParams;
   const format = (searchParams.get("format") ?? "png").toLowerCase();
