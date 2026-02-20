@@ -10,7 +10,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import { Skeleton } from "@/components/ui/skeleton";
-import { MapPin, Loader2, Sparkles, ShieldCheck } from "lucide-react";
+import { MapPin, Loader2, Sparkles, ShieldCheck, Copy } from "lucide-react";
 import { fetchJson } from "@/lib/client-fetch";
 import { isPaymentsEnabled, openRazorpayCheckout } from "@/lib/razorpay-checkout";
 import { AMENITY_OPTIONS } from "@/lib/amenities";
@@ -32,6 +32,15 @@ type GymFormState = {
   hasAC: boolean;
   amenities: string[];
   ownerConsent: boolean;
+};
+
+type ResolvedCoordinates = {
+  address: string;
+  latitude: number;
+  longitude: number;
+  city: string | null;
+  state: string | null;
+  provider: string | null;
 };
 
 const emptyForm: GymFormState = {
@@ -75,6 +84,9 @@ export default function OwnerGymPage() {
   const [customEditAmenity, setCustomEditAmenity] = useState("");
   const [existingConsent, setExistingConsent] = useState(false);
   const [showAddForm, setShowAddForm] = useState(false);
+  const [resolvingAddress, setResolvingAddress] = useState<"add" | "edit" | null>(null);
+  const [addResolvedCoordinates, setAddResolvedCoordinates] = useState<ResolvedCoordinates | null>(null);
+  const [editResolvedCoordinates, setEditResolvedCoordinates] = useState<ResolvedCoordinates | null>(null);
   const paymentsEnabled = isPaymentsEnabled() || isAdmin;
 
   const primaryGym = gyms[0];
@@ -167,6 +179,7 @@ export default function OwnerGymPage() {
       amenities: Array.isArray(gym.amenities) ? gym.amenities : [],
       ownerConsent: !!gym.ownerConsentAt,
     });
+    setEditResolvedCoordinates(null);
   }, [gyms, selectedGymId]);
 
   const uploadImage = async (file: File, index: number, target: "add" | "edit") => {
@@ -250,6 +263,101 @@ export default function OwnerGymPage() {
     });
   };
 
+  const resolveCoordinates = async (target: "add" | "edit") => {
+    const address = (target === "add" ? form.address : editForm.address).trim();
+    if (!address) {
+      toast({
+        title: "Address required",
+        description: "Enter an address before resolving coordinates.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setResolvingAddress(target);
+    try {
+      const result = await fetchJson<{
+        ok?: boolean;
+        error?: string;
+        address?: string;
+        latitude?: number;
+        longitude?: number;
+        city?: string | null;
+        state?: string | null;
+        provider?: string | null;
+      }>("/api/owner/gym/geocode", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ address }),
+        retries: 1,
+      });
+
+      if (
+        !result.ok ||
+        !result.data?.ok ||
+        typeof result.data.latitude !== "number" ||
+        typeof result.data.longitude !== "number"
+      ) {
+        toast({
+          title: "Could not resolve coordinates",
+          description: result.error ?? result.data?.error ?? "Try a more specific address with city/state/pincode.",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      const resolved: ResolvedCoordinates = {
+        address: result.data.address ?? address,
+        latitude: result.data.latitude,
+        longitude: result.data.longitude,
+        city: result.data.city ?? null,
+        state: result.data.state ?? null,
+        provider: result.data.provider ?? null,
+      };
+
+      if (target === "add") {
+        setAddResolvedCoordinates(resolved);
+      } else {
+        setEditResolvedCoordinates(resolved);
+      }
+
+      toast({
+        title: "Coordinates resolved",
+        description: resolved.provider ? `Provider: ${resolved.provider}` : "Address resolved successfully.",
+      });
+    } catch {
+      toast({
+        title: "Could not resolve coordinates",
+        description: "Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setResolvingAddress(null);
+    }
+  };
+
+  const copyCoordinates = async (coords: ResolvedCoordinates) => {
+    try {
+      await navigator.clipboard.writeText(`${coords.latitude}, ${coords.longitude}`);
+      toast({ title: "Copied", description: "Coordinates copied to clipboard." });
+    } catch {
+      toast({ title: "Copy failed", description: "Could not copy coordinates.", variant: "destructive" });
+    }
+  };
+
+  const normalizedAddress = (value: string) => value.trim().toLowerCase();
+
+  const getResolvedCoordinates = (target: "add" | "edit", address: string): ResolvedCoordinates | null => {
+    const current = normalizedAddress(address);
+    if (!current) return null;
+    const resolved = target === "add" ? addResolvedCoordinates : editResolvedCoordinates;
+    if (!resolved) return null;
+    return normalizedAddress(resolved.address) === current ? resolved : null;
+  };
+
+  const activeAddCoordinates = getResolvedCoordinates("add", form.address);
+  const activeEditCoordinates = getResolvedCoordinates("edit", editForm.address);
+
   async function handleCreate(e: React.FormEvent) {
     e.preventDefault();
     setSaving(true);
@@ -258,6 +366,7 @@ export default function OwnerGymPage() {
       setSaving(false);
       return;
     }
+    const resolvedCoordinates = getResolvedCoordinates("add", form.address);
     try {
       const result = await fetchJson<{ gym?: any; error?: string }>("/api/owner/gym", {
         method: "POST",
@@ -279,6 +388,8 @@ export default function OwnerGymPage() {
           hasAC: form.hasAC,
           amenities: form.amenities,
           ownerConsent: form.ownerConsent,
+          latitude: resolvedCoordinates?.latitude,
+          longitude: resolvedCoordinates?.longitude,
         }),
         retries: 1,
       });
@@ -293,6 +404,7 @@ export default function OwnerGymPage() {
         setGyms((prev) => [createdGym, ...prev]);
       }
       setForm(emptyForm);
+      setAddResolvedCoordinates(null);
       setShowAddForm(false);
     } catch {
       toast({ title: "Error", variant: "destructive" });
@@ -309,6 +421,7 @@ export default function OwnerGymPage() {
       setUpdating(false);
       return;
     }
+    const resolvedCoordinates = getResolvedCoordinates("edit", editForm.address);
     try {
       const result = await fetchJson<{ gym?: any; error?: string }>("/api/owner/gym", {
         method: "PATCH",
@@ -330,6 +443,8 @@ export default function OwnerGymPage() {
           yearlyPrice: Math.round(parseFloat(editForm.yearlyPrice) * 100) || 299000,
           hasAC: editForm.hasAC,
           amenities: editForm.amenities,
+          latitude: resolvedCoordinates?.latitude,
+          longitude: resolvedCoordinates?.longitude,
         }),
         retries: 1,
       });
@@ -342,6 +457,7 @@ export default function OwnerGymPage() {
       toast({ title: "Gym updated", description: updatedGym?.name ?? "Changes saved" });
       if (updatedGym) {
         setGyms((prev) => prev.map((g) => (g.id === updatedGym.id ? updatedGym : g)));
+        setEditResolvedCoordinates(null);
       }
     } catch {
       toast({ title: "Error", variant: "destructive" });
@@ -460,10 +576,50 @@ export default function OwnerGymPage() {
                   <Label>Address</Label>
                   <Input
                     value={editForm.address}
-                    onChange={(e) => setEditForm((p) => ({ ...p, address: e.target.value }))}
+                    onChange={(e) => {
+                      const value = e.target.value;
+                      setEditForm((p) => ({ ...p, address: value }));
+                      if (editResolvedCoordinates && normalizedAddress(editResolvedCoordinates.address) !== normalizedAddress(value)) {
+                        setEditResolvedCoordinates(null);
+                      }
+                    }}
                     placeholder="Address"
                     required
                   />
+                  <div className="flex flex-wrap items-center gap-2">
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="outline"
+                      disabled={resolvingAddress === "edit" || !editForm.address.trim()}
+                      onClick={() => void resolveCoordinates("edit")}
+                    >
+                      {resolvingAddress === "edit" ? <Loader2 className="h-4 w-4 animate-spin" /> : "Resolve coordinates"}
+                    </Button>
+                    {activeEditCoordinates && (
+                      <div className="flex items-center gap-2 rounded-md border border-white/10 px-2 py-1 text-xs text-muted-foreground">
+                        <span>
+                          {activeEditCoordinates.latitude.toFixed(6)},
+                          {" "}
+                          {activeEditCoordinates.longitude.toFixed(6)}
+                        </span>
+                        {activeEditCoordinates.provider && (
+                          <span className="text-[11px] uppercase tracking-wide">
+                            {activeEditCoordinates.provider}
+                          </span>
+                        )}
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant="ghost"
+                          className="h-7 px-2"
+                          onClick={() => void copyCoordinates(activeEditCoordinates)}
+                        >
+                          <Copy className="h-3.5 w-3.5" />
+                        </Button>
+                      </div>
+                    )}
+                  </div>
                 </div>
                 <div className="space-y-2">
                   <Label>Amenities</Label>
@@ -730,10 +886,50 @@ export default function OwnerGymPage() {
                 <Label>Address</Label>
                 <Input
                   value={form.address}
-                  onChange={(e) => setForm((p) => ({ ...p, address: e.target.value }))}
+                  onChange={(e) => {
+                    const value = e.target.value;
+                    setForm((p) => ({ ...p, address: value }));
+                    if (addResolvedCoordinates && normalizedAddress(addResolvedCoordinates.address) !== normalizedAddress(value)) {
+                      setAddResolvedCoordinates(null);
+                    }
+                  }}
                   placeholder="Address"
                   required
                 />
+                <div className="flex flex-wrap items-center gap-2">
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="outline"
+                    disabled={resolvingAddress === "add" || !form.address.trim()}
+                    onClick={() => void resolveCoordinates("add")}
+                  >
+                    {resolvingAddress === "add" ? <Loader2 className="h-4 w-4 animate-spin" /> : "Resolve coordinates"}
+                  </Button>
+                  {activeAddCoordinates && (
+                    <div className="flex items-center gap-2 rounded-md border border-white/10 px-2 py-1 text-xs text-muted-foreground">
+                      <span>
+                        {activeAddCoordinates.latitude.toFixed(6)},
+                        {" "}
+                        {activeAddCoordinates.longitude.toFixed(6)}
+                      </span>
+                      {activeAddCoordinates.provider && (
+                        <span className="text-[11px] uppercase tracking-wide">
+                          {activeAddCoordinates.provider}
+                        </span>
+                      )}
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="ghost"
+                        className="h-7 px-2"
+                        onClick={() => void copyCoordinates(activeAddCoordinates)}
+                      >
+                        <Copy className="h-3.5 w-3.5" />
+                      </Button>
+                    </div>
+                  )}
+                </div>
               </div>
                 <div className="space-y-2">
                   <Label>Amenities</Label>

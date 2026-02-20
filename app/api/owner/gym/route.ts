@@ -3,11 +3,24 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import type { Prisma } from "@prisma/client";
-import { forwardGeocode, reverseGeocode } from "@/lib/location";
+import { resolveAddressToCoordinates, reverseGeocode } from "@/lib/location";
 import { requireOwner } from "@/lib/permissions";
 import { jsonError, safeJson } from "@/lib/api";
-import { logServerError } from "@/lib/logger";
+import { logObservabilityEvent, logServerError } from "@/lib/logger";
 import { normalizeAmenities } from "@/lib/gym-utils";
+
+function inferCityStateFromAddress(rawAddress: string): { city: string | null; state: string | null } {
+  const parts = rawAddress
+    .split(",")
+    .map((part) => part.trim().replace(/\b\d{4,6}\b/g, "").trim())
+    .filter(Boolean);
+  if (parts.length === 0) return { city: null, state: null };
+  if (parts.length === 1) return { city: parts[0], state: null };
+  return {
+    city: parts[parts.length - 2] ?? null,
+    state: parts[parts.length - 1] ?? null,
+  };
+}
 
 export async function GET(req: Request) {
   const session = await getServerSession(authOptions);
@@ -145,18 +158,35 @@ export async function POST(req: Request) {
     let lng = longitude;
     let city: string | null = null;
     let state: string | null = null;
+    let geocodeProvider: string | null = null;
+
     if (lat == null || lng == null) {
-      const geo = await forwardGeocode(address.trim());
-      if (!geo) {
-        return jsonError("Unable to resolve location from address", 400);
+      const resolved = await resolveAddressToCoordinates(address.trim());
+      if (resolved) {
+        lat = resolved.latitude;
+        lng = resolved.longitude;
+        geocodeProvider = resolved.provider;
+      } else {
+        logObservabilityEvent({
+          event: "owner.gym.geocode.unresolved",
+          level: "warn",
+          context: {
+            userId: uid,
+            address: address.trim().slice(0, 160),
+            reason: "all_providers_failed",
+          },
+        });
       }
-      lat = geo.latitude;
-      lng = geo.longitude;
     }
     if (lat != null && lng != null) {
       const location = await reverseGeocode(Number(lat), Number(lng));
       city = location?.city ?? null;
       state = location?.state ?? null;
+    }
+    if (!city || !state) {
+      const inferred = inferCityStateFromAddress(address.trim());
+      city = city ?? inferred.city;
+      state = state ?? inferred.state;
     }
     const gym = await prisma.gym.create({
       data: {
@@ -190,7 +220,15 @@ export async function POST(req: Request) {
         youtubeUrl: youtubeUrl?.trim() || null,
       },
     });
-    return NextResponse.json({ gym });
+    return NextResponse.json({
+      gym,
+      geocoding: {
+        resolved: lat != null && lng != null,
+        latitude: lat != null ? Number(lat) : null,
+        longitude: lng != null ? Number(lng) : null,
+        provider: geocodeProvider,
+      },
+    });
   } catch (error) {
     logServerError(error as Error, { route: "/api/owner/gym", userId: uid });
     return jsonError("Failed to create gym", 500);
@@ -251,7 +289,7 @@ export async function PATCH(req: Request) {
     if (data.name != null) update.name = data.name.trim();
     if (data.address != null) {
       update.address = data.address.trim();
-      const geo = await forwardGeocode(data.address.trim());
+      const geo = await resolveAddressToCoordinates(data.address.trim());
       if (geo) {
         update.latitude = geo.latitude;
         update.longitude = geo.longitude;

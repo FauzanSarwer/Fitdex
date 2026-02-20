@@ -54,7 +54,7 @@ export default async function DashboardLayout({
           <div className="absolute inset-0 bg-[radial-gradient(circle_at_top,rgba(59,130,246,0.12),transparent_55%)] dark:bg-[radial-gradient(circle_at_top,rgba(255,255,255,0.08),transparent_55%)]" />
         </div>
         <DashboardNav role={role ?? "USER"} isOwner={isOwner} showVerification={showVerification} />
-        <main className="pl-0 md:pl-56 pt-16 flex-1">{children}</main>
+        <main className="pl-0 md:pl-56 flex-1">{children}</main>
         <Footer className="md:pl-56" />
       </div>
     </LocationGate>

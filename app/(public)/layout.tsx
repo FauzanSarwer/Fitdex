@@ -21,7 +21,7 @@ export default function PublicLayout({
           <div className="absolute inset-0 bg-[radial-gradient(circle_at_top,rgba(59,130,246,0.12),transparent_60%)] dark:bg-[radial-gradient(circle_at_top,rgba(255,255,255,0.06),transparent_60%)]" />
         </div>
         <Header />
-        <main className="pt-16 flex-1">
+        <main className="pt-[var(--fitdex-header-offset,64px)] flex-1">
           <Suspense
             fallback={
               <div className="container mx-auto px-4 py-10">

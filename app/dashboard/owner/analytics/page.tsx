@@ -177,6 +177,26 @@ export default function OwnerAnalyticsPage() {
     };
   }, [selectedGymId]);
 
+  const chartData = useMemo(
+    () =>
+      data?.revenueByMonth
+        ? Object.entries(data.revenueByMonth)
+            .map(([month, value]) => ({ month, revenue: value / 100 }))
+            .sort((a, b) => a.month.localeCompare(b.month))
+        : [],
+    [data?.revenueByMonth]
+  );
+
+  const membersData = useMemo(
+    () =>
+      data?.newMembersByMonth
+        ? Object.entries(data.newMembersByMonth)
+            .map(([month, value]) => ({ month, members: value }))
+            .sort((a, b) => a.month.localeCompare(b.month))
+        : [],
+    [data?.newMembersByMonth]
+  );
+
   if (loading) {
     return (
       <div className="p-6">
@@ -207,26 +227,6 @@ export default function OwnerAnalyticsPage() {
       </div>
     );
   }
-
-  const chartData = useMemo(
-    () =>
-      data?.revenueByMonth
-        ? Object.entries(data.revenueByMonth)
-            .map(([month, value]) => ({ month, revenue: value / 100 }))
-            .sort((a, b) => a.month.localeCompare(b.month))
-        : [],
-    [data?.revenueByMonth]
-  );
-
-  const membersData = useMemo(
-    () =>
-      data?.newMembersByMonth
-        ? Object.entries(data.newMembersByMonth)
-            .map(([month, value]) => ({ month, members: value }))
-            .sort((a, b) => a.month.localeCompare(b.month))
-        : [],
-    [data?.newMembersByMonth]
-  );
   const emptyCopy = "No data yet — go live to start tracking analytics.";
   const growthSignal = membersData.at(-1)?.members ?? 0;
 

@@ -48,6 +48,7 @@ export function Header() {
   const searchParams = useSearchParams();
   const { data: session, status } = useSession();
   const headerRef = useRef<HTMLElement | null>(null);
+  const bannerSlotRef = useRef<HTMLDivElement | null>(null);
   const barRef = useRef<HTMLDivElement | null>(null);
   const glowRef = useRef<HTMLDivElement | null>(null);
   const blurLayerRef = useRef<HTMLDivElement | null>(null);
@@ -244,6 +245,35 @@ export function Header() {
     };
   }, [scrollVelocity]);
 
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const root = document.documentElement;
+    const baseOffset = 64;
+    const applyOffset = () => {
+      const bannerHeight = bannerSlotRef.current?.offsetHeight ?? 0;
+      root.style.setProperty("--fitdex-header-offset", `${baseOffset + bannerHeight}px`);
+    };
+
+    applyOffset();
+    if (typeof ResizeObserver === "undefined" || !bannerSlotRef.current) {
+      return () => {
+        root.style.setProperty("--fitdex-header-offset", `${baseOffset}px`);
+      };
+    }
+
+    const observer = new ResizeObserver(applyOffset);
+    observer.observe(bannerSlotRef.current);
+    window.addEventListener("orientationchange", applyOffset);
+    window.addEventListener("resize", applyOffset);
+
+    return () => {
+      observer.disconnect();
+      window.removeEventListener("orientationchange", applyOffset);
+      window.removeEventListener("resize", applyOffset);
+      root.style.setProperty("--fitdex-header-offset", `${baseOffset}px`);
+    };
+  }, []);
+
   const handleCitySelect = async (city: string) => {
     persistCity(city);
     await saveCity({ city });
@@ -264,7 +294,9 @@ export function Header() {
           backgroundSize: "200% 100%",
         }}
       />
-      <EmailVerificationBanner />
+      <div ref={bannerSlotRef}>
+        <EmailVerificationBanner />
+      </div>
       <div ref={barRef} className="container relative mx-auto flex h-16 items-center px-4">
         <Link href="/" className="group flex items-center gap-2">
           <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-card/80 shadow-glow-sm transition-all duration-300 group-hover:bg-card group-hover:shadow-[0_10px_22px_rgba(0,0,0,0.24)]">

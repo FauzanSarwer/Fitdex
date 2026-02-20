@@ -17,7 +17,6 @@ function LoginForm() {
   const emailParam = searchParams.get("email") ?? "";
   const errorParam = searchParams.get("error") ?? "";
   const [providers, setProviders] = useState<Record<string, { id: string }> | null>(null);
-  const [name, setName] = useState("");
   const [identifier, setIdentifier] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
@@ -75,12 +74,6 @@ function LoginForm() {
     e.preventDefault();
     setError("");
     const trimmedIdentifier = identifier.trim();
-    const isEmailIdentifier = trimmedIdentifier.includes("@");
-    const trimmedName = name.trim();
-    if (isEmailIdentifier && !trimmedName) {
-      setError("Name is required");
-      return;
-    }
     if (!trimmedIdentifier) {
       setError("Username or email is required");
       return;
@@ -88,7 +81,6 @@ function LoginForm() {
     setLoading(true);
     try {
       const res = await signIn("credentials", {
-        name: trimmedName || "Admin",
         email: trimmedIdentifier,
         password,
         redirect: false,
@@ -117,8 +109,6 @@ function LoginForm() {
     }
   }
 
-  const isEmailIdentifier = identifier.trim().includes("@");
-
   return (
     <div className="w-full max-w-md">
       <Card className="glass-card">
@@ -128,18 +118,6 @@ function LoginForm() {
         </CardHeader>
         <CardContent className="space-y-4">
           <form onSubmit={handleSubmit} className="space-y-4">
-            <div className="space-y-2">
-              <Label htmlFor="name">Name</Label>
-              <Input
-                id="name"
-                type="text"
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-                required={isEmailIdentifier}
-                minLength={2}
-                autoComplete="name"
-              />
-            </div>
             <div className="space-y-2">
               <Label htmlFor="email">Username or email</Label>
               <Input

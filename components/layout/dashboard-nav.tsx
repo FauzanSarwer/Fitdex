@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect, useRef } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import Image from "next/image";
@@ -65,6 +66,7 @@ export function DashboardNav({
   showVerification?: boolean;
 }) {
   const pathname = usePathname();
+  const headerRef = useRef<HTMLElement | null>(null);
   const navRole = role === "ADMIN"
     ? pathname?.startsWith("/dashboard/owner")
       ? "OWNER"
@@ -93,9 +95,37 @@ export function DashboardNav({
         ? { href: "/dashboard/owner", label: "Owner panel", icon: Compass }
         : { href: "/dashboard/user", label: "Dashboard", icon: LayoutDashboard };
 
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const root = document.documentElement;
+    const applyOffset = () => {
+      const height = headerRef.current?.offsetHeight ?? 64;
+      root.style.setProperty("--fitdex-dashboard-nav-offset", `${height}px`);
+    };
+
+    applyOffset();
+    if (typeof ResizeObserver === "undefined" || !headerRef.current) {
+      return () => {
+        root.style.removeProperty("--fitdex-dashboard-nav-offset");
+      };
+    }
+
+    const observer = new ResizeObserver(applyOffset);
+    observer.observe(headerRef.current);
+    window.addEventListener("orientationchange", applyOffset);
+    window.addEventListener("resize", applyOffset);
+
+    return () => {
+      observer.disconnect();
+      window.removeEventListener("orientationchange", applyOffset);
+      window.removeEventListener("resize", applyOffset);
+      root.style.removeProperty("--fitdex-dashboard-nav-offset");
+    };
+  }, [pathname, showVerification]);
+
   return (
     <>
-      <header className="fixed top-0 left-0 right-0 z-40 glass border-b border-border/60 md:pl-56">
+      <header ref={headerRef} className="sticky top-0 z-40 glass border-b border-border/60 md:pl-56">
         <EmailVerificationBanner />
         <div className="relative flex h-16 items-center gap-4 px-4">
           <Link href="/" className="flex items-center gap-2">
@@ -165,7 +195,7 @@ export function DashboardNav({
           </div>
         </div>
       </header>
-      <aside className="fixed left-0 top-0 z-50 hidden h-full w-56 flex-col border-r border-border/60 bg-background/95 backdrop-blur md:flex">
+      <aside className="fixed left-0 top-[var(--fitdex-dashboard-nav-offset,64px)] z-50 hidden h-[calc(100dvh-var(--fitdex-dashboard-nav-offset,64px))] w-56 flex-col border-r border-border/60 bg-background/95 backdrop-blur md:flex">
         <div className="flex h-16 items-center border-b border-border/60 px-4">
           <Link href={navRole === "ADMIN" ? "/dashboard/admin" : navRole === "OWNER" ? "/dashboard/owner" : "/dashboard/user"} className="flex items-center gap-2">
             <User className="h-5 w-5 text-primary" />
