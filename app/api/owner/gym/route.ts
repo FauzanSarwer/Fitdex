@@ -2,12 +2,13 @@ import { NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
-import type { Prisma } from "@prisma/client";
+import { Prisma } from "@prisma/client";
 import { resolveAddressToCoordinates, reverseGeocode } from "@/lib/location";
 import { requireOwner } from "@/lib/permissions";
 import { jsonError, safeJson } from "@/lib/api";
 import { logObservabilityEvent, logServerError } from "@/lib/logger";
 import { normalizeAmenities } from "@/lib/gym-utils";
+import { randomUUID } from "crypto";
 
 function inferCityStateFromAddress(rawAddress: string): { city: string | null; state: string | null } {
   const parts = rawAddress
@@ -20,6 +21,83 @@ function inferCityStateFromAddress(rawAddress: string): { city: string | null; s
     city: parts[parts.length - 2] ?? null,
     state: parts[parts.length - 1] ?? null,
   };
+}
+
+function getErrorMessage(error: unknown): string {
+  if (error instanceof Error) return error.message;
+  return String(error ?? "");
+}
+
+function isUnknownCoordinateArgError(error: unknown): boolean {
+  const message = getErrorMessage(error).toLowerCase();
+  return (
+    message.includes("unknown argument `latitude`") ||
+    message.includes("unknown argument `longitude`") ||
+    message.includes("unknown arg `latitude`") ||
+    message.includes("unknown arg `longitude`")
+  );
+}
+
+function isCoordinateConstraintError(error: unknown): boolean {
+  const message = getErrorMessage(error).toLowerCase();
+  const mentionsCoordinates = message.includes("latitude") || message.includes("longitude");
+  const isRequiredConstraint =
+    message.includes("not-null") ||
+    message.includes("null value") ||
+    message.includes("cannot be null") ||
+    message.includes("required");
+  return mentionsCoordinates && isRequiredConstraint;
+}
+
+type LegacyGymInsertArgs = {
+  ownerId: string;
+  name: string;
+  address: string;
+  latitude: number;
+  longitude: number;
+  monthlyPrice: number;
+  quarterlyPrice: number | null;
+  yearlyPrice: number;
+  partnerDiscountPercent: number;
+  coverImageUrl: string | null;
+};
+
+async function createGymWithLegacyCoordinates(args: LegacyGymInsertArgs) {
+  const id = randomUUID();
+  const now = new Date();
+  await prisma.$executeRaw`
+    INSERT INTO "Gym" (
+      "id",
+      "name",
+      "address",
+      "latitude",
+      "longitude",
+      "ownerId",
+      "monthlyPrice",
+      "quarterlyPrice",
+      "yearlyPrice",
+      "partnerDiscountPercent",
+      "coverImageUrl",
+      "createdAt",
+      "updatedAt"
+    )
+    VALUES (
+      ${id},
+      ${args.name},
+      ${args.address},
+      ${args.latitude},
+      ${args.longitude},
+      ${args.ownerId},
+      ${args.monthlyPrice},
+      ${args.quarterlyPrice},
+      ${args.yearlyPrice},
+      ${args.partnerDiscountPercent},
+      ${args.coverImageUrl},
+      ${now},
+      ${now}
+    )
+  `;
+  return prisma.gym.findUnique({ where: { id } });
 }
 
 export async function GET(req: Request) {
@@ -188,38 +266,94 @@ export async function POST(req: Request) {
       city = city ?? inferred.city;
       state = state ?? inferred.state;
     }
-    const gym = await prisma.gym.create({
-      data: {
-        ownerId: uid,
-        name: name.trim(),
-        address: address.trim(),
-        city,
-        state,
-        hasAC: !!hasAC,
-        amenities: normalizeAmenities(amenities),
-        ownerConsentAt: ownerConsent ? new Date() : null,
-        openTime: openTime ?? null,
-        closeTime: closeTime ?? null,
-        openDays: openDays ?? null,
-        dayPassPrice: dayPassPrice != null ? Number(dayPassPrice) : null,
-        monthlyPrice: Number(monthlyPrice),
-        quarterlyPrice: quarterlyPrice != null ? Number(quarterlyPrice) : null,
-        yearlyPrice: Number(yearlyPrice),
-        partnerDiscountPercent: Number(partnerDiscountPercent ?? 10),
-        invoiceTypeDefault: invoiceTypeDefault ?? null,
-        quarterlyDiscountType: quarterlyDiscountType ?? "PERCENT",
-        quarterlyDiscountValue: Number(quarterlyDiscountValue ?? 10),
-        yearlyDiscountType: yearlyDiscountType ?? "PERCENT",
-        yearlyDiscountValue: Number(yearlyDiscountValue ?? 15),
-        welcomeDiscountType: welcomeDiscountType ?? "PERCENT",
-        welcomeDiscountValue: Number(welcomeDiscountValue ?? 10),
-        coverImageUrl: imageList[0] ?? null,
-        imageUrls: imageList,
-        instagramUrl: instagramUrl?.trim() || null,
-        facebookUrl: facebookUrl?.trim() || null,
-        youtubeUrl: youtubeUrl?.trim() || null,
-      },
-    });
+    const baseCreateData: Prisma.GymCreateInput = {
+      owner: { connect: { id: uid } },
+      name: name.trim(),
+      address: address.trim(),
+      city,
+      state,
+      hasAC: !!hasAC,
+      amenities: normalizeAmenities(amenities),
+      ownerConsentAt: ownerConsent ? new Date() : null,
+      openTime: openTime ?? null,
+      closeTime: closeTime ?? null,
+      openDays: openDays ?? null,
+      dayPassPrice: dayPassPrice != null ? Number(dayPassPrice) : null,
+      monthlyPrice: Number(monthlyPrice),
+      quarterlyPrice: quarterlyPrice != null ? Number(quarterlyPrice) : null,
+      yearlyPrice: Number(yearlyPrice),
+      partnerDiscountPercent: Number(partnerDiscountPercent ?? 10),
+      invoiceTypeDefault: invoiceTypeDefault ?? null,
+      quarterlyDiscountType: quarterlyDiscountType ?? "PERCENT",
+      quarterlyDiscountValue: Number(quarterlyDiscountValue ?? 10),
+      yearlyDiscountType: yearlyDiscountType ?? "PERCENT",
+      yearlyDiscountValue: Number(yearlyDiscountValue ?? 15),
+      welcomeDiscountType: welcomeDiscountType ?? "PERCENT",
+      welcomeDiscountValue: Number(welcomeDiscountValue ?? 10),
+      coverImageUrl: imageList[0] ?? null,
+      imageUrls: imageList,
+      instagramUrl: instagramUrl?.trim() || null,
+      facebookUrl: facebookUrl?.trim() || null,
+      youtubeUrl: youtubeUrl?.trim() || null,
+    };
+
+    let gym = null as Awaited<ReturnType<typeof prisma.gym.create>> | null;
+    let coordinateArgsUnsupported = false;
+
+    if (lat != null && lng != null) {
+      try {
+        gym = await prisma.gym.create({
+          data: {
+            ...baseCreateData,
+            latitude: Number(lat),
+            longitude: Number(lng),
+          } as Prisma.GymCreateInput,
+        });
+      } catch (error) {
+        if (isUnknownCoordinateArgError(error)) {
+          coordinateArgsUnsupported = true;
+        } else {
+          throw error;
+        }
+      }
+    }
+
+    if (!gym) {
+      try {
+        gym = await prisma.gym.create({ data: baseCreateData });
+      } catch (error) {
+        if (isCoordinateConstraintError(error)) {
+          if (lat == null || lng == null) {
+            return jsonError(
+              "Could not resolve gym coordinates from address. Please use 'Resolve coordinates' and retry.",
+              422
+            );
+          }
+          if (coordinateArgsUnsupported) {
+            const legacyGym = await createGymWithLegacyCoordinates({
+              ownerId: uid,
+              name: name.trim(),
+              address: address.trim(),
+              latitude: Number(lat),
+              longitude: Number(lng),
+              monthlyPrice: Number(monthlyPrice),
+              quarterlyPrice: quarterlyPrice != null ? Number(quarterlyPrice) : null,
+              yearlyPrice: Number(yearlyPrice),
+              partnerDiscountPercent: Number(partnerDiscountPercent ?? 10),
+              coverImageUrl: imageList[0] ?? null,
+            });
+            if (legacyGym) {
+              gym = legacyGym;
+            }
+          }
+        }
+
+        if (!gym) {
+          throw error;
+        }
+      }
+    }
+
     return NextResponse.json({
       gym,
       geocoding: {
@@ -230,6 +364,12 @@ export async function POST(req: Request) {
       },
     });
   } catch (error) {
+    if (error instanceof Prisma.PrismaClientInitializationError) {
+      return jsonError("Database unavailable. Please try again in a moment.", 503);
+    }
+    if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2022") {
+      return jsonError("Database schema mismatch detected. Please apply latest migrations.", 500);
+    }
     logServerError(error as Error, { route: "/api/owner/gym", userId: uid });
     return jsonError("Failed to create gym", 500);
   }
